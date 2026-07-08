@@ -655,11 +655,12 @@ function WelcomePageContent() {
         return;
       }
 
-      // No local keystore (fresh device): legacy recovery path.
-      const { recoverFullWallet } = await import(
-        '@/wallet/key-management/recoverByPasskey'
-      );
-      const recovered = await recoverFullWallet();
+      // No local keystore (fresh device): one passkey ceremony, scheme
+      // auto-detected. PRF wallets re-derive the key directly from the
+      // (synced) authenticator; legacy wallets fall back to the old scheme so
+      // the user can open the original wallet and migrate.
+      const { recoverWallet } = await import('@/wallet/key-management');
+      const recovered = await recoverWallet();
       const recoveredWallet = loadWallet();
 
       if (!recoveredWallet) {
@@ -671,7 +672,12 @@ function WelcomePageContent() {
         credentialId: recovered.credentialId,
       });
       setWalletExists(true);
-      router.push('/dashboard');
+      if (recovered.keyScheme === 'legacy-sha256') {
+        // Insecure legacy key recovered — push the user straight to migration.
+        router.push('/upgrade');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       showErrorToast(
         err instanceof Error ? err.message : 'Failed to enter INJ Pass.'

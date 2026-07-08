@@ -93,17 +93,20 @@ export async function recoverWalletAddress(): Promise<RecoverByPasskeyResult> {
 }
 
 /**
- * Recover full wallet (address + encrypted private key) using Passkey
- * 
+ * @deprecated Use `recoverWallet` from `./prf` instead. That unified entry point
+ * does a single passkey ceremony and auto-detects the scheme (PRF re-derivation
+ * for secure wallets, sha256 fallback only for legacy migration). This function
+ * ONLY handles the insecure legacy `sha256(credentialId)` scheme and would
+ * silently produce a wrong key/address for a PRF wallet; kept for back-compat.
+ *
+ * Recover full wallet (address + encrypted private key) using Passkey.
+ *
  * This function:
  * 1. Authenticates with passkey
  * 2. Gets wallet address from backend
- * 3. Re-derives the private key using the same method as creation
+ * 3. Re-derives the private key using the legacy sha256(credentialId) method
  * 4. Re-creates the encrypted keystore
  * 5. Saves to localStorage
- * 
- * Note: This assumes the private key was derived from credentialId
- * using the same deterministic method as in createByPasskey
  */
 export async function recoverFullWallet(): Promise<
   RecoverByPasskeyResult & { address: string; privateKey: Uint8Array }

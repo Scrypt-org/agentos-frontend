@@ -1,5 +1,33 @@
 import { API_BASE_URL } from './api-base';
 
+/**
+ * fetch with a hard timeout. On flaky networks or when the backend is
+ * unreachable, a plain fetch can hang indefinitely — and because these calls run
+ * inside the auth popup during connect/sign, a hang leaves the dApp spinning
+ * forever with no feedback. A manual AbortController is used (not
+ * AbortSignal.timeout) for compatibility with older browsers that lack it.
+ */
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit = {},
+  timeoutMs = 10000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(
+        'Could not reach the INJ Pass server (request timed out). Please check your network and try again.',
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export interface PasskeyChallenge {
   challenge: string;
   expiresAt: number;
@@ -37,7 +65,7 @@ export async function requestChallenge(
   action: 'register' | 'authenticate',
   userId?: string
 ): Promise<PasskeyChallenge> {
-  const response = await fetch(`${API_BASE_URL}/passkey/challenge`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/passkey/challenge`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, userId }),
@@ -81,7 +109,7 @@ export async function verifyPasskey(
     requestBody.inviteCode = inviteCode;
   }
 
-  const response = await fetch(`${API_BASE_URL}/passkey/verify`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/passkey/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(requestBody),
@@ -187,7 +215,7 @@ export async function verifyToken(token?: string): Promise<TokenVerifyResponse> 
 
   try {
     console.log('[verifyToken] Calling API:', `${API_BASE_URL}/passkey/verify-token`);
-    const response = await fetch(`${API_BASE_URL}/passkey/verify-token`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/passkey/verify-token`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -220,7 +248,7 @@ export async function refreshToken(token?: string): Promise<string | null> {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/passkey/refresh-token`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/passkey/refresh-token`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${authToken}`,

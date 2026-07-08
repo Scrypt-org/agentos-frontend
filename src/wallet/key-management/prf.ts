@@ -25,6 +25,7 @@ import {
   setAuthToken,
 } from '@/services/passkey';
 import { saveWallet } from '../keystore/storage';
+import { encryptKey } from '../keystore/encryptKey';
 
 /**
  * Fixed application salt fed to the authenticator's PRF. A stable salt yields a
@@ -269,4 +270,127 @@ export async function unlockPrfWallet(credentialId: string): Promise<Uint8Array>
   }
   const { privateKey } = hkdfToSecp256k1(prfOutput);
   return privateKey;
+}
+
+export interface RecoverWalletResult {
+  address: string;
+  privateKey: Uint8Array;
+  credentialId: string;
+  walletName?: string;
+  keyScheme: 'prf-v1' | 'legacy-sha256';
+}
+
+/**
+ * Fresh-device recovery (no local keystore). One passkey ceremony, then the
+ * wallet's scheme is auto-detected by matching the derived address against the
+ * address the backend has on record for this credential:
+ *
+ *  1. **PRF (secure)** — re-derive the key directly from the authenticator's PRF
+ *     output. Requires the passkey to be present on this device (e.g. synced via
+ *     iCloud Keychain / Google Password Manager). This is the trust root; no
+ *     server-side key material is involved.
+ *  2. **Legacy (insecure, migration only)** — if there is no PRF output or it
+ *     doesn't match, fall back to the old `sha256(credentialId)` key. This is
+ *     recovered ONLY so the user can open the original wallet and move funds to a
+ *     new PRF wallet; the caller should immediately prompt migration.
+ *
+ * The credential is discoverable (resident key), so no `allowCredentials` is
+ * needed — the authenticator lets the user pick the passkey.
+ */
+export async function recoverWallet(): Promise<RecoverWalletResult> {
+  const { challenge } = await requestChallenge('authenticate');
+
+  const assertion = (await navigator.credentials.get({
+    publicKey: {
+      challenge: base64ToArrayBuffer(challenge),
+      timeout: 60000,
+      userVerification: 'required',
+      // Request PRF; harmless for legacy credentials (they simply return none).
+      extensions: prfEvalExtension(),
+    },
+  })) as PublicKeyCredential | null;
+
+  if (!assertion || !assertion.response) {
+    throw new Error('Passkey authentication cancelled or failed');
+  }
+
+  const response = assertion.response as AuthenticatorAssertionResponse;
+  const credentialId = arrayBufferToBase64(assertion.rawId);
+
+  const verifyResult = await verifyPasskey(challenge, {
+    id: credentialId,
+    rawId: credentialId,
+    response: {
+      clientDataJSON: arrayBufferToBase64(response.clientDataJSON),
+      authenticatorData: arrayBufferToBase64(response.authenticatorData),
+      signature: arrayBufferToBase64(response.signature),
+      userHandle: response.userHandle
+        ? arrayBufferToBase64(response.userHandle)
+        : undefined,
+    },
+    type: assertion.type,
+  });
+
+  if (!verifyResult.success || !verifyResult.verified) {
+    throw new Error('Passkey verification failed');
+  }
+  if (verifyResult.token) {
+    setAuthToken(verifyResult.token);
+  }
+  if (!verifyResult.walletAddress) {
+    throw new Error('No wallet is associated with this passkey.');
+  }
+  const walletAddress = verifyResult.walletAddress;
+
+  // 1) Secure path: re-derive from the PRF output and confirm it matches.
+  const prfOutput = readPrfFirst(assertion);
+  if (prfOutput) {
+    const { privateKey, address } = hkdfToSecp256k1(prfOutput);
+    if (address === walletAddress) {
+      saveWallet({
+        address,
+        encryptedPrivateKey: '',
+        source: 'passkey',
+        keyScheme: 'prf-v1',
+        credentialId,
+        createdAt: Date.now(),
+        walletName: verifyResult.walletName,
+      });
+      return {
+        address,
+        privateKey,
+        credentialId,
+        walletName: verifyResult.walletName,
+        keyScheme: 'prf-v1',
+      };
+    }
+  }
+
+  // 2) Legacy migration fallback: key = sha256(credentialId). Insecure — kept
+  //    working only so existing users can open the original wallet and migrate.
+  const legacyEntropy = sha256(new TextEncoder().encode(credentialId));
+  const { privateKey, address } = deriveSecp256k1(legacyEntropy);
+  if (address === walletAddress) {
+    const encryptedPrivateKey = await encryptKey(privateKey, legacyEntropy);
+    saveWallet({
+      address,
+      encryptedPrivateKey,
+      source: 'passkey',
+      keyScheme: 'legacy-sha256',
+      credentialId,
+      createdAt: Date.now(),
+      walletName: verifyResult.walletName,
+    });
+    return {
+      address,
+      privateKey,
+      credentialId,
+      walletName: verifyResult.walletName,
+      keyScheme: 'legacy-sha256',
+    };
+  }
+
+  throw new Error(
+    'Could not recover wallet: the derived address does not match the backend record for either scheme.',
+  );
 }

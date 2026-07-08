@@ -486,9 +486,21 @@ function AuthPageContent() {
       try {
         dismissErrorToast(true);
         const keystore = loadWallet();
-        if (!keystore || !keystore.credentialId) {
+        if (!keystore) {
           throw new Error(
             'No wallet found. Please create a wallet first at injpass.com'
+          );
+        }
+        if (!keystore.credentialId) {
+          // A wallet exists but has no passkey credential — i.e. a
+          // password-fallback wallet created when this device/browser lacks
+          // WebAuthn PRF. dApp connect is passkey-only for now, so surface a
+          // clear, actionable message instead of the misleading "No wallet
+          // found" (which sends users hunting for a wallet they actually have).
+          throw new Error(
+            'This is a password wallet (your device does not support passkey). ' +
+              'Connecting to dApps is not supported for password wallets yet. ' +
+              'Please use a device with passkey support.'
           );
         }
 

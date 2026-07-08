@@ -27,8 +27,14 @@ export interface CreateByPasskeyResult {
 }
 
 /**
+ * @deprecated INSECURE — derives the private key as `sha256(credentialId)`, a
+ * public value. Use `createPrfWallet` from `./prf` for all new wallets. This is
+ * retained only for reference/back-compat and must NOT be wired into any
+ * creation UI. `unlockByPasskey` below is still used to open existing legacy
+ * wallets (routed via `unlockWalletKey`).
+ *
  * Create a new wallet using Passkey
- * 
+ *
  * Flow:
  * 1. Request challenge from backend
  * 2. Create WebAuthn credential

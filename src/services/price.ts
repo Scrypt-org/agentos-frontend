@@ -133,6 +133,69 @@ export async function getTokenPrice(tokenId: string = 'injective-protocol'): Pro
 }
 
 /**
+ * Get several token prices in a SINGLE CoinGecko request (comma-separated ids),
+ * instead of one HTTP round-trip per token. Shares the same 60s cache as
+ * getTokenPrice(): fresh ids are served from cache and only the stale ones are
+ * fetched. Returns a map keyed by tokenId.
+ */
+export async function getTokenPrices(
+  tokenIds: string[],
+): Promise<Record<string, TokenPrice>> {
+  const now = Date.now();
+  const result: Record<string, TokenPrice> = {};
+  const missing: string[] = [];
+
+  for (const id of tokenIds) {
+    const cached = priceCache.get(`${id}-usd`);
+    if (cached && now - cached.timestamp < CACHE_DURATION) {
+      result[id] = cached.price;
+    } else {
+      missing.push(id);
+    }
+  }
+
+  if (missing.length === 0) {
+    return result;
+  }
+
+  try {
+    const response = await fetch(
+      `${NETWORK_CONFIG.coingeckoApi}/simple/price?ids=${missing.join(',')}&vs_currencies=usd&include_24hr_change=true`,
+      { headers: { Accept: 'application/json' } },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch prices: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    for (const id of missing) {
+      const tokenData = data[id];
+      if (tokenData) {
+        const priceData: TokenPrice = {
+          usd: tokenData.usd,
+          usd24hChange: tokenData.usd_24h_change,
+          lastUpdated: now,
+        };
+        priceCache.set(`${id}-usd`, { price: priceData, timestamp: now });
+        result[id] = priceData;
+      } else {
+        // Keep any stale cache, else a neutral default.
+        result[id] = priceCache.get(`${id}-usd`)?.price ?? { usd: 0, lastUpdated: now };
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch batched prices:', error);
+    for (const id of missing) {
+      result[id] = priceCache.get(`${id}-usd`)?.price ?? { usd: 0, lastUpdated: now };
+    }
+  }
+
+  return result;
+}
+
+/**
  * Clear the price cache
  */
 export function clearPriceCache(): void {

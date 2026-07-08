@@ -9,7 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useWalletErrorToast } from '@/lib/useWalletErrorToast';
 import { importPrivateKey } from '@/wallet/key-management';
 import { encryptKey, decryptKey, loadWallet, saveWallet } from '@/wallet/keystore';
-import { unlockByPasskey } from '@/wallet/key-management/createByPasskey';
+import { unlockWalletKey } from '@/wallet/key-management';
 import { sendTransaction } from '@/wallet/chain/evm/sendTransaction';
 import type { Address } from 'viem';
 
@@ -207,8 +207,7 @@ export default function ConnectPage() {
         throw new Error('No passkey found');
       }
 
-      const entropy = await unlockByPasskey(keystore.credentialId);
-      const privateKey = await decryptKey(keystore.encryptedPrivateKey, entropy);
+      const privateKey = await unlockWalletKey(keystore);
       afterAuth(privateKey, keystore.address);
     } catch (err) {
       const errorMessage =

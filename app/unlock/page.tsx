@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@/contexts/WalletContext';
 import { usePin } from '@/contexts/PinContext';
-import { unlockByPasskey } from '@/wallet/key-management/createByPasskey';
+import { unlockWalletKey } from '@/wallet/key-management';
 import { unlockByNFC, readNFCTag } from '@/wallet/key-management/createByNFC';
 import { decryptKey } from '@/wallet/keystore';
 import type { LocalKeystore } from '@/types/wallet';
@@ -44,9 +44,8 @@ export default function UnlockPage() {
     setError('');
 
     try {
-      const entropy = await unlockByPasskey(keystore.credentialId);
-      const privateKey = await decryptKey(keystore.encryptedPrivateKey, entropy);
-      
+      const privateKey = await unlockWalletKey(keystore);
+
       unlock(privateKey, keystore);
       router.push('/dashboard');
     } catch (err) {

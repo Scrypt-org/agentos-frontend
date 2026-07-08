@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createByPasskey } from '@/wallet/key-management';
+import { createPrfWallet, PrfUnsupportedError } from '@/wallet/key-management';
 import { useWallet } from '@/contexts/WalletContext';
 
 export default function PasskeyCreatePage() {
@@ -27,26 +27,23 @@ export default function PasskeyCreatePage() {
     setError('');
 
     try {
-      const result = await createByPasskey(username);
+      // Secure PRF wallet; createPrfWallet returns the derived key directly.
+      const result = await createPrfWallet(username);
 
-      // Load and unlock wallet
       const { loadWallet } = await import('@/wallet/keystore');
       const keystore = loadWallet();
-
       if (!keystore) {
         throw new Error('Failed to load created wallet');
       }
 
-      const { unlockByPasskey } = await import('@/wallet/key-management/createByPasskey');
-      const { decryptKey } = await import('@/wallet/keystore');
-
-      const entropy = await unlockByPasskey(result.credentialId);
-      const privateKey = await decryptKey(keystore.encryptedPrivateKey, entropy);
-
-      unlock(privateKey, keystore);
+      unlock(result.privateKey, keystore);
       router.replace('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create passkey');
+      if (err instanceof PrfUnsupportedError) {
+        setError('此设备/浏览器不支持安全钱包（PRF）。请到主页用密码方式创建。');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to create passkey');
+      }
     } finally {
       setLoading(false);
     }

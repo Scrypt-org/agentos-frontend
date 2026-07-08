@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePin } from '@/contexts/PinContext';
 import { useWallet } from '@/contexts/WalletContext';
-import { decryptKey } from '@/wallet/keystore';
 
 interface TransactionAuthModalProps {
   isOpen: boolean;
@@ -92,14 +91,13 @@ export default function TransactionAuthModal({
     setError('');
 
     try {
-      const { unlockByPasskey } = await import('@/wallet/key-management/createByPasskey');
-      
+      const { unlockWalletKey } = await import('@/wallet/key-management');
+
       if (!keystore?.credentialId) {
         throw new Error('No passkey found');
       }
-      
-      const decryptionEntropy = await unlockByPasskey(keystore.credentialId);
-      const decryptedPrivateKey = await decryptKey(keystore.encryptedPrivateKey, decryptionEntropy);
+
+      const decryptedPrivateKey = await unlockWalletKey(keystore);
       unlock(decryptedPrivateKey, keystore);
       resetActivity();
       onSuccess();

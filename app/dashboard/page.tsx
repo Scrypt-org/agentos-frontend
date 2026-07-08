@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePin } from '@/contexts/PinContext';
 import { useWallet } from '@/contexts/WalletContext';
-import { estimateGas, getBalance as getChainBalance, getCosmosTxHistory, getTxHistory, sendTransaction, waitForTransaction } from '@/wallet/chain';
+import { estimateGas, getCosmosTxHistory, getTxHistory, sendTransaction, waitForTransaction } from '@/wallet/chain';
 import { getBalance as getNinjaBalanceFromBackend } from '@/services/points';
-import { Balance, GasEstimate, INJECTIVE_MAINNET } from '@/types/chain';
+import { GasEstimate, INJECTIVE_MAINNET } from '@/types/chain';
 import { ACTIVE_NETWORK } from '@/config/network';
-import { getTokenPrice } from '@/services/price';
+import { getTokenPrices } from '@/services/price';
 import { executeSwap, getSwapQuote, ROUTER_ADDRESS } from '@/services/dex-swap';
 import { startQRScanner, stopQRScanner, clearQRScanner, isCameraSupported, isValidAddress } from '@/services/qr-scanner';
 import { isNFCSupported, readNFCCard, type NFCCardData } from '@/services/nfc';
@@ -20,6 +20,7 @@ import Image from 'next/image';
 import NFTDetailModal from '@/components/NFTDetailModal';
 import TransactionAuthModal from '@/components/TransactionAuthModal';
 import WelcomeThemeIconButton from '@/components/WelcomeThemeIconButton';
+import { LegacyWalletBanner } from '@/components/LegacyWalletBanner';
 import NinjaMinerGame from '@/components/NinjaMinerGame';
 import EditableAccountIdentity from '@/components/EditableAccountIdentity';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -637,7 +638,6 @@ export default function DashboardPage() {
   const { theme } = useTheme();
   const { isUnlocked, address, privateKey, resetTxAuth, isCheckingSession, keystore } = useWallet();
   const { autoLockMinutes, isPinLocked } = usePin();
-  const [balance, setBalance] = useState<Balance | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [walletNetworkMode, setWalletNetworkMode] = useState<WalletNetworkMode>('mainnet');
@@ -1027,19 +1027,21 @@ export default function DashboardPage() {
       } else {
         setLoading(true);
       }
-      const [balanceData, injPriceData, usdtPriceData, usdcPriceData, tokenBalData] = await Promise.all([
-        getChainBalance(address, currentNetworkMeta.chain),
-        getTokenPrice('injective-protocol'),
-        getTokenPrice('tether'),
-        getTokenPrice('usd-coin'),
+      // Prices: one batched CoinGecko request instead of 3 separate calls.
+      // Balances: getDashboardTokenBalances already returns the native INJ
+      // balance, so we no longer make a separate getChainBalance RPC round-trip.
+      const [prices, tokenBalData] = await Promise.all([
+        getTokenPrices(['injective-protocol', 'tether', 'usd-coin']),
         getDashboardTokenBalances(address as Address, walletNetworkMode),
       ]);
-      
-      setBalance(balanceData);
-      setInjPrice(injPriceData.usd);
-      setInjPriceChange24h(injPriceData.usd24hChange || 0);
-      setUsdtPriceChange24h(usdtPriceData.usd24hChange || 0);
-      setUsdcPriceChange24h(usdcPriceData.usd24hChange || 0);
+
+      const injPriceData = prices['injective-protocol'];
+      if (injPriceData) {
+        setInjPrice(injPriceData.usd);
+        setInjPriceChange24h(injPriceData.usd24hChange || 0);
+      }
+      setUsdtPriceChange24h(prices['tether']?.usd24hChange || 0);
+      setUsdcPriceChange24h(prices['usd-coin']?.usd24hChange || 0);
       setTokenBalances({
         INJ: parseFloat(tokenBalData.INJ).toFixed(4),
         USDC: parseFloat(tokenBalData.USDC).toFixed(2),
@@ -1055,7 +1057,7 @@ export default function DashboardPage() {
       }
       setNetworkSwitching(false);
     }
-  }, [address, currentNetworkMeta.chain, ninjaBalance, walletNetworkMode]);
+  }, [address, ninjaBalance, walletNetworkMode]);
 
   const handleFaucetTokenClaim = useCallback(async (networkId: string) => {
     if (!address || faucetClaimLocked || faucetClaimingId) {
@@ -1905,7 +1907,7 @@ export default function DashboardPage() {
         ? 'Loading wallet surface'
         : 'Wallet surface ready';
   const safeInjPrice = injPrice > 0 ? injPrice : 25;
-  const injBalanceValue = balance ? parseFloat(balance.formatted) : parseFloat(tokenBalances.INJ);
+  const injBalanceValue = parseFloat(tokenBalances.INJ);
   const injUsdValue = Number.isFinite(injBalanceValue) ? injBalanceValue * safeInjPrice : 0;
   const usdtValue = Number.isFinite(parseFloat(tokenBalances.USDT)) ? parseFloat(tokenBalances.USDT) : 0;
   const usdcValue = Number.isFinite(parseFloat(tokenBalances.USDC)) ? parseFloat(tokenBalances.USDC) : 0;
@@ -2108,6 +2110,9 @@ export default function DashboardPage() {
   return (
         <>
         <div className="min-h-screen bg-black">
+          <div className="px-4 pt-4">
+            <LegacyWalletBanner />
+          </div>
           <div>
             {/* Modern Dashboard Header */}
             <div className="bg-gradient-to-b from-white/5 to-transparent border-b border-white/5 backdrop-blur-sm">

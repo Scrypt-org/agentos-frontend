@@ -8,8 +8,8 @@ import { WalletErrorToast } from '@/components/WalletErrorToast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useWalletErrorToast } from '@/lib/useWalletErrorToast';
 import { unlockByPasskey } from '@/wallet/key-management/createByPasskey';
+import { unlockWalletKey } from '@/wallet/key-management';
 import { loadWallet } from '@/wallet/keystore/storage';
-import { decryptKey } from '@/wallet/keystore';
 import { signAndSendTransaction } from '@/wallet/chain/evm/sendTransaction';
 import { INJECTIVE_MAINNET, INJECTIVE_TESTNET, type TransactionRequest } from '@/types/chain';
 import { NETWORK_CONFIG } from '@/config/network';
@@ -281,10 +281,9 @@ function AuthPageContent() {
       const keystore = loadWallet();
       if (!keystore?.credentialId) throw new Error('Wallet not found');
 
-      const entropy = await unlockByPasskey(keystore.credentialId);
+      const privateKey = await unlockWalletKey(keystore);
       setMessage('Authorizing signature...');
 
-      const privateKey = await decryptKey(keystore.encryptedPrivateKey, entropy);
       const messageHash = hashPersonalMessage(msg);
       const sigBytes = secp256k1.sign(messageHash, privateKey, {
         lowS: true,
@@ -378,10 +377,9 @@ function AuthPageContent() {
       const keystore = loadWallet();
       if (!keystore?.credentialId) throw new Error('Wallet not found');
 
-      const entropy = await unlockByPasskey(keystore.credentialId);
+      const privateKey = await unlockWalletKey(keystore);
       setMessage('Signing & broadcasting transaction...');
 
-      const privateKey = await decryptKey(keystore.encryptedPrivateKey, entropy);
       const activeChain = NETWORK_CONFIG.isMainnet ? INJECTIVE_MAINNET : INJECTIVE_TESTNET;
       const txHash = await signAndSendTransaction(privateKey, normalizeTx(tx), activeChain);
 
@@ -488,9 +486,21 @@ function AuthPageContent() {
       try {
         dismissErrorToast(true);
         const keystore = loadWallet();
-        if (!keystore || !keystore.credentialId) {
+        if (!keystore) {
           throw new Error(
             'No wallet found. Please create a wallet first at injpass.com'
+          );
+        }
+        if (!keystore.credentialId) {
+          // A wallet exists but has no passkey credential — i.e. a
+          // password-fallback wallet created when this device/browser lacks
+          // WebAuthn PRF. dApp connect is passkey-only for now, so surface a
+          // clear, actionable message instead of the misleading "No wallet
+          // found" (which sends users hunting for a wallet they actually have).
+          throw new Error(
+            'This is a password wallet (your device does not support passkey). ' +
+              'Connecting to dApps is not supported for password wallets yet. ' +
+              'Please use a device with passkey support.'
           );
         }
 
@@ -550,8 +560,7 @@ function AuthPageContent() {
         }
 
         setMessage('Unlocking your INJ Pass...');
-        const entropy = await unlockByPasskey(keystore.credentialId);
-        const privateKey = await decryptKey(keystore.encryptedPrivateKey, entropy);
+        const privateKey = await unlockWalletKey(keystore);
 
         setMessage('Signing message...');
         const messageHash = hashPersonalMessage(request.message);

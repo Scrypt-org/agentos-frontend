@@ -188,6 +188,7 @@ export function triggerWalletConnect(): Promise<{ address: string; walletName: s
       reject(new Error('Popup blocked. Please allow popups for this site.'));
       return;
     }
+    console.log('[INJPASS] connect: auth popup opened, waiting for AUTH_WINDOW_READY', { requestId });
 
     // 监听连接结果
     const handleMessage = (event: MessageEvent<WalletConnectResponse>) => {
@@ -202,15 +203,17 @@ export function triggerWalletConnect(): Promise<{ address: string; walletName: s
 
       // 处理窗口准备就绪消息
       if (type === 'AUTH_WINDOW_READY' && respId === requestId) {
-        console.log('✅ Auth window ready, sending connect request');
+        console.log('[INJPASS] connect: AUTH_WINDOW_READY received, sending WALLET_CONNECT');
         clearInterval(sendInterval); // 停止轮询
         sendRequest(); // 发送一次请求
         return;
       }
 
       if (type === 'WALLET_CONNECT_RESPONSE' && respId === requestId) {
+        console.log('[INJPASS] connect: WALLET_CONNECT_RESPONSE received', { hasError: !!error });
         // 清理资源（但不关闭弹窗！）
         clearTimeout(timeout);
+        clearTimeout(blockedCheck);
         clearInterval(sendInterval);
         window.removeEventListener('message', handleMessage);
         
@@ -236,6 +239,20 @@ export function triggerWalletConnect(): Promise<{ address: string; walletName: s
 
     window.addEventListener('message', handleMessage);
 
+    // 弹窗拦截检测：部分拦截器/浏览器会返回一个立即关闭的假窗口，
+    // window.open 不返回 null，因此需要延迟复查 popup.closed，
+    // 给出明确的"弹窗被拦截"提示，而不是误导性的"窗口被关闭"。
+    const blockedCheck = setTimeout(() => {
+      if (popup.closed) {
+        clearInterval(sendInterval);
+        clearTimeout(timeout);
+        window.removeEventListener('message', handleMessage);
+        reject(
+          new Error('Popup blocked. Please allow popups for this site and try again.')
+        );
+      }
+    }, 600);
+
     // 将连接请求发送给弹窗
     const sendRequest = () => {
       if (popup && !popup.closed) {
@@ -251,6 +268,7 @@ export function triggerWalletConnect(): Promise<{ address: string; walletName: s
     // 超时处理（60秒）
     const timeout = setTimeout(() => {
       clearInterval(sendInterval);
+      clearTimeout(blockedCheck);
       window.removeEventListener('message', handleMessage);
       if (!popup.closed) {
         popup.close();
@@ -265,14 +283,15 @@ export function triggerWalletConnect(): Promise<{ address: string; walletName: s
       if (popup.closed) {
         clearInterval(sendInterval);
         clearTimeout(timeout);
+        clearTimeout(blockedCheck);
         window.removeEventListener('message', handleMessage);
         reject(new Error('Authentication window was closed'));
         return;
       }
-      
+
       sendRequest();
       attempts++;
-      
+
       if (attempts >= maxAttempts) {
         clearInterval(sendInterval);
       }

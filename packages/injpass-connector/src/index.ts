@@ -174,13 +174,34 @@ export class InjPassConnector {
       throw new Error('Already connected');
     }
 
-    // Create iframe
-    this.createIframe();
-
     // Wait for connection
     return new Promise((resolve, reject) => {
+      // The embed page proves it loaded and its JS ran by sending its first
+      // INJPASS_RESIZE. If nothing arrives within 15s, the widget almost
+      // certainly failed to load (network can't reach the embed host, an ad/
+      // privacy blocker killed the iframe, etc.). Fail with an actionable
+      // message rather than making the dApp spin for the full 60s.
+      let embedLoaded = false;
+      const loadTimeout = setTimeout(() => {
+        if (!embedLoaded) {
+          clearTimeout(timeout);
+          reject(
+            new Error(
+              `INJ Pass widget did not load (network or blocked?): ${this.config.embedUrl}`,
+            ),
+          );
+          this.disconnect();
+        }
+      }, 15000);
+
       const timeout = setTimeout(() => {
-        reject(new Error('Connection timeout'));
+        reject(
+          new Error(
+            embedLoaded
+              ? 'Connection timeout: no response from the INJ Pass approval popup. Please retry and complete the passkey prompt.'
+              : `Connection timeout: the INJ Pass widget never loaded (${this.config.embedUrl}).`,
+          ),
+        );
         this.disconnect();
       }, 60000); // 60 second timeout
 
@@ -192,6 +213,7 @@ export class InjPassConnector {
         const { type, address, walletName, error } = event.data;
 
         if (type === 'INJPASS_CONNECTED') {
+          clearTimeout(loadTimeout);
           clearTimeout(timeout);
           this.connected = true;
 
@@ -210,6 +232,11 @@ export class InjPassConnector {
 
         // Embed page requests iframe resize (ball ↔ card)
         if (type === 'INJPASS_RESIZE' && this.iframe) {
+          // First RESIZE = the embed page is alive; cancel the load watchdog.
+          if (!embedLoaded) {
+            embedLoaded = true;
+            clearTimeout(loadTimeout);
+          }
           const { width, height } = event.data;
           this.iframe.style.width = `${width}px`;
           this.iframe.style.height = `${height}px`;
@@ -244,6 +271,18 @@ export class InjPassConnector {
       };
 
       window.addEventListener('message', this.messageHandler);
+
+      // Create the iframe now that reject/timeouts are in scope. onError fires
+      // when the embed document itself can't be fetched (DNS/network/blocked
+      // host) — fail fast instead of waiting out the load watchdog.
+      this.createIframe(() => {
+        if (!embedLoaded) {
+          clearTimeout(loadTimeout);
+          clearTimeout(timeout);
+          reject(new Error(`Failed to load INJ Pass widget: ${this.config.embedUrl}`));
+          this.disconnect();
+        }
+      });
     });
   }
 
@@ -461,10 +500,17 @@ export class InjPassConnector {
     return provider;
   }
 
-  private createIframe(): void {
+  private createIframe(onError?: () => void): void {
     this.iframe = document.createElement('iframe');
     this.iframe.src = this.config.embedUrl;
-    
+    if (onError) {
+      // Fires when the browser cannot load the iframe document (network error,
+      // blocked host). Note: for a cross-origin document that DOES load, only
+      // `onload` fires and its content stays unreadable — readiness is instead
+      // confirmed by the embed page's first INJPASS_RESIZE message (see connect).
+      this.iframe.onerror = onError;
+    }
+
     // Note: We no longer need 'publickey-credentials-get' in iframe
     // because Passkey authentication happens in a popup window
     // This makes the SDK work in all browsers without Storage Access API

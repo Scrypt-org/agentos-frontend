@@ -24,6 +24,47 @@ Lightweight SDK for embedding INJ Pass wallet in your dApp via iframe.
 - 🔄 **Cross-dApp** - One wallet works across all dApps
 - 🌐 **Universal Browser Support** - No more Storage Access API prompts!
 
+## INJ Pass mini apps
+
+Apps hosted on an assigned subdomain such as `gift.injpass.com` can run inside
+INJ Pass without bundling any INJ Pass source code. INJ Pass loads the app in an
+origin-locked iframe and the SDK exposes the parent wallet as an EIP-1193
+provider. The app receives an address and RPC methods only; private keys and
+recovery phrases remain in the INJ Pass host.
+
+```typescript
+import { InjPassMiniAppConnector } from '@injpass/cli';
+
+if (InjPassMiniAppConnector.isEmbedded()) {
+  const connector = new InjPassMiniAppConnector();
+  const wallet = await connector.connect();
+
+  // null means the INJ Pass host is currently in guest mode.
+  if (wallet) {
+    window.ethereum = wallet.provider;
+    console.log(wallet.address, wallet.walletName);
+  }
+
+  connector.onSession((session) => {
+    console.log('INJ Pass session changed', session);
+  });
+}
+```
+
+Call `connector.requestLogin()` when a guest starts an authenticated action.
+The INJ Pass host opens its wallet chooser. Contract calls made through ethers,
+wagmi, or viem then travel through the same provider and are signed by the
+selected INJ Pass wallet after host approval.
+
+The same connector keeps the INJ Pass DApp browser synchronized with the app's
+current title and path. Browser back, forward, home, and reload commands are
+handled automatically, including navigation performed by client-side routers.
+
+For local development, serve the dApp on its own port (for example
+`http://localhost:3002`) and register that exact origin in the INJ Pass mini app
+manifest. Production registrations should use one dedicated HTTPS subdomain per
+app and should never accept wildcard origins.
+
 ## How It Works (v2.0 Architecture)
 
 ```mermaid

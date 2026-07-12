@@ -757,3 +757,11 @@ class InjPassSigner {
 }
 
 export type { InjPassSigner };
+export {
+  INJPASS_MINIAPP_CHANNEL,
+  InjPassMiniAppConnector,
+  type ConnectedMiniAppWallet,
+  type InjPassMiniAppConfig,
+  type InjPassMiniAppNavigationAction,
+  type InjPassMiniAppSession,
+} from './miniapp';

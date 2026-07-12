@@ -42,7 +42,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# temp sdk
-/packages
-/packages/injpass-connector
+# local SDK build output
+/packages/*/node_modules
+/packages/*/dist
+/packages/*/pnpm-lock.yaml
 /public/injpass-connector

@@ -17,8 +17,24 @@ import type { LocalKeystore } from '@/types/wallet';
 import { unlockByPasskey } from './createByPasskey';
 import { unlockPrfWallet } from './prf';
 import { decryptKey } from '../keystore/encryptKey';
+import { unlockLocalMnemonicWallet } from './unlockLocalMnemonicWallet';
 
-export async function unlockWalletKey(keystore: LocalKeystore): Promise<Uint8Array> {
+export class PasswordRequiredError extends Error {
+  constructor() {
+    super('Enter this wallet\'s local password to continue.');
+    this.name = 'PasswordRequiredError';
+  }
+}
+
+export async function unlockWalletKey(
+  keystore: LocalKeystore,
+  options?: { password?: string },
+): Promise<Uint8Array> {
+  if (keystore.keyScheme === 'local-mnemonic-v1') {
+    if (!options?.password) throw new PasswordRequiredError();
+    return unlockLocalMnemonicWallet(keystore, options.password);
+  }
+
   if (!keystore.credentialId) {
     throw new Error('This wallet has no passkey credential to unlock with.');
   }

@@ -14,7 +14,8 @@ Lightweight SDK for embedding INJ Pass wallet in your dApp via iframe.
 
 ## Features
 
-- 🔐 **Passkey Authentication** - Secure, passwordless wallet access using WebAuthn
+- 🔐 **Wallet Choice** - Users choose any local INJ Pass Passkey or traditional wallet
+- 🗝️ **Isolated Traditional Wallet Unlock** - Local passwords and private keys remain inside the INJ Pass authorization window
 - 📱 **Mobile Support** - Works on iOS/Android browsers
 - 🎨 **Flexible UI** - Floating, modal, or inline modes
 - 🫧 **Smart Floating Widget** - The embed can expand into a full card or shrink into a small floating ball without blocking your app
@@ -29,13 +30,13 @@ Lightweight SDK for embedding INJ Pass wallet in your dApp via iframe.
 sequenceDiagram
     participant DApp
     participant Iframe as INJ Pass iframe
-    participant Popup as Auth Popup
+    participant Popup as INJ Pass Authorization
     
     DApp->>Iframe: Load /embed in iframe
-    User->>Iframe: Click "Connect"
-    Iframe->>Popup: Open popup window
-    Popup->>User: Request Passkey
-    User->>Popup: Authenticate (biometrics)
+    User->>Iframe: Click "Choose wallet"
+    Iframe->>Popup: Open secure authorization window
+    Popup->>User: Choose Passkey or traditional wallet
+    User->>Popup: Unlock inside INJ Pass
     Popup->>Iframe: Send wallet info
     Popup->>Popup: Close
     Iframe->>DApp: Forward wallet info
@@ -113,7 +114,7 @@ const connector = new InjPassConnector({
 const wallet = await connector.connect();
 console.log('Connected:', wallet.address);
 
-// Sign message
+// Sign message. INJ Pass displays an approval window; no private key enters the dApp.
 const signature = await wallet.signer.signMessage('Hello World');
 console.log('Signature:', signature);
 

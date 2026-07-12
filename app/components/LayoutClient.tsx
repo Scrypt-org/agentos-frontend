@@ -16,7 +16,7 @@ export function GeometricShapes() {
   const pathname = usePathname();
   const { theme } = useTheme();
 
-  if (pathname === '/welcome') {
+  if (pathname === '/' || pathname === '/welcome' || pathname === '/dashboard') {
     return null;
   }
 

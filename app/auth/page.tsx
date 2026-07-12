@@ -7,19 +7,20 @@ import WelcomeThemeIconButton from '@/components/WelcomeThemeIconButton';
 import { WalletErrorToast } from '@/components/WalletErrorToast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useWalletErrorToast } from '@/lib/useWalletErrorToast';
-import { unlockByPasskey } from '@/wallet/key-management/createByPasskey';
 import { unlockWalletKey } from '@/wallet/key-management';
-import { loadWallet } from '@/wallet/keystore/storage';
+import { loadWallet, loadWallets, setActiveWallet } from '@/wallet/keystore/storage';
 import { signAndSendTransaction } from '@/wallet/chain/evm/sendTransaction';
 import { INJECTIVE_MAINNET, INJECTIVE_TESTNET, type TransactionRequest } from '@/types/chain';
 import { NETWORK_CONFIG } from '@/config/network';
+import type { LocalKeystore } from '@/types/wallet';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { keccak_256 } from '@noble/hashes/sha3.js';
-import type {
-  AuthRequest,
-  AuthResponse,
-  WalletConnectRequest,
-  WalletConnectResponse,
+import {
+  isValidOrigin,
+  type AuthRequest,
+  type AuthResponse,
+  type WalletConnectRequest,
+  type WalletConnectResponse,
 } from '@/lib/auth-bridge';
 
 /** Embedded-dApp transaction request relayed from the /embed iframe. */
@@ -160,6 +161,25 @@ function callerOriginToLabel(origin: string | null) {
   }
 }
 
+function isTraditionalWallet(wallet: LocalKeystore | null): boolean {
+  return wallet?.keyScheme === 'local-mnemonic-v1';
+}
+
+function canUseWalletWithDapps(wallet: LocalKeystore): boolean {
+  return isTraditionalWallet(wallet) || Boolean(wallet.credentialId);
+}
+
+function walletSecurityLabel(wallet: LocalKeystore): string {
+  if (isTraditionalWallet(wallet)) return 'Traditional';
+  if (wallet.keyScheme === 'prf-v1') return 'Passkey PRF';
+  if (wallet.credentialId) return 'Passkey';
+  return 'Migration required';
+}
+
+function truncateWalletAddress(address: string): string {
+  return address.length > 18 ? `${address.slice(0, 8)}...${address.slice(-6)}` : address;
+}
+
 function AuthPageContent() {
   const { theme } = useTheme();
   const isLightMode = theme === 'light';
@@ -169,6 +189,7 @@ function AuthPageContent() {
       return {
         requestId: null as string | null,
         originParam: null as string | null,
+        appOriginParam: null as string | null,
         action: 'connect',
       };
     }
@@ -177,14 +198,23 @@ function AuthPageContent() {
     return {
       requestId: params.get('requestId'),
       originParam: params.get('origin'),
+      appOriginParam: params.get('appOrigin'),
       action: params.get('action') || 'connect',
     };
   });
 
-  const { requestId, originParam, action } = query;
+  const { requestId, originParam, appOriginParam, action } = query;
 
   const [status, setStatus] = useState<
-    'waiting' | 'sign_pending' | 'tx_pending' | 'processing' | 'success' | 'error' | 'ready'
+    | 'waiting'
+    | 'select_wallet'
+    | 'unlock_wallet'
+    | 'sign_pending'
+    | 'tx_pending'
+    | 'processing'
+    | 'success'
+    | 'error'
+    | 'ready'
   >('waiting');
   const [message, setMessage] = useState('');
   const [currentSignRequest, setCurrentSignRequest] = useState<{
@@ -198,6 +228,15 @@ function AuthPageContent() {
     origin: string;
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [availableWallets, setAvailableWallets] = useState<LocalKeystore[]>([]);
+  const [selectedWallet, setSelectedWallet] = useState<LocalKeystore | null>(null);
+  const [walletPassword, setWalletPassword] = useState('');
+  const selectedWalletRef = useRef<LocalKeystore | null>(null);
+  const traditionalSessionKeyRef = useRef<Uint8Array | null>(null);
+  const pendingWalletConnectRef = useRef<{
+    requestId: string;
+    targetOrigin: string;
+  } | null>(null);
   const { errorToast, showErrorToast, dismissErrorToast } = useWalletErrorToast();
 
   const BALL_W = 82;
@@ -232,10 +271,7 @@ function AuthPageContent() {
 
   useEffect(() => {
     const handleSignRequest = (event: MessageEvent) => {
-      const isLocalhost = event.origin.startsWith('http://localhost:');
-      const isSameOrigin = event.origin === originParam;
-      const isSameDomain = event.origin === window.location.origin;
-      if (!isLocalhost && !isSameOrigin && !isSameDomain) return;
+      if (event.source !== window.opener || event.origin !== originParam) return;
 
       const { type, requestId: reqId, message: msg, tx } = event.data;
       if (type === 'SIGN_REQUEST' && statusRef.current === 'ready') {
@@ -266,6 +302,116 @@ function AuthPageContent() {
     }
   }, [action]);
 
+  useEffect(() => () => {
+    traditionalSessionKeyRef.current?.fill(0);
+    traditionalSessionKeyRef.current = null;
+  }, []);
+
+  const getActionPrivateKey = async (): Promise<{
+    privateKey: Uint8Array;
+    ephemeral: boolean;
+    wallet: LocalKeystore;
+  }> => {
+    const wallet = selectedWalletRef.current;
+    if (!wallet) {
+      throw new Error('This app session has no selected wallet. Please reconnect.');
+    }
+
+    if (isTraditionalWallet(wallet)) {
+      const privateKey = traditionalSessionKeyRef.current;
+      if (!privateKey) {
+        throw new Error('This traditional wallet session is locked. Please reconnect.');
+      }
+      return { privateKey, ephemeral: false, wallet };
+    }
+
+    return {
+      privateKey: await unlockWalletKey(wallet),
+      ephemeral: true,
+      wallet,
+    };
+  };
+
+  const finishWalletConnect = async (wallet: LocalKeystore, password?: string) => {
+    const pending = pendingWalletConnectRef.current;
+    if (!pending) {
+      throw new Error('The wallet connection request has expired. Please try again.');
+    }
+    if (!canUseWalletWithDapps(wallet)) {
+      throw new Error('This legacy wallet must be migrated in INJ Pass before it can connect to apps.');
+    }
+
+    setErrorMessage('');
+    setStatus('processing');
+    setMessage(isTraditionalWallet(wallet) ? 'Unlocking encrypted wallet...' : 'Verifying with system Passkey...');
+
+    try {
+      if (isTraditionalWallet(wallet)) {
+        const privateKey = await unlockWalletKey(wallet, { password });
+        traditionalSessionKeyRef.current?.fill(0);
+        traditionalSessionKeyRef.current = privateKey;
+      } else {
+        const verificationKey = await unlockWalletKey(wallet);
+        verificationKey.fill(0);
+        traditionalSessionKeyRef.current?.fill(0);
+        traditionalSessionKeyRef.current = null;
+      }
+
+      const activeWallet = setActiveWallet(wallet.address) || wallet;
+      selectedWalletRef.current = activeWallet;
+      setSelectedWallet(activeWallet);
+      setWalletPassword('');
+
+      const response: WalletConnectResponse = {
+        type: 'WALLET_CONNECT_RESPONSE',
+        requestId: pending.requestId,
+        address: activeWallet.address,
+        walletName: activeWallet.walletName || 'INJ Pass Wallet',
+        walletType: isTraditionalWallet(activeWallet) ? 'traditional' : 'passkey',
+      };
+      window.opener?.postMessage(response, pending.targetOrigin);
+      pendingWalletConnectRef.current = null;
+      setStatus('ready');
+      setMessage('Ready to review app requests');
+    } catch (error) {
+      const rawMessage = error instanceof Error ? error.message : 'Unable to unlock this wallet.';
+      const friendlyMessage = friendlyErrorMessage(rawMessage);
+      showErrorToast(friendlyMessage);
+      setErrorMessage(friendlyMessage);
+      setStatus(isTraditionalWallet(wallet) ? 'unlock_wallet' : 'select_wallet');
+    }
+  };
+
+  const chooseWallet = (wallet: LocalKeystore) => {
+    dismissErrorToast(true);
+    setErrorMessage('');
+    selectedWalletRef.current = wallet;
+    setSelectedWallet(wallet);
+    setWalletPassword('');
+
+    if (isTraditionalWallet(wallet)) {
+      setStatus('unlock_wallet');
+      return;
+    }
+    void finishWalletConnect(wallet);
+  };
+
+  const rejectWalletConnect = () => {
+    const pending = pendingWalletConnectRef.current;
+    if (pending) {
+      const response: WalletConnectResponse = {
+        type: 'WALLET_CONNECT_RESPONSE',
+        requestId: pending.requestId,
+        error: 'User cancelled wallet connection.',
+      };
+      window.opener?.postMessage(response, pending.targetOrigin);
+    }
+    pendingWalletConnectRef.current = null;
+    traditionalSessionKeyRef.current?.fill(0);
+    traditionalSessionKeyRef.current = null;
+    window.close();
+  };
+
   const handleConfirmSign = async () => {
     if (!currentSignRequest) return;
 
@@ -278,43 +424,44 @@ function AuthPageContent() {
 
     try {
       dismissErrorToast(true);
-      const keystore = loadWallet();
-      if (!keystore?.credentialId) throw new Error('Wallet not found');
-
-      const privateKey = await unlockWalletKey(keystore);
-      setMessage('Authorizing signature...');
-
-      const messageHash = hashPersonalMessage(msg);
-      const sigBytes = secp256k1.sign(messageHash, privateKey, {
-        lowS: true,
-        prehash: false,
-        format: 'recovered',
-      });
-
-      const ethSig = new Uint8Array(65);
-      ethSig.set(sigBytes.slice(1, 33), 0);
-      ethSig.set(sigBytes.slice(33, 65), 32);
-      ethSig[64] = sigBytes[0] + 27;
-
-      window.opener?.postMessage(
-        {
-          type: 'SIGN_RESPONSE',
-          requestId: reqId,
-          signature: Array.from(ethSig),
-          address: keystore.address,
-        },
-        reqOrigin
-      );
+      const authorization = await getActionPrivateKey();
       try {
-        const bc = new BroadcastChannel('injpass_tx');
-        bc.postMessage({
-          type: 'SIGN_RESPONSE',
-          requestId: reqId,
-          signature: Array.from(ethSig),
-          address: keystore.address,
+        setMessage('Authorizing signature...');
+
+        const messageHash = hashPersonalMessage(msg);
+        const sigBytes = secp256k1.sign(messageHash, authorization.privateKey, {
+          lowS: true,
+          prehash: false,
+          format: 'recovered',
         });
-        bc.close();
-      } catch {}
+
+        const ethSig = new Uint8Array(65);
+        ethSig.set(sigBytes.slice(1, 33), 0);
+        ethSig.set(sigBytes.slice(33, 65), 32);
+        ethSig[64] = sigBytes[0] + 27;
+
+        window.opener?.postMessage(
+          {
+            type: 'SIGN_RESPONSE',
+            requestId: reqId,
+            signature: Array.from(ethSig),
+            address: authorization.wallet.address,
+          },
+          reqOrigin
+        );
+        try {
+          const bc = new BroadcastChannel('injpass_tx');
+          bc.postMessage({
+            type: 'SIGN_RESPONSE',
+            requestId: reqId,
+            signature: Array.from(ethSig),
+            address: authorization.wallet.address,
+          });
+          bc.close();
+        } catch {}
+      } finally {
+        if (authorization.ephemeral) authorization.privateKey.fill(0);
+      }
 
       setCurrentSignRequest(null);
       setStatus('success');
@@ -374,14 +521,15 @@ function AuthPageContent() {
 
     try {
       dismissErrorToast(true);
-      const keystore = loadWallet();
-      if (!keystore?.credentialId) throw new Error('Wallet not found');
-
-      const privateKey = await unlockWalletKey(keystore);
-      setMessage('Signing & broadcasting transaction...');
-
-      const activeChain = NETWORK_CONFIG.isMainnet ? INJECTIVE_MAINNET : INJECTIVE_TESTNET;
-      const txHash = await signAndSendTransaction(privateKey, normalizeTx(tx), activeChain);
+      const authorization = await getActionPrivateKey();
+      let txHash: string;
+      try {
+        setMessage('Signing & broadcasting transaction...');
+        const activeChain = NETWORK_CONFIG.isMainnet ? INJECTIVE_MAINNET : INJECTIVE_TESTNET;
+        txHash = await signAndSendTransaction(authorization.privateKey, normalizeTx(tx), activeChain);
+      } finally {
+        if (authorization.ephemeral) authorization.privateKey.fill(0);
+      }
 
       console.log('[INJ Pass /auth] TX broadcast success, txHash:', txHash);
 
@@ -465,6 +613,15 @@ function AuthPageContent() {
       return;
     }
 
+    const requestedAppOrigin = appOriginParam
+      || (originParam !== window.location.origin ? originParam : null);
+    if (requestedAppOrigin && !isValidOrigin(requestedAppOrigin)) {
+      showErrorToast('This app is not authorized to use INJ Pass.');
+      setErrorMessage('This app origin is not on the INJ Pass authorization allowlist.');
+      setStatus('error');
+      return;
+    }
+
     let processingStarted = false;
 
     const handleWalletConnect = async (
@@ -480,44 +637,37 @@ function AuthPageContent() {
       }
 
       processingStarted = true;
-      setStatus('processing');
-      setMessage('Preparing secure authorization...');
 
       try {
         dismissErrorToast(true);
-        const keystore = loadWallet();
-        if (!keystore) {
+        if (
+          request.appOrigin
+          && requestedAppOrigin
+          && request.appOrigin !== requestedAppOrigin
+        ) {
+          throw new Error('The app origin changed during authorization. Please reconnect.');
+        }
+        const effectiveAppOrigin = request.appOrigin || requestedAppOrigin;
+        if (effectiveAppOrigin && !isValidOrigin(effectiveAppOrigin)) {
+          throw new Error('This app is not authorized to use INJ Pass.');
+        }
+        const wallets = loadWallets();
+        if (wallets.length === 0) {
           throw new Error(
             'No wallet found. Please create a wallet first at injpass.com'
           );
         }
-        if (!keystore.credentialId) {
-          // A wallet exists but has no passkey credential — i.e. a
-          // password-fallback wallet created when this device/browser lacks
-          // WebAuthn PRF. dApp connect is passkey-only for now, so surface a
-          // clear, actionable message instead of the misleading "No wallet
-          // found" (which sends users hunting for a wallet they actually have).
-          throw new Error(
-            'This is a password wallet (your device does not support passkey). ' +
-              'Connecting to dApps is not supported for password wallets yet. ' +
-              'Please use a device with passkey support.'
-          );
-        }
-
-        setMessage('Verifying with passkey...');
-        await unlockByPasskey(keystore.credentialId);
-
-        const response: WalletConnectResponse = {
-          type: 'WALLET_CONNECT_RESPONSE',
+        pendingWalletConnectRef.current = {
           requestId: request.requestId,
-          address: keystore.address,
-          walletName: keystore.walletName || 'INJ Pass Wallet',
+          targetOrigin,
         };
-
-        window.opener?.postMessage(response, targetOrigin);
-
-        setStatus('ready');
-        setMessage('Ready to sign transactions');
+        selectedWalletRef.current = null;
+        setSelectedWallet(null);
+        setAvailableWallets(wallets);
+        setWalletPassword('');
+        setErrorMessage('');
+        setMessage('Choose the wallet INJ Gift may request actions from.');
+        setStatus('select_wallet');
       } catch (err) {
         const rawMsg = err instanceof Error ? err.message : 'Connection failed';
         const friendlyMsg = friendlyErrorMessage(rawMsg);
@@ -610,10 +760,7 @@ function AuthPageContent() {
     };
 
     const handleMessage = async (event: MessageEvent) => {
-      const isLocalhost = event.origin.startsWith('http://localhost:');
-      const isSameOrigin = event.origin === originParam;
-
-      if (!isLocalhost && !isSameOrigin) {
+      if (event.source !== window.opener || event.origin !== originParam) {
         showErrorToast('Origin verification failed');
         setStatus('error');
         return;
@@ -660,9 +807,12 @@ function AuthPageContent() {
     }
 
     return () => window.removeEventListener('message', handleMessage);
-  }, [action, dismissErrorToast, originParam, requestId, showErrorToast]);
+  }, [action, appOriginParam, dismissErrorToast, originParam, requestId, showErrorToast]);
 
-  const callerLabel = useMemo(() => callerOriginToLabel(originParam), [originParam]);
+  const callerLabel = useMemo(
+    () => callerOriginToLabel(appOriginParam || originParam),
+    [appOriginParam, originParam],
+  );
 
   const pageTone = isLightMode ? 'bg-[#e9eff7] text-[#171b24]' : 'bg-[#020202] text-white';
   const headerTone = isLightMode ? 'text-[#59657a]' : 'text-white/58';
@@ -708,12 +858,16 @@ function AuthPageContent() {
   }
 
   const title =
-    status === 'sign_pending'
+    status === 'select_wallet'
+      ? 'Choose an INJ Pass wallet'
+      : status === 'unlock_wallet'
+        ? `Unlock ${selectedWallet?.walletName || 'traditional wallet'}`
+      : status === 'sign_pending'
       ? 'Review authorization request'
       : status === 'tx_pending'
         ? 'Review transaction request'
       : status === 'processing'
-        ? 'Authorizing with passkey'
+        ? 'Authorizing wallet'
         : status === 'success'
           ? 'Authorization complete'
           : status === 'error'
@@ -723,10 +877,14 @@ function AuthPageContent() {
               : 'Authorize secure action';
 
   const description =
-    status === 'sign_pending'
-      ? `Review the request from ${callerLabel} before approving with your passkey.`
+    status === 'select_wallet'
+      ? `${callerLabel} is requesting an INJ Pass connection. Choose the wallet for this app session.`
+      : status === 'unlock_wallet'
+        ? 'Enter this wallet\'s local password. It stays inside this secure INJ Pass window.'
+      : status === 'sign_pending'
+      ? `Review the request from ${callerLabel} before approving it.`
       : status === 'tx_pending'
-        ? `Review the transaction from ${callerLabel} before approving with your passkey.`
+        ? `Review the transaction from ${callerLabel} before approving it.`
       : status === 'processing'
         ? message || 'Preparing secure authorization...'
       : status === 'success'
@@ -734,7 +892,7 @@ function AuthPageContent() {
       : status === 'error'
             ? errorMessage || 'An unexpected error occurred. Please try again.'
             : action === 'connect'
-              ? 'Your paired wallet stays self-custodial while INJ Pass opens the secure session.'
+              ? 'Your selected wallet stays self-custodial while INJ Pass opens the secure session.'
               : 'INJ Pass is preparing the next authorization flow.';
 
   return (
@@ -834,12 +992,106 @@ function AuthPageContent() {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <TrustPillBadge label="Passkey Security" icon="passkey" isLightMode={isLightMode} showActivation activationIndex={0} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.16em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
+              <TrustPillBadge label={isTraditionalWallet(selectedWallet) ? 'Local Encryption' : 'Passkey Security'} icon="passkey" isLightMode={isLightMode} showActivation activationIndex={0} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.16em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
               <TrustPillBadge label="Sovereign Custody" icon="custody" isLightMode={isLightMode} showActivation activationIndex={1} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.16em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
               <TrustPillBadge label="Agent Session" icon="lock" isLightMode={isLightMode} showActivation activationIndex={2} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.16em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
             </div>
 
-            {status === 'sign_pending' && currentSignRequest ? (
+            {status === 'select_wallet' ? (
+              <div className="mt-5 flex min-h-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                  {availableWallets.map((wallet) => {
+                    const supported = canUseWalletWithDapps(wallet);
+                    return (
+                      <button
+                        key={wallet.address}
+                        type="button"
+                        onClick={() => chooseWallet(wallet)}
+                        disabled={!supported}
+                        className={`flex w-full items-center gap-3 rounded-[20px] border px-3.5 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                          isLightMode
+                            ? 'border-[#d5deed] bg-white/72 hover:border-[#bfcde3] hover:bg-white'
+                            : 'border-white/10 bg-white/[0.05] hover:border-white/18 hover:bg-white/[0.08]'
+                        }`}
+                      >
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${isLightMode ? 'border-[#d4deed] bg-white text-[#4f48df]' : 'border-white/10 bg-white/[0.06] text-white'}`}>
+                          {isTraditionalWallet(wallet) ? '24' : 'P'}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold">{wallet.walletName || 'INJ Pass Wallet'}</span>
+                          <span className={`mt-1 block font-mono text-[10px] ${headerTone}`}>{truncateWalletAddress(wallet.address)}</span>
+                        </span>
+                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${isLightMode ? 'border-[#d5deed] text-[#59657a]' : 'border-white/10 text-white/58'}`}>
+                          {walletSecurityLabel(wallet)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {errorMessage ? <p className={`mt-3 text-xs leading-5 ${isLightMode ? 'text-rose-700' : 'text-rose-200'}`}>{errorMessage}</p> : null}
+
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-current/10 pt-4">
+                  <button type="button" onClick={rejectWalletConnect} className={`rounded-full px-4 py-2.5 text-xs font-semibold transition ${secondaryButtonTone}`}>Cancel</button>
+                  <a href="/welcome" target="_blank" rel="noreferrer" className={`rounded-full px-4 py-2.5 text-xs font-semibold transition ${primaryButtonTone}`}>Create another wallet</a>
+                </div>
+              </div>
+            ) : status === 'unlock_wallet' && selectedWallet ? (
+              <form
+                className="mt-5 flex min-h-0 flex-1 flex-col"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (walletPassword) void finishWalletConnect(selectedWallet, walletPassword);
+                }}
+              >
+                <div className={`rounded-[22px] border px-4 py-4 ${surfaceTone}`}>
+                  <p className="text-sm font-semibold">{selectedWallet.walletName || 'INJ Pass Wallet'}</p>
+                  <p className={`mt-1 font-mono text-[11px] ${headerTone}`}>{selectedWallet.address}</p>
+                </div>
+
+                <label className="mt-5 block">
+                  <span className={`text-[10px] font-medium uppercase tracking-[0.2em] ${headerTone}`}>Local wallet password</span>
+                  <input
+                    autoFocus
+                    type="password"
+                    value={walletPassword}
+                    onChange={(event) => {
+                      setWalletPassword(event.target.value);
+                      setErrorMessage('');
+                    }}
+                    autoComplete="current-password"
+                    placeholder="Enter your local password"
+                    className={`mt-2 h-12 w-full rounded-[18px] border px-4 text-sm outline-none transition focus:border-violet-400 ${isLightMode ? 'border-[#d5deed] bg-white/82 text-[#171b24]' : 'border-white/12 bg-white/[0.05] text-white'}`}
+                  />
+                </label>
+
+                <p className={`mt-3 text-xs leading-5 ${headerTone}`}>The password decrypts this wallet only inside the INJ Pass authorization window. It is never shared with {callerLabel}.</p>
+                {errorMessage ? <p className={`mt-3 text-xs leading-5 ${isLightMode ? 'text-rose-700' : 'text-rose-200'}`}>{errorMessage}</p> : null}
+
+                <div className="mt-auto grid grid-cols-2 gap-2.5 pt-5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWalletPassword('');
+                      setErrorMessage('');
+                      setSelectedWallet(null);
+                      selectedWalletRef.current = null;
+                      setStatus('select_wallet');
+                    }}
+                    className={`rounded-[20px] border px-4 py-3 text-sm font-semibold transition ${secondaryButtonTone}`}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!walletPassword}
+                    className={`rounded-[20px] border px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${primaryButtonTone}`}
+                  >
+                    Unlock and connect
+                  </button>
+                </div>
+              </form>
+            ) : status === 'sign_pending' && currentSignRequest ? (
               <div className="mt-5 flex min-h-0 flex-1 flex-col gap-3">
                 <div className={`rounded-[24px] border p-4 ${surfaceTone}`}>
                   <p className={`text-[10px] uppercase tracking-[0.2em] ${headerTone}`}>
@@ -854,14 +1106,14 @@ function AuthPageContent() {
                   <p className={`text-[10px] uppercase tracking-[0.2em] ${headerTone}`}>
                     Requested by
                   </p>
-                  <p className="mt-2 text-sm">{callerOriginToLabel(currentSignRequest.origin)}</p>
+                  <p className="mt-2 text-sm">{callerLabel}</p>
                   <p className={`mt-1 truncate text-xs ${headerTone}`}>
-                    {currentSignRequest.origin}
+                    {appOriginParam || currentSignRequest.origin}
                   </p>
                 </div>
 
                 <div className={`rounded-[22px] border px-4 py-3 text-sm ${isLightMode ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-amber-400/20 bg-amber-500/10 text-amber-100'}`}>
-                  Your passkey approval is required before this signature can be released.
+                  Your approval is required. The selected wallet&apos;s private key never leaves this INJ Pass window.
                 </div>
 
                 <div className="mt-auto grid grid-cols-2 gap-2.5 pt-1">
@@ -875,7 +1127,7 @@ function AuthPageContent() {
                     onClick={handleConfirmSign}
                     className={`rounded-[22px] border px-4 py-3 text-sm font-semibold transition-all ${primaryButtonTone}`}
                   >
-                    Sign with Passkey
+                    {isTraditionalWallet(selectedWallet) ? 'Approve signature' : 'Sign with Passkey'}
                   </button>
                 </div>
               </div>
@@ -914,11 +1166,11 @@ function AuthPageContent() {
                   <p className={`text-[10px] uppercase tracking-[0.2em] ${headerTone}`}>
                     Requested by
                   </p>
-                  <p className="mt-1 text-xs">{callerOriginToLabel(currentTxRequest.origin)}</p>
+                  <p className="mt-1 text-xs">{callerLabel}</p>
                 </div>
 
                 <div className={`rounded-[16px] border px-3 py-2 text-xs ${isLightMode ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-amber-400/20 bg-amber-500/10 text-amber-100'}`}>
-                  Passkey approval is required to sign this transaction.
+                  Review every field before approving. INJ Gift receives only the resulting transaction hash.
                 </div>
 
                 <div className="mt-auto grid grid-cols-2 gap-2 pt-1 flex-shrink-0">
@@ -932,7 +1184,7 @@ function AuthPageContent() {
                     onClick={handleConfirmTx}
                     className={`rounded-[18px] border px-3 py-2.5 text-sm font-semibold transition-all ${primaryButtonTone}`}
                   >
-                    Approve with Passkey
+                    {isTraditionalWallet(selectedWallet) ? 'Approve transaction' : 'Approve with Passkey'}
                   </button>
                 </div>
               </div>
@@ -990,11 +1242,11 @@ function AuthPageContent() {
                     Security notice
                   </p>
                   <p className="mt-2 text-sm leading-6">
-                    INJ Pass authorizes from a self-custodial wallet secured by passkeys. Your private key never leaves this secure window.
+                    INJ Pass authorizes from the wallet you selected. Passkey and traditional wallet secrets remain inside this secure window.
                   </p>
-                  {originParam ? (
+                  {appOriginParam || originParam ? (
                     <p className={`mt-2 text-xs ${headerTone}`}>
-                      Requested by: {originParam}
+                      Requested by: {appOriginParam || originParam}
                     </p>
                   ) : null}
                 </div>

@@ -36,8 +36,8 @@ interface ChatCompletionStreamChunk {
 
 const MAX_HISTORY_MESSAGES = 16;
 const MAX_MESSAGE_CHARS = 4000;
-const DEFAULT_BASE_URL = 'https://yinli.one/v1';
-const DEFAULT_MODEL = 'deepseek-v3.2';
+const DEFAULT_BASE_URL = 'https://api.deepseek.com';
+const DEFAULT_MODEL = 'deepseek-chat';
 
 const SUPPORT_SYSTEM_PROMPT = `
 You are Eric inside INJ Pass Support, the Speclist in AgentOS. Speak directly in
@@ -115,7 +115,7 @@ function parseMessages(value: unknown): SupportMessage[] {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.SUPPORT_AI_API_KEY || process.env.YINLI_API_KEY;
+  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.SUPPORT_AI_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json(
@@ -138,8 +138,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const baseUrl = process.env.SUPPORT_AI_BASE_URL || process.env.YINLI_BASE_URL || DEFAULT_BASE_URL;
-  const model = process.env.SUPPORT_AI_MODEL || DEFAULT_MODEL;
+  const baseUrl = process.env.DEEPSEEK_BASE_URL || process.env.SUPPORT_AI_BASE_URL || DEFAULT_BASE_URL;
+  const model = process.env.DEEPSEEK_MODEL || process.env.SUPPORT_AI_MODEL || DEFAULT_MODEL;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45000);
 

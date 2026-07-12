@@ -3,8 +3,7 @@
  * Integrates WebAuthn API with wallet key derivation
  */
 
-import { deriveSecp256k1 } from './deriveSecp256k1';
-import { encryptKey } from '../keystore/encryptKey';
+import { encryptKey, encryptText } from '../keystore/encryptKey';
 import { saveWallet } from '../keystore/storage';
 import { LocalKeystore } from '@/types/wallet';
 import {
@@ -15,6 +14,7 @@ import {
   setAuthToken,
 } from '@/services/passkey';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { english, generateMnemonic, mnemonicToAccount } from 'viem/accounts';
 
 export interface CreateByPasskeyResult {
   address: string;
@@ -24,15 +24,10 @@ export interface CreateByPasskeyResult {
   // immediately without a second passkey ceremony. Use it in-memory and discard;
   // never persist or log it.
   privateKey: Uint8Array;
+  mnemonic: string;
 }
 
 /**
- * @deprecated INSECURE — derives the private key as `sha256(credentialId)`, a
- * public value. Use `createPrfWallet` from `./prf` for all new wallets. This is
- * retained only for reference/back-compat and must NOT be wired into any
- * creation UI. `unlockByPasskey` below is still used to open existing legacy
- * wallets (routed via `unlockWalletKey`).
- *
  * Create a new wallet using Passkey
  *
  * Flow:
@@ -84,12 +79,17 @@ export async function createByPasskey(
 
     const response = credential.response as AuthenticatorAttestationResponse;
 
-    // 3. Derive wallet address from credential ID first (before verification)
-    // Use base64-encoded rawId as the credential identifier
+    // 3. Generate a recoverable 24-word BIP-39 wallet.
     const credentialIdBase64 = arrayBufferToBase64(credential.rawId);
     const credentialIdBytes = new TextEncoder().encode(credentialIdBase64);
-    const walletEntropy = sha256(credentialIdBytes);
-    const { privateKey, address } = deriveSecp256k1(walletEntropy);
+    const encryptionEntropy = sha256(credentialIdBytes);
+    const mnemonic = generateMnemonic(english, 256);
+    const account = mnemonicToAccount(mnemonic);
+    const privateKey = account.getHdKey().privateKey;
+    if (!privateKey) {
+      throw new Error('Unable to derive the wallet key from its recovery phrase');
+    }
+    const address = account.address;
 
     // 4. Verify with backend and send wallet address and wallet name
     const verifyResult = await verifyPasskey(challenge, {
@@ -111,11 +111,9 @@ export async function createByPasskey(
       setAuthToken(verifyResult.token);
     }
 
-    // 5. Derive encryption key from credential ID (same as wallet entropy for simplicity)
-    const encryptionEntropy = walletEntropy;
-
     // 6. Encrypt and save
     const encryptedPrivateKey = await encryptKey(privateKey, encryptionEntropy);
+    const encryptedMnemonic = await encryptText(mnemonic, encryptionEntropy);
 
     const keystore: LocalKeystore = {
       address,
@@ -124,6 +122,8 @@ export async function createByPasskey(
       credentialId: verifyResult.credentialId,
       createdAt: Date.now(),
       walletName: verifyResult.walletName,
+      keyScheme: 'legacy-sha256',
+      encryptedMnemonic,
     };
 
     saveWallet(keystore);
@@ -133,6 +133,7 @@ export async function createByPasskey(
       credentialId: verifyResult.credentialId,
       walletName: verifyResult.walletName,
       privateKey,
+      mnemonic,
     };
   } catch (error) {
     throw new Error(

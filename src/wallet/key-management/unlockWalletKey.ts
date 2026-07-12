@@ -18,6 +18,7 @@ import { unlockByPasskey } from './createByPasskey';
 import { unlockPrfWallet } from './prf';
 import { decryptKey } from '../keystore/encryptKey';
 import { unlockLocalMnemonicWallet } from './unlockLocalMnemonicWallet';
+import { deriveSecp256k1 } from './deriveSecp256k1';
 
 export class PasswordRequiredError extends Error {
   constructor() {
@@ -26,13 +27,24 @@ export class PasswordRequiredError extends Error {
   }
 }
 
+function assertExpectedAddress(privateKey: Uint8Array, expectedAddress: string): Uint8Array {
+  const { address } = deriveSecp256k1(privateKey);
+  if (address.trim().toLowerCase() !== expectedAddress.trim().toLowerCase()) {
+    throw new Error('Unlocked key does not match the wallet address. Recovery is required.');
+  }
+  return privateKey;
+}
+
 export async function unlockWalletKey(
   keystore: LocalKeystore,
   options?: { password?: string },
 ): Promise<Uint8Array> {
   if (keystore.keyScheme === 'local-mnemonic-v1') {
     if (!options?.password) throw new PasswordRequiredError();
-    return unlockLocalMnemonicWallet(keystore, options.password);
+    return assertExpectedAddress(
+      await unlockLocalMnemonicWallet(keystore, options.password),
+      keystore.address,
+    );
   }
 
   if (!keystore.credentialId) {
@@ -40,10 +52,16 @@ export async function unlockWalletKey(
   }
 
   if (keystore.keyScheme === 'prf-v1') {
-    return unlockPrfWallet(keystore.credentialId);
+    return assertExpectedAddress(await unlockPrfWallet(keystore.credentialId), keystore.address);
   }
 
   // Legacy passkey wallet: authenticate, then decrypt with sha256(credentialId).
-  const entropy = await unlockByPasskey(keystore.credentialId);
-  return decryptKey(keystore.encryptedPrivateKey, entropy);
+  await unlockByPasskey(keystore.credentialId);
+  const legacyKeyCredentialId = keystore.legacyKeyCredentialId ?? keystore.credentialId;
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const entropy = sha256(new TextEncoder().encode(legacyKeyCredentialId));
+  return assertExpectedAddress(
+    await decryptKey(keystore.encryptedPrivateKey, entropy),
+    keystore.address,
+  );
 }

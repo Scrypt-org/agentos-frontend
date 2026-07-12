@@ -15,6 +15,8 @@ export interface LocalKeystore {
   source: WalletSource;
   keyScheme?: KeyScheme; // undefined = legacy-sha256 (back-compat)
   credentialId?: string; // Passkey only
+  /** Historical credential-id representation used to derive a legacy wallet key. */
+  legacyKeyCredentialId?: string;
   nfcUID?: string; // NFC only
   createdAt: number; // Unix timestamp
   walletName?: string; // Display name for the wallet

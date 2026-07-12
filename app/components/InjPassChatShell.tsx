@@ -75,14 +75,14 @@ import { getUserStakingInfo, type StakingInfo } from '@/services/staking';
 import { estimateGas, getBalance as getNativeBalance, getGasPrice, sendTransaction, waitForTransaction } from '@/wallet/chain';
 import {
   completeLocalWalletSetup,
-  createByPasskey,
   createPrfWallet,
   detectPrfSupport,
   importMnemonicWallet,
   markMnemonicBackedUp,
-  recoverFullWallet,
+  recoverWallet,
   revealWalletMnemonic,
   unlockWalletKey,
+  PrfUnsupportedError,
   type PrfDetection,
 } from '@/wallet/key-management';
 import { deleteWallet, deleteWalletByAddress, loadWallet, loadWallets, setActiveWallet } from '@/wallet/keystore';
@@ -3672,7 +3672,7 @@ function WalletSetupWizard({
   const isFinalStep = activeStep === stages.length - 1;
   const usesPrf = prfDetection?.capabilityPrf === true;
   const passkeyProtectionLabel = prfDetection
-    ? usesPrf ? 'Passkey PRF' : 'Compatible Passkey'
+    ? usesPrf ? 'Passkey PRF' : 'Passkey PRF (unconfirmed)'
     : 'Checking this device...';
 
   const advance = () => {
@@ -3835,14 +3835,12 @@ function WalletSetupWizard({
                   </div>
                   <div className="flex items-center justify-between gap-4 py-4">
                     <span className={cx('text-sm', isLight ? 'text-black/48' : 'text-white/48')}>{isPasskey ? 'Recovery' : 'Storage'}</span>
-                    <strong className="text-right text-sm">{isPasskey ? usesPrf ? 'System Passkey' : '24-word offline backup' : 'Encrypted in this browser'}</strong>
+                    <strong className="text-right text-sm">{isPasskey ? 'System Passkey PRF' : 'Encrypted in this browser'}</strong>
                   </div>
                 </div>
                 <p className={cx('mt-4 text-xs leading-5', isLight ? 'text-black/46' : 'text-white/46')}>
                   {isPasskey
-                    ? usesPrf
-                      ? 'Only public credential metadata and the wallet address are registered. The wallet key is derived inside the system Passkey flow and is not stored on disk.'
-                      : 'This device will create a recoverable wallet protected by its system Passkey. You will be asked to save the 24 words offline after creation.'
+                    ? 'INJ Pass will verify PRF support in the real system Passkey prompt. Only public credential metadata and the wallet address are registered; the wallet key is not stored on disk.'
                     : 'Your recovery phrase and password are never uploaded to the INJ Pass server. You will be asked to save the 24 words offline after creation.'}
                 </p>
               </div>
@@ -6651,35 +6649,36 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       const walletName = newWalletName.trim() || 'My INJ Pass';
       const detection = prfDetection || await detectPrfSupport();
       setPrfDetection(detection);
-      if (detection.capabilityPrf === true) {
-        const result = await createPrfWallet(walletName);
-        const createdWallet = loadWallet();
-        if (!createdWallet) {
-          throw new Error('The Passkey wallet was created but its local metadata could not be loaded.');
-        }
-        unlockWithWalletKey(result.privateKey, createdWallet);
-        setMnemonicWords([]);
-        setMnemonicBackedUpLocally(true);
-        setTraditionalWalletWizardOpen(false);
-      } else {
-        const result = await createByPasskey(walletName);
-        const createdWallet = loadWallet();
-        if (!createdWallet) {
-          throw new Error('The Passkey wallet was created but its local metadata could not be loaded.');
-        }
-        unlockWithWalletKey(result.privateKey, createdWallet);
-        setMnemonicWords(result.mnemonic.split(/\s+/));
-        setMnemonicBackedUpLocally(false);
-        setMnemonicStep('words');
-        setComposerIntroDeferredForBackup(true);
-        setTraditionalWalletWizardOpen(false);
-        setMnemonicBackupOpen(true);
+      // Detection is advisory only. The authenticator selected in the actual
+      // WebAuthn ceremony is the source of truth for PRF support.
+      const result = await createPrfWallet(walletName);
+      const createdWallet = loadWallet();
+      if (!createdWallet) {
+        throw new Error('The Passkey wallet was created but its local metadata could not be loaded.');
       }
+      unlockWithWalletKey(result.privateKey, createdWallet);
+      setMnemonicWords([]);
+      setMnemonicBackedUpLocally(true);
+      setTraditionalWalletWizardOpen(false);
       setAuthMenuOpen(false);
       setNewWalletName('');
       setLocalWallets(loadWallets());
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Failed to create INJ Pass.');
+      if (error instanceof PrfUnsupportedError) {
+        // Match the test-branch behavior: keep the creation wizard open and
+        // switch to the user-selectable mnemonic/password method after the real
+        // authenticator confirms PRF is unavailable.
+        setWalletSetupMethod('traditional');
+        setTraditionalWalletWizardMode('create');
+        setTraditionalWalletWizardStep(0);
+        setNewWalletPassword('');
+        setNewWalletPasswordConfirm('');
+        setAuthError(
+          'This authenticator does not support secure Passkey PRF. Continue with the Traditional wallet option to create a recoverable 24-word wallet protected by a local password.',
+        );
+      } else {
+        setAuthError(error instanceof Error ? error.message : 'Failed to create INJ Pass.');
+      }
     } finally {
       setAuthPendingAction(null);
     }
@@ -6709,7 +6708,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setAuthError('');
 
     try {
-      const recovered = await recoverFullWallet();
+      // A single discoverable ceremony auto-detects PRF wallets and only falls
+      // back to legacy sha256 derivation for an existing matching wallet.
+      const recovered = await recoverWallet();
       const recoveredWallet = loadWallet();
       if (!recoveredWallet) {
         throw new Error('The Passkey was verified but the wallet could not be recovered.');

@@ -35,6 +35,7 @@ export interface CatNFT {
   collection: string;
   owner: Address;
   tokenURI: string;
+  mintTxHash?: Hash;
 }
 
 export interface CatCollectionInfo {
@@ -48,6 +49,9 @@ export interface CatCollectionInfo {
 export interface CatMintResult {
   hash: Hash;
   tokenId: string | null;
+  gasSponsored?: boolean;
+  sponsoredWei?: string;
+  sponsorshipTxHash?: Hash;
 }
 
 export interface CatMintCredits {
@@ -389,6 +393,14 @@ export async function getCatNFTsForOwner(ownerAddress: Address): Promise<CatNFT[
         }),
       ]);
 
+      const mintTxHashes = new Map<string, Hash>();
+      for (const log of mintLogs) {
+        const tokenId = log.args?.tokenId;
+        if (typeof tokenId === 'bigint' && log.transactionHash) {
+          mintTxHashes.set(tokenId.toString(), log.transactionHash);
+        }
+      }
+
       const tokenIds = [...mintLogs, ...transferLogs]
         .sort((a, b) => {
           if (a.blockNumber === b.blockNumber) {
@@ -408,7 +420,10 @@ export async function getCatNFTsForOwner(ownerAddress: Address): Promise<CatNFT[
 
         const nft = await getCatNFTDetails(tokenId);
         if (nft?.owner.toLowerCase() === ownerAddress.toLowerCase()) {
-          nfts.push(nft);
+          nfts.push({
+            ...nft,
+            mintTxHash: mintTxHashes.get(key),
+          });
           if (nfts.length >= Number(balance)) {
             return nfts;
           }
@@ -434,7 +449,10 @@ export async function getCatNFTForOwner(ownerAddress: Address): Promise<CatNFT |
   return nfts[0] ?? null;
 }
 
-export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult> {
+async function mintCatNFTWithVoucherEndpoint(
+  privateKey: Uint8Array,
+  endpoint: 'mint-voucher' | 'sponsored-mint-voucher',
+): Promise<CatMintResult> {
   const contractAddress = getCatNFTContractAddress();
   const client = createClient();
 
@@ -450,7 +468,7 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
     transport: http(),
   });
 
-  const voucherResponse = await fetch(`${API_BASE_URL}/catnft/mint-voucher`, {
+  const voucherResponse = await fetch(`${API_BASE_URL}/catnft/${endpoint}`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ quantity: 1 }),
@@ -472,6 +490,10 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
       quantity: number;
     };
     signature: `0x${string}`;
+    gasLimit?: string;
+    gasSponsored?: boolean;
+    sponsoredWei?: string;
+    sponsorshipTxHash?: Hash;
   };
 
   const hash = await walletClient.writeContract({
@@ -487,6 +509,7 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
       },
       voucherPayload.signature,
     ],
+    gas: voucherPayload.gasLimit ? BigInt(voucherPayload.gasLimit) : undefined,
   });
 
   const receipt = await client.waitForTransactionReceipt({ hash });
@@ -509,7 +532,7 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
       tokenId: tokenId.toString(),
       txHash: hash,
       ownerAddress: account.address,
-      source: 'frontend',
+      source: endpoint === 'sponsored-mint-voucher' ? 'eric-mfer' : 'frontend',
     }),
   });
 
@@ -526,7 +549,18 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
   return {
     hash,
     tokenId: typeof tokenId === 'bigint' ? tokenId.toString() : null,
+    gasSponsored: voucherPayload.gasSponsored,
+    sponsoredWei: voucherPayload.sponsoredWei,
+    sponsorshipTxHash: voucherPayload.sponsorshipTxHash,
   };
+}
+
+export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult> {
+  return mintCatNFTWithVoucherEndpoint(privateKey, 'mint-voucher');
+}
+
+export async function mintSponsoredCatNFT(privateKey: Uint8Array): Promise<CatMintResult> {
+  return mintCatNFTWithVoucherEndpoint(privateKey, 'sponsored-mint-voucher');
 }
 
 export async function getCatMintCredits(): Promise<CatMintCredits> {

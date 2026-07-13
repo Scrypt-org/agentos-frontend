@@ -140,6 +140,12 @@ export interface PublicChatResponse {
   error?: string;
 }
 
+export interface TaskProgressStepsResponse {
+  ok: boolean;
+  steps?: string[];
+  error?: string;
+}
+
 function rethrowAbort(error: unknown): void {
   if (error instanceof Error && error.name === 'AbortError') {
     throw error;
@@ -244,6 +250,30 @@ export async function sendPublicAgentMessage(request: {
   } catch (error) {
     rethrowAbort(error);
     console.error('[AI] Public chat failed:', error);
+    return { ok: false, error: 'Network error' };
+  }
+}
+
+export async function generateTaskProgressSteps(request: {
+  prompt: string;
+  language: string;
+  mode: 'chat' | 'build';
+}, signal?: AbortSignal): Promise<TaskProgressStepsResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/ai/task-steps`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+      signal,
+    });
+    const payload = await response.json().catch(() => ({})) as TaskProgressStepsResponse;
+    if (!response.ok) {
+      return { ok: false, error: payload.error || 'Task steps failed' };
+    }
+    return payload;
+  } catch (error) {
+    rethrowAbort(error);
+    console.error('[AI] Task step generation failed:', error);
     return { ok: false, error: 'Network error' };
   }
 }

@@ -12,6 +12,7 @@ import {
   encodeFunctionData,
   formatEther,
   http,
+  isAddress,
   keccak256,
   stringToHex,
   type Address,
@@ -37,6 +38,7 @@ import {
   getAgentSandboxDetails,
   getStoredAgentConversation,
   getStoredAgentConversations,
+  generateTaskProgressSteps,
   searchStoredAgentConversations,
   sendAgentMessage,
   sendPublicAgentMessage,
@@ -77,6 +79,7 @@ import { getUserProfile, type UserProfileResponse } from '@/services/user';
 import { authenticateWalletSession } from '@/services/wallet-auth';
 import { createMySkill, getMySkills, getPublicSkills } from '@/services/skills';
 import { getN1NJ4NFTs, type NFT } from '@/services/nft';
+import { getCatNFTDetails, getCatNFTsForOwner, mintSponsoredCatNFT } from '@/services/catnft';
 import { getUserStakingInfo, type StakingInfo } from '@/services/staking';
 import {
   executeInjGiftCommand,
@@ -113,6 +116,7 @@ type AssetWalletView = 'assets' | 'send' | 'receive';
 type ProfilePanel = 'menu' | 'language' | 'preferences' | 'tokens';
 type PreferenceSection = 'display' | 'security' | 'wallet' | 'account';
 type LanguageCode = 'en' | 'de' | 'fr' | 'ko' | 'ja' | 'zh-Hans' | 'zh-Hant';
+type ThinkingMode = 'chat' | 'build';
 type ReasoningLevel = 'High' | 'Medium' | 'Low';
 type AgentModel = 'AgentOS 1.0' | 'AgentOS 1.5';
 type CreativeStage = 'guide' | 'plan' | 'building' | 'published';
@@ -139,6 +143,11 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
   body: string;
   isError?: boolean;
+}
+
+interface ThinkingProgressState {
+  steps: string[];
+  activeIndex: number;
 }
 
 interface DAppMarketItem {
@@ -1799,6 +1808,208 @@ function formatAmount(value: string | number, digits = 4) {
   return numeric.toLocaleString(undefined, { maximumFractionDigits: digits });
 }
 
+function formatNFTTokenNumber(tokenId?: string | null) {
+  if (!tokenId) return '--';
+  return `#${tokenId.padStart(3, '0')}`;
+}
+
+function getNFTRarity(nft?: NFT | null) {
+  const rarity = nft?.metadata?.attributes?.find((attribute) =>
+    /rarity|tier|rank/i.test(attribute.trait_type),
+  )?.value;
+  if (rarity === undefined || rarity === null || rarity === '') return 'Normal';
+  const value = String(rarity);
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+interface EricMferMintCopy {
+  complete: string;
+  sponsored: string;
+  transaction: string;
+  login: string;
+  noCredits: string;
+  failed: string;
+  rarity: string;
+}
+
+const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
+  en: {
+    complete: 'Mint complete. You received',
+    sponsored: 'INJ Pass sponsored the network fee for this mint.',
+    transaction: 'View transaction',
+    login: 'Log in to INJ Pass and unlock a wallet before minting an eric mfer.',
+    noCredits: 'This wallet has already used its complimentary eric mfer mint.',
+    failed: 'The eric mfer mint could not be completed. Please try again.',
+    rarity: 'Rarity',
+  },
+  de: {
+    complete: 'Mint abgeschlossen. Du hast erhalten:',
+    sponsored: 'INJ Pass hat die Netzwerkgebühr für diesen Mint übernommen.',
+    transaction: 'Transaktion ansehen',
+    login: 'Melde dich bei INJ Pass an und entsperre eine Wallet, bevor du einen eric mfer mintest.',
+    noCredits: 'Diese Wallet hat ihren kostenlosen eric mfer Mint bereits verwendet.',
+    failed: 'Der eric mfer Mint konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
+    rarity: 'Seltenheit',
+  },
+  fr: {
+    complete: 'Mint terminé. Vous avez reçu',
+    sponsored: 'INJ Pass a pris en charge les frais réseau de ce mint.',
+    transaction: 'Voir la transaction',
+    login: 'Connectez-vous à INJ Pass et déverrouillez un portefeuille avant de minter un eric mfer.',
+    noCredits: 'Ce portefeuille a déjà utilisé son mint eric mfer offert.',
+    failed: 'Le mint eric mfer n’a pas pu être terminé. Réessayez.',
+    rarity: 'Rareté',
+  },
+  ko: {
+    complete: '민팅이 완료되었습니다. 받은 NFT:',
+    sponsored: '이번 민팅의 네트워크 수수료는 INJ Pass가 지원했습니다.',
+    transaction: '트랜잭션 보기',
+    login: 'eric mfer를 민팅하려면 INJ Pass에 로그인하고 지갑 잠금을 해제하세요.',
+    noCredits: '이 지갑은 무료 eric mfer 민팅을 이미 사용했습니다.',
+    failed: 'eric mfer 민팅을 완료하지 못했습니다. 다시 시도하세요.',
+    rarity: '희귀도',
+  },
+  ja: {
+    complete: 'ミントが完了しました。獲得したNFT:',
+    sponsored: '今回のミントのネットワーク手数料はINJ Passが負担しました。',
+    transaction: 'トランザクションを見る',
+    login: 'eric mferをミントする前にINJ Passへログインし、ウォレットを解除してください。',
+    noCredits: 'このウォレットは無料のeric mferミントをすでに使用しています。',
+    failed: 'eric mferのミントを完了できませんでした。もう一度お試しください。',
+    rarity: 'レア度',
+  },
+  'zh-Hans': {
+    complete: 'Mint 完成，你获得了',
+    sponsored: '本次 Mint 的网络费由 INJ Pass 赞助。',
+    transaction: '查看交易',
+    login: '请先登录 INJ Pass 并解锁钱包，再 Mint eric mfer。',
+    noCredits: '这个钱包已经使用过一次免费的 eric mfer Mint。',
+    failed: 'eric mfer Mint 未能完成，请稍后重试。',
+    rarity: '稀有度',
+  },
+  'zh-Hant': {
+    complete: 'Mint 完成，你獲得了',
+    sponsored: '本次 Mint 的網路費由 INJ Pass 贊助。',
+    transaction: '查看交易',
+    login: '請先登入 INJ Pass 並解鎖錢包，再 Mint eric mfer。',
+    noCredits: '這個錢包已經使用過一次免費的 eric mfer Mint。',
+    failed: 'eric mfer Mint 未能完成，請稍後重試。',
+    rarity: '稀有度',
+  },
+};
+
+function isEricMferMintMessage(message: string) {
+  const referencesEricMfer = /@\s*eric[\s_-]*mfer\b/i.test(message);
+  const hasMintIntent = /\bmint(?:ing|ed)?\b|\bclaim\b|\bget\s+(?:me\s+)?(?:an?|one)\b|\bprägen\b|\bminten\b|\bfrapper\b|\bminter\b|민팅|민트|발행|ミント|発行|铸造|鑄造|铸一个|鑄一個|挖一个|挖一個|领一个|領一個|领取|領取/i.test(message);
+  return referencesEricMfer && hasMintIntent;
+}
+
+function formatEricMferMintMessage(
+  languageCode: LanguageCode,
+  result: { hash: string; tokenId: string | null; gasSponsored?: boolean },
+  nft: NFT | null,
+) {
+  const text = ericMferMintCopy[languageCode];
+  const tokenNumber = formatNFTTokenNumber(result.tokenId);
+  const name = nft?.name || `eric mfer ${tokenNumber}`;
+  const sponsorship = result.gasSponsored ? `\n\n${text.sponsored}` : '';
+  const image = nft?.image
+    ? `\n\n![${name.replace(/[\[\]]/g, '')}](${nft.image})`
+    : '';
+  return `${text.complete} **${name}** (${tokenNumber}).${image}\n\n${text.rarity}: **${getNFTRarity(nft)}**.${sponsorship}\n\n[${text.transaction}](https://blockscout.injective.network/tx/${result.hash})`;
+}
+
+function localizeEricMferMintError(error: unknown, languageCode: LanguageCode) {
+  const message = error instanceof Error ? error.message : String(error);
+  const text = ericMferMintCopy[languageCode];
+  if (/INJPASS_LOGIN_REQUIRED|unlock|locked|authentication/i.test(message)) return text.login;
+  if (/insufficient mint credits|complimentary mint|already.*mint/i.test(message)) return text.noCredits;
+  return text.failed;
+}
+
+const thinkingFallbacks: Record<LanguageCode, Record<ThinkingMode | 'mint', string[]>> = {
+  en: {
+    chat: ['Understand the request', 'Identify the relevant context', 'Check wallet requirements', 'Prepare the next action', 'Review safety constraints', 'Assemble the response'],
+    build: ['Clarify the product scope', 'Map Injective components', 'Design the contract surface', 'Shape the interface flow', 'Plan tests and deployment', 'Assemble the build roadmap'],
+    mint: ['Parse the mint request', 'Verify wallet access', 'Check mint eligibility', 'Prepare the sponsored voucher', 'Submit the mint transaction', 'Read NFT metadata'],
+  },
+  de: {
+    chat: ['Anfrage verstehen', 'Relevanten Kontext erkennen', 'Wallet-Anforderungen prüfen', 'Nächste Aktion vorbereiten', 'Sicherheitsregeln prüfen', 'Antwort zusammenstellen'],
+    build: ['Produktumfang klären', 'Injective-Komponenten abbilden', 'Vertragsschnittstelle entwerfen', 'Oberflächenablauf gestalten', 'Tests und Deployment planen', 'Build-Roadmap erstellen'],
+    mint: ['Mint-Anfrage analysieren', 'Wallet-Zugriff prüfen', 'Mint-Berechtigung prüfen', 'Gesponserten Voucher vorbereiten', 'Mint-Transaktion senden', 'NFT-Metadaten laden'],
+  },
+  fr: {
+    chat: ['Comprendre la demande', 'Identifier le contexte utile', 'Vérifier les besoins du wallet', 'Préparer la prochaine action', 'Contrôler les règles de sécurité', 'Composer la réponse'],
+    build: ['Clarifier le périmètre', 'Cartographier les composants Injective', 'Concevoir les contrats', 'Structurer le parcours utilisateur', 'Planifier tests et déploiement', 'Assembler la feuille de route'],
+    mint: ['Analyser la demande de mint', 'Vérifier l’accès au wallet', 'Contrôler l’éligibilité', 'Préparer le voucher sponsorisé', 'Envoyer la transaction de mint', 'Lire les métadonnées NFT'],
+  },
+  ko: {
+    chat: ['요청 내용 파악', '관련 컨텍스트 확인', '지갑 요구사항 점검', '다음 작업 준비', '안전 조건 검토', '응답 구성'],
+    build: ['제품 범위 정리', 'Injective 구성요소 설계', '컨트랙트 인터페이스 구성', '화면 흐름 설계', '테스트와 배포 계획', '빌드 로드맵 작성'],
+    mint: ['민팅 요청 분석', '지갑 접근 확인', '민팅 자격 확인', '가스 지원 바우처 준비', '민팅 트랜잭션 제출', 'NFT 메타데이터 조회'],
+  },
+  ja: {
+    chat: ['依頼内容を確認', '関連コンテキストを特定', 'ウォレット要件を確認', '次の操作を準備', '安全条件を確認', '回答を構成'],
+    build: ['プロダクト範囲を整理', 'Injective構成を設計', 'コントラクト面を設計', '画面フローを構成', 'テストとデプロイを計画', 'ビルド工程を整理'],
+    mint: ['Mint依頼を解析', 'ウォレット接続を確認', 'Mint資格を確認', 'スポンサーVoucherを準備', 'Mint取引を送信', 'NFTメタデータを取得'],
+  },
+  'zh-Hans': {
+    chat: ['理解当前指令', '识别相关上下文', '检查钱包操作条件', '准备下一步动作', '复核安全边界', '组织最终回复'],
+    build: ['梳理产品范围', '映射 Injective 组件', '设计合约接口', '整理前端流程', '规划测试与部署', '组装构建路线'],
+    mint: ['解析 Mint 指令', '核对钱包访问', '检查 Mint 资格', '准备赞助凭证', '提交 Mint 交易', '读取 NFT 元数据'],
+  },
+  'zh-Hant': {
+    chat: ['理解目前指令', '識別相關上下文', '檢查錢包操作條件', '準備下一步動作', '複核安全邊界', '組織最終回覆'],
+    build: ['梳理產品範圍', '映射 Injective 元件', '設計合約介面', '整理前端流程', '規劃測試與部署', '組裝建構路線'],
+    mint: ['解析 Mint 指令', '核對錢包存取', '檢查 Mint 資格', '準備贊助憑證', '提交 Mint 交易', '讀取 NFT 中繼資料'],
+  },
+};
+
+function chooseFallbackThinkingSteps(prompt: string, languageCode: LanguageCode, mode: ThinkingMode) {
+  const isMint = /\bmint(?:ing|ed)?\b|铸造|鑄造|민팅|민트|ミント/i.test(prompt);
+  const pool = thinkingFallbacks[languageCode][isMint ? 'mint' : mode];
+  const count = 3 + Math.floor(Math.random() * 3);
+  const middle = pool.slice(1, -1)
+    .map((step) => ({ step, order: Math.random() }))
+    .sort((left, right) => left.order - right.order)
+    .slice(0, Math.max(1, count - 2))
+    .map(({ step }) => step);
+  const selected = new Set([pool[0], ...middle, pool[pool.length - 1]]);
+  return pool.filter((step) => selected.has(step)).slice(0, 5);
+}
+
+function splitStreamingText(value: string) {
+  const chunks: string[] = [];
+  let current = '';
+  for (const character of value) {
+    current += character;
+    if (current.length >= 5 || /[\s\n.,!?;:，。！？；：]/.test(character)) {
+      chunks.push(current);
+      current = '';
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+function waitForStreamDelay(delay: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Stopped', 'AbortError'));
+      return;
+    }
+    const abort = () => {
+      window.clearTimeout(timer);
+      reject(new DOMException('Stopped', 'AbortError'));
+    };
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }, delay);
+    signal.addEventListener('abort', abort, { once: true });
+  });
+}
+
 function formatBytes(value: number) {
   if (!Number.isFinite(value) || value <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -1915,6 +2126,16 @@ function MarkdownMessage({ body, isLight }: { body: string; isLight: boolean }) 
             {children}
           </a>
         ),
+        img: ({ src, alt }) => typeof src === 'string' && src ? (
+          <Image
+            src={src}
+            alt={alt || 'NFT'}
+            width={440}
+            height={440}
+            unoptimized
+            className={cx('my-4 aspect-square w-full max-w-[360px] rounded-lg border object-cover', isLight ? 'border-black/8 bg-black/4' : 'border-white/10 bg-white/6')}
+          />
+        ) : null,
       }}
     >
       {body}
@@ -1997,6 +2218,64 @@ function CheckIcon({ className = 'h-4 w-4' }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="m6 12.5 3.8 3.8L18 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+function ThinkingProgress({
+  label,
+  progress,
+  isLight,
+}: {
+  label: string;
+  progress: ThinkingProgressState;
+  isLight: boolean;
+}) {
+  return (
+    <div className="min-w-0" aria-live="polite">
+      <span className={cx('inj-thinking-sheen text-sm', isLight ? 'inj-thinking-sheen-light' : 'inj-thinking-sheen-dark')}>
+        {label}
+      </span>
+      {progress.steps.length > 0 && (
+        <ol className="mt-2.5 space-y-1.5">
+          {progress.steps.map((step, index) => {
+            const complete = index < progress.activeIndex;
+            const active = index === progress.activeIndex;
+            return (
+              <li
+                key={`${index}-${step}`}
+                aria-current={active ? 'step' : undefined}
+                className={cx(
+                  'flex min-w-0 items-center gap-2 text-xs leading-5 transition duration-500 motion-safe:animate-[injFadeUp_360ms_cubic-bezier(0.22,1,0.36,1)_both]',
+                  active
+                    ? isLight ? 'text-black/68' : 'text-white/72'
+                    : complete
+                      ? isLight ? 'text-black/42' : 'text-white/44'
+                      : isLight ? 'text-black/26' : 'text-white/28',
+                )}
+              >
+                <span
+                  className={cx(
+                    'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border transition duration-500',
+                    complete
+                      ? 'border-emerald-500/45 bg-emerald-500/12 text-emerald-500'
+                      : active
+                        ? isLight ? 'border-black/22' : 'border-white/28'
+                        : isLight ? 'border-black/10' : 'border-white/12',
+                  )}
+                >
+                  {complete ? (
+                    <CheckIcon className="h-2.5 w-2.5" />
+                  ) : active ? (
+                    <span className={cx('h-1.5 w-1.5 animate-pulse rounded-full', isLight ? 'bg-black/62' : 'bg-white/72')} />
+                  ) : null}
+                </span>
+                <span className="min-w-0 truncate">{step}</span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -2539,7 +2818,9 @@ function WalletDataPanel({
   const title = walletTabs.find((item) => item.id === tab)?.label || 'Wallet';
   const supportsTransfers = tab === 'tokens' || tab === 'nfts';
   const canSend = tab === 'tokens' || Boolean(data.nfts?.length);
+  const [selectedNft, setSelectedNft] = useState<NFT | null>(null);
   return (
+    <>
     <section className="mx-auto w-full max-w-4xl py-5">
       <div className={cx('flex items-end justify-between border-b pb-4', isLight ? 'border-black/8' : 'border-white/8')}>
         <div>
@@ -2578,15 +2859,22 @@ function WalletDataPanel({
         data.nfts.length > 0 ? (
           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {data.nfts.map((nft) => (
-              <article key={`${nft.contractAddress}-${nft.tokenId}`} className="min-w-0">
+              <button
+                key={`${nft.contractAddress}-${nft.tokenId}`}
+                type="button"
+                onClick={() => setSelectedNft(nft)}
+                className="group min-w-0 text-left outline-none"
+                aria-label={`View ${nft.name} details`}
+              >
                 <div className={cx('relative aspect-square overflow-hidden rounded-xl', isLight ? 'bg-black/5' : 'bg-white/7')}>
-                  {nft.image ? <Image src={nft.image} alt={nft.name} fill sizes="180px" unoptimized className="object-cover" /> : <div className="flex h-full items-center justify-center text-xs opacity-45">No image</div>}
+                  {nft.image ? <Image src={nft.image} alt={nft.name} fill sizes="180px" unoptimized className="object-cover transition duration-300 group-hover:scale-[1.025]" /> : <div className="flex h-full items-center justify-center text-xs opacity-45">No image</div>}
+                  <span className={cx('absolute inset-0 rounded-xl ring-1 ring-inset transition', isLight ? 'ring-black/0 group-hover:ring-black/14' : 'ring-white/0 group-hover:ring-white/18')} />
                 </div>
                 <div className="mt-2 truncate text-sm font-bold">{nft.name}</div><div className={cx('text-xs', isLight ? 'text-black/42' : 'text-white/42')}>#{nft.tokenId}</div>
-              </article>
+              </button>
             ))}
           </div>
-        ) : <div className={cx('py-14 text-center text-sm', isLight ? 'text-black/46' : 'text-white/46')}>No N1NJ4 NFTs found.</div>
+        ) : <div className={cx('py-14 text-center text-sm', isLight ? 'text-black/46' : 'text-white/46')}>No NFTs found in this wallet.</div>
       )}
 
       {isAuthenticated && !error && tab === 'defi' && data.defi && (
@@ -2620,6 +2908,92 @@ function WalletDataPanel({
         ) : <div className={cx('py-14 text-center text-sm', isLight ? 'text-black/46' : 'text-white/46')}>No recent EVM activity.</div>
       )}
     </section>
+    {selectedNft && (
+      <OverlayPortal enabled>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-8">
+          <button
+            type="button"
+            onClick={() => setSelectedNft(null)}
+            className="absolute inset-0 bg-black/62 backdrop-blur-md"
+            aria-label="Close NFT details"
+          />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wallet-nft-detail-title"
+            className={cx(
+              'relative z-10 grid w-full max-w-3xl overflow-hidden rounded-lg border shadow-[0_28px_90px_rgba(0,0,0,0.3)] motion-safe:animate-[injFadeUp_420ms_cubic-bezier(0.22,1,0.36,1)_both] md:grid-cols-[minmax(260px,0.9fr)_minmax(320px,1.1fr)]',
+              isLight ? 'border-black/10 bg-[#fbfbfa] text-black' : 'border-white/12 bg-[#151517] text-white shadow-black/60',
+            )}
+          >
+            <div className={cx('relative min-h-[300px] md:min-h-[520px]', isLight ? 'bg-black/5' : 'bg-white/5')}>
+              {selectedNft.image ? (
+                <Image src={selectedNft.image} alt={selectedNft.name} fill sizes="(max-width: 768px) 100vw, 380px" unoptimized className="object-cover" />
+              ) : (
+                <div className="flex h-full min-h-[300px] items-center justify-center text-sm opacity-42">No image</div>
+              )}
+            </div>
+            <div className="relative flex min-w-0 flex-col p-6 sm:p-8">
+              <button
+                type="button"
+                onClick={() => setSelectedNft(null)}
+                className={cx('absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full transition', isLight ? 'hover:bg-black/6' : 'hover:bg-white/9')}
+                aria-label="Close NFT details"
+              >
+                <CloseIcon className="h-3.5 w-3.5" />
+              </button>
+              <div className={cx('pr-10 text-[10px] font-bold uppercase tracking-[0.18em]', isLight ? 'text-black/38' : 'text-white/38')}>{selectedNft.collection}</div>
+              <h2 id="wallet-nft-detail-title" className="inj-display-serif mt-2 pr-10 text-3xl leading-tight">{selectedNft.name}</h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className={cx('rounded-md px-2.5 py-1.5 font-mono text-xs font-bold', isLight ? 'bg-black text-white' : 'bg-white text-black')}>{formatNFTTokenNumber(selectedNft.tokenId)}</span>
+                <span className={cx('rounded-md border px-2.5 py-1.5 text-xs font-bold', isLight ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-violet-300/16 bg-violet-300/10 text-violet-200')}>Rarity · {getNFTRarity(selectedNft)}</span>
+              </div>
+
+              {selectedNft.description && <p className={cx('mt-5 text-sm leading-6', isLight ? 'text-black/58' : 'text-white/58')}>{selectedNft.description}</p>}
+
+              {selectedNft.metadata?.attributes && selectedNft.metadata.attributes.length > 0 && (
+                <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3">
+                  {selectedNft.metadata.attributes.slice(0, 8).map((attribute, index) => (
+                    <div key={`${attribute.trait_type}-${index}`} className={cx('border-t pt-2', isLight ? 'border-black/8' : 'border-white/9')}>
+                      <div className={cx('truncate text-[10px] uppercase', isLight ? 'text-black/38' : 'text-white/38')}>{attribute.trait_type}</div>
+                      <div className="mt-1 truncate text-xs font-bold">{String(attribute.value)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <dl className={cx('mt-auto divide-y pt-6 text-xs', isLight ? 'divide-black/8' : 'divide-white/9')}>
+                <div className="py-3">
+                  <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Contract</dt>
+                  <dd className="mt-1 break-all font-mono">{selectedNft.contractAddress}</dd>
+                </div>
+                <div className="py-3">
+                  <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Owner</dt>
+                  <dd className="mt-1 break-all font-mono">{selectedNft.owner}</dd>
+                </div>
+                {selectedNft.mintTxHash && (
+                  <div className="py-3">
+                    <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Mint transaction</dt>
+                    <dd className="mt-1">
+                      <a href={`https://blockscout.injective.network/tx/${selectedNft.mintTxHash}`} target="_blank" rel="noreferrer" className="break-all font-mono text-violet-500 underline underline-offset-4">{selectedNft.mintTxHash}</a>
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              <a
+                href={`https://blockscout.injective.network/token/${selectedNft.contractAddress}/instance/${selectedNft.tokenId}`}
+                target="_blank"
+                rel="noreferrer"
+                className={cx('mt-5 flex h-10 items-center justify-center rounded-md text-xs font-bold transition', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}
+              >
+                View on Injective Explorer
+              </a>
+            </div>
+          </section>
+        </div>
+      </OverlayPortal>
+    )}
+    </>
   );
 }
 
@@ -2924,7 +3298,7 @@ function NFTTransferPanel({
 
   const normalizeRecipient = (value: string): Address => {
     const normalized = value.trim().startsWith('inj1') ? getEthereumAddress(value.trim()) : value.trim();
-    if (!/^0x[a-fA-F0-9]{40}$/.test(normalized)) throw new Error(copy.invalidRecipient);
+    if (!isAddress(normalized, { strict: false })) throw new Error(copy.invalidRecipient);
     return normalized as Address;
   };
 
@@ -2939,10 +3313,13 @@ function NFTTransferPanel({
 
   const localizeError = (transferError: unknown) => {
     const message = transferError instanceof Error ? transferError.message : String(transferError);
-    if (/invalid|address|recipient/i.test(message)) return copy.invalidRecipient;
     if (/insufficient|funds for gas|balance/i.test(message)) return copy.insufficientBalance;
     if (/owner|approved|authorization/i.test(message)) return 'This wallet is not authorized to transfer the selected NFT.';
-    return copy.agentUnavailable;
+    if (/invalid (?:evm |cosmos )?(?:recipient )?address|address (?:is )?invalid|invalid recipient|checksum/i.test(message)) return copy.invalidRecipient;
+    if (/rejected|denied|cancelled|canceled/i.test(message)) return 'The transaction was cancelled.';
+    if (/nonce|fee|max fee|underpriced|gas price/i.test(message)) return 'The network rejected the transaction fee. Refresh the estimate and try again.';
+    if (/revert|execution/i.test(message)) return 'The NFT contract rejected this transfer. Refresh ownership and try again.';
+    return 'Unable to send this NFT right now. Refresh the wallet and try again.';
   };
 
   const reviewTransfer = async () => {
@@ -3138,9 +3515,96 @@ function DAppMarketGrid({
   );
 }
 
+function MiniAppTabStrip({
+  tabs,
+  activeAppId,
+  appsHomeActive,
+  onSelectApp,
+  onCloseApp,
+  onSelectAppsHome,
+  onAddApp,
+  isLight,
+  appsLabel,
+}: {
+  tabs: DAppMarketItem[];
+  activeAppId: string | null;
+  appsHomeActive: boolean;
+  onSelectApp: (app: DAppMarketItem) => void;
+  onCloseApp: (appId: string) => void;
+  onSelectAppsHome: () => void;
+  onAddApp: () => void;
+  isLight: boolean;
+  appsLabel: string;
+}) {
+  return (
+    <div className={cx('flex h-10 shrink-0 items-end border-b px-2', isLight ? 'border-black/8 bg-[#ededf0]' : 'border-white/8 bg-[#161619]')}>
+      <div role="tablist" aria-label="Open INJ Pass apps" className="flex min-w-0 items-end gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {tabs.map((tab) => {
+          const active = activeAppId === tab.id;
+          return (
+            <div
+              key={tab.id}
+              className={cx(
+                'flex h-9 min-w-[150px] max-w-[260px] items-center rounded-t-md border-x border-t px-2.5 transition',
+                active
+                  ? isLight ? 'border-black/8 bg-white text-black' : 'border-white/9 bg-[#0d0d0f] text-white'
+                  : isLight ? 'border-transparent bg-black/[0.025] text-black/55 hover:bg-black/[0.045]' : 'border-transparent bg-white/[0.025] text-white/55 hover:bg-white/[0.05]',
+              )}
+            >
+              <button type="button" role="tab" aria-selected={active} onClick={() => onSelectApp(tab)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                <span className={cx('relative h-5 w-5 shrink-0 overflow-hidden rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}><DAppLogo app={tab} /></span>
+                <span className="min-w-0 flex-1 truncate text-xs font-bold">{tab.name}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onCloseApp(tab.id)}
+                className={cx('ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition', isLight ? 'hover:bg-black/6' : 'hover:bg-white/9')}
+                aria-label={`Close ${tab.name}`}
+                title="Close app"
+              >
+                <CloseIcon className="h-3 w-3" />
+              </button>
+            </div>
+          );
+        })}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={appsHomeActive}
+          onClick={onSelectAppsHome}
+          className={cx(
+            'flex h-9 min-w-[145px] items-center gap-2 rounded-t-md border-x border-t px-2.5 text-left transition',
+            appsHomeActive
+              ? isLight ? 'border-black/8 bg-white text-black' : 'border-white/9 bg-[#0d0d0f] text-white'
+              : isLight ? 'border-transparent bg-black/[0.025] text-black/55 hover:bg-black/[0.045]' : 'border-transparent bg-white/[0.025] text-white/55 hover:bg-white/[0.05]',
+          )}
+        >
+          <span className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}><DAppMarketIcon className="h-3.5 w-3.5" /></span>
+          <span className="min-w-0 flex-1 truncate text-xs font-bold">{appsLabel}</span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+        </button>
+        <button
+          type="button"
+          onClick={onAddApp}
+          className={cx('mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition', isLight ? 'text-black/48 hover:bg-black/7 hover:text-black' : 'text-white/48 hover:bg-white/9 hover:text-white')}
+          aria-label="Open a new app tab"
+          title="New app tab"
+        >
+          <PlusIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="flex-1" />
+      <div className={cx('mb-2 mr-2 hidden shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] sm:block', isLight ? 'text-black/34' : 'text-white/34')}>INJ Pass Apps</div>
+    </div>
+  );
+}
+
 function DAppMarketPanel({
   apps,
+  tabs,
   onOpenApp,
+  onCloseApp,
+  onAddApp,
   onDragStart,
   onPointerDown,
   onPointerUp,
@@ -3148,7 +3612,10 @@ function DAppMarketPanel({
   copy,
 }: {
   apps: DAppMarketItem[];
+  tabs: DAppMarketItem[];
   onOpenApp: (app: DAppMarketItem) => void;
+  onCloseApp: (appId: string) => void;
+  onAddApp: () => void;
   onDragStart: (event: DragEvent<HTMLElement>, app: DAppMarketItem) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>, app: DAppMarketItem) => void;
   onPointerUp: () => void;
@@ -3171,19 +3638,7 @@ function DAppMarketPanel({
         isLight ? 'border-black/10 bg-[#f7f7f8] text-[#1d1d1f]' : 'border-white/10 bg-[#0d0d0f] text-white shadow-black/35'
       )}
     >
-      <div className={cx('flex h-10 shrink-0 items-end border-b px-2', isLight ? 'border-black/8 bg-[#ededf0]' : 'border-white/8 bg-[#161619]')}>
-        <div className={cx('flex h-9 min-w-0 max-w-[300px] items-center gap-2 rounded-t-md border-x border-t px-2.5', isLight ? 'border-black/8 bg-white text-black' : 'border-white/9 bg-[#0d0d0f] text-white')}>
-          <div className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}>
-            <DAppMarketIcon className="h-3.5 w-3.5" />
-          </div>
-          <span className="min-w-0 flex-1 truncate text-xs font-bold">{copy.dappMarket}</span>
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-        </div>
-        <div className="flex-1" />
-        <div className={cx('mb-2 mr-2 hidden text-[10px] font-semibold uppercase tracking-[0.12em] sm:block', isLight ? 'text-black/34' : 'text-white/34')}>
-          INJ Pass Apps
-        </div>
-      </div>
+      <MiniAppTabStrip tabs={tabs} activeAppId={null} appsHomeActive onSelectApp={onOpenApp} onCloseApp={onCloseApp} onSelectAppsHome={onAddApp} onAddApp={onAddApp} isLight={isLight} appsLabel={copy.dappMarket} />
 
       <div className={cx('flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:px-3', isLight ? 'border-black/8 bg-white' : 'border-white/8 bg-[#0d0d0f]')}>
         <span className={browserButtonClass}><BrowserBackIcon /></span>
@@ -3232,6 +3687,7 @@ function DAppMarketPanel({
 
 function MiniAppPanel({
   app,
+  tabs,
   manifest,
   src,
   iframeKey,
@@ -3241,13 +3697,16 @@ function MiniAppPanel({
   address,
   walletName,
   isLight,
-  onClose,
+  onSelectApp,
+  onCloseApp,
+  onAddApp,
   onNavigate,
   onOpenWallet,
   onOpenExternal,
   onFrameLoad,
 }: {
   app: DAppMarketItem;
+  tabs: DAppMarketItem[];
   manifest: MiniAppManifest;
   src: string;
   iframeKey: string;
@@ -3257,7 +3716,9 @@ function MiniAppPanel({
   address: string | null;
   walletName?: string;
   isLight: boolean;
-  onClose: () => void;
+  onSelectApp: (app: DAppMarketItem) => void;
+  onCloseApp: (appId: string) => void;
+  onAddApp: () => void;
   onNavigate: (action: MiniAppNavigationAction) => void;
   onOpenWallet: () => void;
   onOpenExternal: () => void;
@@ -3293,40 +3754,7 @@ function MiniAppPanel({
         isLight ? 'border-black/10 bg-[#f7f7f8]' : 'border-white/10 bg-[#0d0d0f] shadow-black/35',
       )}
     >
-      <div className={cx('flex h-10 shrink-0 items-end border-b px-2', isLight ? 'border-black/8 bg-[#ededf0]' : 'border-white/8 bg-[#161619]')}>
-        <div
-          className={cx(
-            'flex h-9 min-w-0 max-w-[300px] items-center gap-2 rounded-t-md border-x border-t px-2.5',
-            isLight ? 'border-black/8 bg-white text-black' : 'border-white/9 bg-[#0d0d0f] text-white',
-          )}
-          title={navigation.title || app.name}
-        >
-          <div className={cx('relative h-5 w-5 shrink-0 overflow-hidden rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}>
-            <DAppLogo app={app} />
-          </div>
-          <span className="min-w-0 flex-1 truncate text-xs font-bold">{navigation.title || app.name}</span>
-          <span
-            className={cx(
-              'h-1.5 w-1.5 shrink-0 rounded-full',
-              isLoading ? 'animate-pulse bg-amber-400' : address ? 'bg-emerald-500' : isLight ? 'bg-black/24' : 'bg-white/30',
-            )}
-            aria-label={isLoading ? 'Loading' : address ? 'Wallet connected' : 'Guest session'}
-          />
-          <button
-            type="button"
-            onClick={onClose}
-            className={cx('flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition', isLight ? 'hover:bg-black/6' : 'hover:bg-white/9')}
-            aria-label={`Close ${app.name}`}
-            title="Close app"
-          >
-            <CloseIcon className="h-3 w-3" />
-          </button>
-        </div>
-        <div className="flex-1" />
-        <div className={cx('mb-2 mr-2 hidden text-[10px] font-semibold uppercase tracking-[0.12em] sm:block', isLight ? 'text-black/34' : 'text-white/34')}>
-          INJ Pass Apps
-        </div>
-      </div>
+      <MiniAppTabStrip tabs={tabs} activeAppId={app.id} appsHomeActive={false} onSelectApp={onSelectApp} onCloseApp={onCloseApp} onSelectAppsHome={onAddApp} onAddApp={onAddApp} isLight={isLight} appsLabel="Apps" />
 
       <div className={cx('flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:px-3', isLight ? 'border-black/8 bg-white' : 'border-white/8 bg-[#0d0d0f]')}>
         <button type="button" onClick={() => onNavigate('back')} disabled={!navigation.canGoBack} className={browserButtonClass} aria-label="Back" title="Back">
@@ -3361,7 +3789,7 @@ function MiniAppPanel({
 
         <div className={cx('hidden h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 md:flex', isLight ? 'border-black/8 text-black/58' : 'border-white/8 text-white/58')} title={`${manifest.networkName} · Chain ${manifest.chainId}`}>
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          <span className="text-[11px] font-semibold">Injective Testnet</span>
+          <span className="text-[11px] font-semibold">{manifest.networkName}</span>
         </div>
 
         <button
@@ -4939,6 +5367,57 @@ function ShellMotionStyles() {
         }
       }
 
+      @keyframes injThinkingSheen {
+        0% {
+          background-position: 130% 50%;
+        }
+        58%,
+        100% {
+          background-position: -130% 50%;
+        }
+      }
+
+      .inj-thinking-sheen {
+        display: inline-block;
+        color: transparent;
+        background-image: linear-gradient(
+          102deg,
+          var(--inj-thinking-base) 0%,
+          var(--inj-thinking-base) 38%,
+          var(--inj-thinking-glow) 49%,
+          var(--inj-thinking-peak) 52%,
+          var(--inj-thinking-glow) 55%,
+          var(--inj-thinking-base) 66%,
+          var(--inj-thinking-base) 100%
+        );
+        background-position: 130% 50%;
+        background-size: 240% 100%;
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: injThinkingSheen 2.7s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+        will-change: background-position;
+      }
+
+      .inj-thinking-sheen-light {
+        --inj-thinking-base: rgba(0, 0, 0, 0.42);
+        --inj-thinking-glow: rgba(0, 0, 0, 0.68);
+        --inj-thinking-peak: rgba(0, 0, 0, 0.96);
+      }
+
+      .inj-thinking-sheen-dark {
+        --inj-thinking-base: rgba(255, 255, 255, 0.42);
+        --inj-thinking-glow: rgba(255, 255, 255, 0.72);
+        --inj-thinking-peak: rgba(255, 255, 255, 1);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .inj-thinking-sheen {
+          animation: none;
+          background-position: 50% 50%;
+        }
+      }
+
       @keyframes injLiquidMenu {
         0% {
           opacity: 0;
@@ -5181,6 +5660,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [dappMarketOpen, setDappMarketOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [dappMarketItems, setDappMarketItems] = useState<DAppMarketItem[]>(dappMarketApps);
+  const [miniAppTabs, setMiniAppTabs] = useState<DAppMarketItem[]>([]);
   const [activeMiniApp, setActiveMiniApp] = useState<DAppMarketItem | null>(null);
   const [miniAppUrl, setMiniAppUrl] = useState('');
   const [miniAppFrameNonce, setMiniAppFrameNonce] = useState(0);
@@ -5227,6 +5707,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [agentConversationId, setAgentConversationId] = useState<string | undefined>();
   const [selectedStoredConversationId, setSelectedStoredConversationId] = useState<string | undefined>();
   const [isAgentRunning, setIsAgentRunning] = useState(false);
+  const [thinkingProgress, setThinkingProgress] = useState<ThinkingProgressState>({ steps: [], activeIndex: 0 });
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingAgentConfirmation | null>(null);
   const [storedConversations, setStoredConversations] = useState<StoredConversationSummary[]>([]);
   const [conversationSearchOpen, setConversationSearchOpen] = useState(false);
@@ -5282,7 +5763,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [traditionalWalletWizardMode, setTraditionalWalletWizardMode] = useState<TraditionalWalletWizardMode>('create');
   const [traditionalWalletWizardStep, setTraditionalWalletWizardStep] = useState(0);
   const [orphanWalletAddress, setOrphanWalletAddress] = useState<string | null>(null);
-  const [localWallets, setLocalWallets] = useState<LocalKeystore[]>([]);
+  const [localWallets, setLocalWallets] = useState<LocalKeystore[]>(() => (
+    typeof window === 'undefined' ? [] : loadWallets()
+  ));
   const [localUnlockWallet, setLocalUnlockWallet] = useState<LocalKeystore | null>(null);
   const [localUnlockPassword, setLocalUnlockPassword] = useState('');
   const [localUnlockError, setLocalUnlockError] = useState('');
@@ -5344,6 +5827,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const composerDemoResumeTimerRef = useRef<number | null>(null);
   const chatAbortControllerRef = useRef<AbortController | null>(null);
   const creativeAbortControllerRef = useRef<AbortController | null>(null);
+  const thinkingProgressTimerRef = useRef<number | null>(null);
+  const thinkingProgressRequestRef = useRef(0);
+  const thinkingProgressAbortControllerRef = useRef<AbortController | null>(null);
 
   const surfaceTone = isLight
     ? 'bg-[#fbfbfa] text-[#1d1d1f]'
@@ -5481,6 +5967,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   useEffect(() => () => {
     chatAbortControllerRef.current?.abort();
     creativeAbortControllerRef.current?.abort();
+    thinkingProgressAbortControllerRef.current?.abort();
+    if (thinkingProgressTimerRef.current) window.clearTimeout(thinkingProgressTimerRef.current);
     if (composerDemoResumeTimerRef.current) window.clearTimeout(composerDemoResumeTimerRef.current);
     if (miniAppLoadingTimerRef.current) window.clearTimeout(miniAppLoadingTimerRef.current);
   }, []);
@@ -6331,6 +6819,151 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }
   };
 
+  const persistCommandConversation = (
+    messageStamp: number,
+    prompt: string,
+    assistantMessage: ChatMessage,
+    model: string,
+  ) => {
+    if (!isAuthenticated) return;
+
+    const conversationId = agentConversationId || uid(model);
+    const title = currentConversationTitle || prompt.slice(0, 48);
+    const nextMessages: ChatMessage[] = [
+      ...messages,
+      { id: `u-${messageStamp}`, role: 'user', body: prompt },
+      assistantMessage,
+    ];
+    const history = nextMessages
+      .filter((message) => message.role === 'user' || message.role === 'assistant')
+      .map((message) => ({
+        role: message.role as 'user' | 'assistant',
+        content: message.body,
+      }));
+
+    setAgentConversationId(conversationId);
+    setSelectedStoredConversationId(conversationId);
+    conversationCacheRef.current.set(conversationId, { title, messages: nextMessages });
+    void syncAgentConversation({
+      conversationId,
+      title,
+      model,
+      messages: history,
+    }).then((synced) => {
+      if (!synced) return;
+      const now = new Date().toISOString();
+      upsertStoredConversation({
+        id: conversationId,
+        title,
+        model,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+  };
+
+  const stopThinkingProgress = () => {
+    thinkingProgressRequestRef.current += 1;
+    thinkingProgressAbortControllerRef.current?.abort();
+    thinkingProgressAbortControllerRef.current = null;
+    if (thinkingProgressTimerRef.current) {
+      window.clearTimeout(thinkingProgressTimerRef.current);
+      thinkingProgressTimerRef.current = null;
+    }
+    setThinkingProgress({ steps: [], activeIndex: 0 });
+  };
+
+  const scheduleThinkingProgress = (requestId: number) => {
+    const advance = () => {
+      if (thinkingProgressRequestRef.current !== requestId) return;
+      setThinkingProgress((current) => ({
+        ...current,
+        activeIndex: Math.min(current.activeIndex + 1, Math.max(0, current.steps.length - 1)),
+      }));
+      thinkingProgressTimerRef.current = window.setTimeout(
+        advance,
+        850 + Math.floor(Math.random() * 600),
+      );
+    };
+
+    thinkingProgressTimerRef.current = window.setTimeout(
+      advance,
+      750 + Math.floor(Math.random() * 450),
+    );
+  };
+
+  const beginThinkingProgress = (prompt: string, mode: ThinkingMode) => {
+    thinkingProgressAbortControllerRef.current?.abort();
+    if (thinkingProgressTimerRef.current) {
+      window.clearTimeout(thinkingProgressTimerRef.current);
+      thinkingProgressTimerRef.current = null;
+    }
+
+    const requestId = thinkingProgressRequestRef.current + 1;
+    thinkingProgressRequestRef.current = requestId;
+    setThinkingProgress({
+      steps: chooseFallbackThinkingSteps(prompt, selectedLanguageCode, mode),
+      activeIndex: 0,
+    });
+    scheduleThinkingProgress(requestId);
+
+    const controller = new AbortController();
+    thinkingProgressAbortControllerRef.current = controller;
+    void generateTaskProgressSteps({
+      prompt,
+      language: selectedLanguage.label,
+      mode,
+    }, controller.signal).then((result) => {
+      if (
+        thinkingProgressRequestRef.current !== requestId
+        || !result.ok
+        || !result.steps
+        || result.steps.length < 3
+      ) return;
+
+      const steps = result.steps.slice(0, 5);
+      setThinkingProgress((current) => ({
+        steps,
+        activeIndex: Math.min(current.activeIndex, steps.length - 1),
+      }));
+    }).catch((error) => {
+      if (!isAbortError(error)) {
+        console.warn('[ChatShell] Task progress generation failed:', error);
+      }
+    });
+  };
+
+  const streamAssistantMessage = async (
+    assistantMessage: ChatMessage,
+    signal: AbortSignal,
+  ) => {
+    const chunks = splitStreamingText(assistantMessage.body);
+    let streamedBody = '';
+
+    setMessages((current) => [
+      ...current,
+      { ...assistantMessage, body: '' },
+    ]);
+
+    for (let index = 0; index < chunks.length; index += 1) {
+      if (signal.aborted) throw new DOMException('Stopped', 'AbortError');
+      const chunk = chunks[index];
+      streamedBody += chunk;
+      const nextBody = streamedBody;
+      setMessages((current) => current.map((message) => (
+        message.id === assistantMessage.id
+          ? { ...message, body: nextBody }
+          : message
+      )));
+      if (index < chunks.length - 1) {
+        const pause = /[.!?。！？]\s*$/.test(chunk)
+          ? 52
+          : 18 + Math.floor(Math.random() * 18);
+        await waitForStreamDelay(pause, signal);
+      }
+    }
+  };
+
   const sendChatMessage = async (
     text: string,
     options: {
@@ -6362,6 +6995,53 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     const controller = new AbortController();
     chatAbortControllerRef.current?.abort();
     chatAbortControllerRef.current = controller;
+    beginThinkingProgress(trimmedText, 'chat');
+
+    if (isEricMferMintMessage(trimmedText)) {
+      setIsAgentRunning(true);
+      try {
+        if (!isAuthenticated) throw new Error('INJPASS_LOGIN_REQUIRED');
+        if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+
+        const signingKey = await requireWalletPrivateKey();
+        if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+        const result = await mintSponsoredCatNFT(signingKey);
+        const mintedNft = result.tokenId
+          ? await getCatNFTDetails(BigInt(result.tokenId))
+          : null;
+        const assistantMessage: ChatMessage = {
+          id: `a-${messageStamp}`,
+          role: 'assistant',
+          body: formatEricMferMintMessage(selectedLanguageCode, result, mintedNft),
+        };
+
+        setWalletPanelData((current) => ({ ...current, nfts: undefined }));
+        stopThinkingProgress();
+        await streamAssistantMessage(assistantMessage, controller.signal);
+        setChatWorkStatus('complete');
+        persistCommandConversation(messageStamp, trimmedText, assistantMessage, 'eric-mfer');
+      } catch (error) {
+        if (isAbortError(error)) {
+          setChatWorkStatus('idle');
+          return;
+        }
+        const assistantMessage: ChatMessage = {
+          id: `a-${messageStamp}`,
+          role: 'assistant',
+          body: localizeEricMferMintError(error, selectedLanguageCode),
+        };
+        setMessages((current) => [...current, assistantMessage]);
+        setChatWorkStatus('idle');
+        persistCommandConversation(messageStamp, trimmedText, assistantMessage, 'eric-mfer');
+      } finally {
+        stopThinkingProgress();
+        if (chatAbortControllerRef.current === controller) {
+          chatAbortControllerRef.current = null;
+          setIsAgentRunning(false);
+        }
+      }
+      return;
+    }
 
     if (isInjGiftMessage(trimmedText)) {
       setIsAgentRunning(true);
@@ -6440,6 +7120,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         ]);
         setChatWorkStatus('idle');
       } finally {
+        stopThinkingProgress();
         if (chatAbortControllerRef.current === controller) {
           chatAbortControllerRef.current = null;
           setIsAgentRunning(false);
@@ -6486,6 +7167,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         ]);
         setChatWorkStatus('idle');
       } finally {
+        stopThinkingProgress();
         if (chatAbortControllerRef.current === controller) {
           chatAbortControllerRef.current = null;
           setIsAgentRunning(false);
@@ -6549,6 +7231,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       ]);
       setChatWorkStatus('idle');
     } finally {
+      stopThinkingProgress();
       if (chatAbortControllerRef.current === controller) {
         chatAbortControllerRef.current = null;
         setIsAgentRunning(false);
@@ -6622,7 +7305,17 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         tokens.XAUT = '0';
         if (requestId === walletPanelRequestRef.current) setWalletPanelData((current) => ({ ...current, tokens }));
       } else if (tab === 'nfts') {
-        const nfts = await getN1NJ4NFTs(address as Address);
+        const [n1nj4NFTs, catNFTs] = await Promise.all([
+          getN1NJ4NFTs(address as Address),
+          getCatNFTsForOwner(address as Address),
+        ]);
+        const seenNFTs = new Set<string>();
+        const nfts: NFT[] = [...catNFTs, ...n1nj4NFTs].filter((nft) => {
+          const key = `${nft.contractAddress.toLowerCase()}-${nft.tokenId}`;
+          if (seenNFTs.has(key)) return false;
+          seenNFTs.add(key);
+          return true;
+        });
         if (requestId === walletPanelRequestRef.current) setWalletPanelData((current) => ({ ...current, nfts }));
       } else if (tab === 'defi') {
         const defi = await getUserStakingInfo(address as Address);
@@ -6715,6 +7408,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     if (!pendingConfirmation || isAgentRunning) return;
 
     setIsAgentRunning(true);
+    beginThinkingProgress(
+      `${approve ? 'Approve' : 'Reject'} ${pendingConfirmation.toolName}`,
+      'chat',
+    );
     try {
       if (approve && pendingConfirmation.executionMode === 'client_wallet') {
         await executeClientWalletPendingAction(pendingConfirmation);
@@ -6748,6 +7445,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         },
       ]);
     } finally {
+      stopThinkingProgress();
       setIsAgentRunning(false);
     }
   };
@@ -6780,6 +7478,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     const controller = new AbortController();
     creativeAbortControllerRef.current?.abort();
     creativeAbortControllerRef.current = controller;
+    beginThinkingProgress(prompt, 'build');
 
     try {
       const result = await createCreativePlan({
@@ -6830,6 +7529,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setCreativeError(copy.agentUnavailable);
       setCreativeWorkStatus('idle');
     } finally {
+      stopThinkingProgress();
       if (creativeAbortControllerRef.current === controller) {
         creativeAbortControllerRef.current = null;
         setIsCreativePlanning(false);
@@ -6982,10 +7682,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     switchProductMode('chat');
     setActiveChatSurface('dapp-market');
     setActiveWalletTab(null);
+    setActiveMiniApp(null);
+    setMiniAppUrl('');
+    setMiniAppNavigation(initialMiniAppNavigation);
+    setMiniAppLoading(false);
     setDappMarketOpen((current) => !current);
   };
 
-  const openDApp = (app: DAppMarketItem, path = '/') => {
+  const openDApp = (app: DAppMarketItem, path?: string) => {
     const manifest = getMiniAppManifest(app.id);
     if (manifest) {
       try {
@@ -6994,6 +7698,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         parsedUrl.searchParams.delete('injpass_miniapp');
         parsedUrl.searchParams.delete('injpass_host_origin');
         const initialPath = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}` || '/';
+        setMiniAppTabs((current) => current.some((tab) => tab.id === app.id) ? current : [...current, app]);
         setActiveMiniApp(app);
         setMiniAppUrl(url);
         setMiniAppNavigation({
@@ -7019,6 +7724,32 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       return;
     }
     attachDAppToComposer(app);
+  };
+
+  const openNewMiniAppTab = () => {
+    if (miniAppLoadingTimerRef.current) {
+      window.clearTimeout(miniAppLoadingTimerRef.current);
+      miniAppLoadingTimerRef.current = null;
+    }
+    setActiveMiniApp(null);
+    setMiniAppUrl('');
+    setMiniAppNavigation(initialMiniAppNavigation);
+    setMiniAppLoading(false);
+    switchProductMode('chat');
+    setActiveChatSurface('dapp-market');
+    setActiveWalletTab(null);
+  };
+
+  const closeMiniAppTab = (appId: string) => {
+    const remaining = miniAppTabs.filter((tab) => tab.id !== appId);
+    setMiniAppTabs(remaining);
+    if (activeMiniApp?.id !== appId) return;
+    const nextTab = remaining.at(-1);
+    if (nextTab) {
+      openDApp(nextTab);
+      return;
+    }
+    openNewMiniAppTab();
   };
 
   const navigateMiniApp = (action: MiniAppNavigationAction) => {
@@ -7101,6 +7832,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const startNewSkillBuild = () => {
     chatAbortControllerRef.current?.abort();
     creativeAbortControllerRef.current?.abort();
+    stopThinkingProgress();
     creativeDraftRef.current = '';
     switchProductMode('creative');
     chatDraftRef.current = '';
@@ -7255,6 +7987,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const stopActiveAiTask = () => {
+    stopThinkingProgress();
     if (activeMode === 'chat') {
       chatAbortControllerRef.current?.abort();
       chatAbortControllerRef.current = null;
@@ -7496,6 +8229,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         address: address || null,
         walletName: keystore?.walletName,
         chainId: manifest.chainId,
+        language: selectedLanguageCode,
       },
     });
 
@@ -7540,6 +8274,15 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       };
 
       if (message.method === 'injpass_requestLogin') {
+        setAuthError('');
+        setOrphanWalletAddress(null);
+        setLocalWallets(loadWallets());
+        void detectPrfSupport().then(setPrfDetection).catch(() => undefined);
+        authMenuPinnedRef.current = true;
+        if (authMenuTimerRef.current) {
+          window.clearTimeout(authMenuTimerRef.current);
+          authMenuTimerRef.current = null;
+        }
         setAuthMethod('mnemonic');
         setAuthMenuOpen(true);
         respond(true);
@@ -7552,6 +8295,30 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           .catch((error) => respond(undefined, {
             code: -32603,
             message: error instanceof Error ? error.message : 'Unable to sign out.',
+          }));
+        return;
+      }
+
+      if (message.method === 'injpass_mintCatNft') {
+        if (activeMiniApp.id !== 'eric-mfer') {
+          respond(undefined, { code: 4100, message: 'This app cannot request a CatNFT mint.' });
+          return;
+        }
+        if (!isAuthenticated || !address) {
+          respond(undefined, { code: 4100, message: 'Log in to INJ Pass before minting.' });
+          return;
+        }
+
+        void requireWalletPrivateKeyRef.current()
+          .then((signingKey) => mintSponsoredCatNFT(signingKey))
+          .then((result) => {
+            resetTxAuth();
+            setWalletPanelData((current) => ({ ...current, nfts: undefined }));
+            respond(result);
+          })
+          .catch((error) => respond(undefined, {
+            code: -32603,
+            message: error instanceof Error ? error.message : 'Unable to mint this NFT.',
           }));
         return;
       }
@@ -7577,7 +8344,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     window.addEventListener('message', handleMiniAppMessage);
     sendSession();
     return () => window.removeEventListener('message', handleMiniAppMessage);
-  }, [activeMiniApp, address, isAuthenticated, keystore?.walletName, logout, miniAppUrl]);
+  }, [activeMiniApp, address, isAuthenticated, keystore?.walletName, logout, miniAppUrl, resetTxAuth, selectedLanguageCode]);
 
   const refreshAccountDeletionStatus = async () => {
     if (!isAuthenticated || accountActionState === 'deleted') {
@@ -9022,7 +9789,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               <div className="pointer-events-auto flex items-center gap-2 lg:hidden">
                 <div className="text-sm font-bold">INJ Pass</div>
               </div>
-              {!activeWalletTab && activeChatSurface !== 'mini-app' && activeChatSurface !== 'skills' && <div className="pointer-events-auto absolute left-1/2 top-12 -translate-x-1/2 sm:top-0">
+              {!activeWalletTab && activeChatSurface !== 'mini-app' && activeChatSurface !== 'skills' && activeChatSurface !== 'dapp-market' && <div className="pointer-events-auto absolute left-1/2 top-12 -translate-x-1/2 sm:top-0">
                   <ModeToggle
                     activeMode={activeMode}
                     setActiveMode={switchProductMode}
@@ -9306,8 +10073,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                             </div>
                           ))}
                           {isAgentRunning && (
-                            <div className="flex items-center text-sm">
-                              <span className={cx(isLight ? 'text-black/48' : 'text-white/48')}>{copy.agentThinking}</span>
+                            <div className="w-full max-w-md py-1">
+                              <ThinkingProgress
+                                label={copy.agentThinking}
+                                progress={thinkingProgress}
+                                isLight={isLight}
+                              />
                             </div>
                           )}
                           <div ref={conversationEndRef} />
@@ -9353,7 +10124,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   {activeChatSurface === 'dapp-market' && (
                     <DAppMarketPanel
                       apps={dappMarketItems}
+                      tabs={miniAppTabs}
                       onOpenApp={openDApp}
+                      onCloseApp={closeMiniAppTab}
+                      onAddApp={openNewMiniAppTab}
                       onDragStart={handleDAppDragStart}
                       onPointerDown={handleDAppPointerDown}
                       onPointerUp={clearPointerDApp}
@@ -9379,6 +10153,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   {activeChatSurface === 'mini-app' && activeMiniApp && activeMiniAppManifest && miniAppUrl && (
                     <MiniAppPanel
                       app={activeMiniApp}
+                      tabs={miniAppTabs}
                       manifest={activeMiniAppManifest}
                       src={miniAppUrl}
                       iframeKey={`${activeMiniApp.id}-${address || 'guest'}-${miniAppFrameNonce}`}
@@ -9388,17 +10163,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                       address={address}
                       walletName={keystore?.walletName}
                       isLight={isLight}
-                      onClose={() => {
-                        if (miniAppLoadingTimerRef.current) {
-                          window.clearTimeout(miniAppLoadingTimerRef.current);
-                          miniAppLoadingTimerRef.current = null;
-                        }
-                        setActiveMiniApp(null);
-                        setMiniAppUrl('');
-                        setMiniAppNavigation(initialMiniAppNavigation);
-                        setMiniAppLoading(false);
-                        setActiveChatSurface('dapp-market');
-                      }}
+                      onSelectApp={openDApp}
+                      onCloseApp={closeMiniAppTab}
+                      onAddApp={openNewMiniAppTab}
                       onNavigate={navigateMiniApp}
                       onOpenWallet={() => {
                         setAuthError('');
@@ -9509,8 +10276,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               )}
 
               {activeMode === 'creative' && isCreativePlanning && (
-                <div className="mx-auto flex w-full max-w-3xl items-center py-8 text-sm">
-                  <span className={cx(isLight ? 'text-black/48' : 'text-white/48')}>{copy.agentThinking}</span>
+                <div className="mx-auto w-full max-w-3xl py-8">
+                  <ThinkingProgress
+                    label={copy.agentThinking}
+                    progress={thinkingProgress}
+                    isLight={isLight}
+                  />
                 </div>
               )}
 
@@ -9539,7 +10310,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 </div>
               )}
 
-              {activeChatSurface !== 'cloud-drive' && activeChatSurface !== 'mini-app' && activeChatSurface !== 'skills' && <form
+              {activeChatSurface !== 'cloud-drive' && activeChatSurface !== 'mini-app' && activeChatSurface !== 'skills' && activeChatSurface !== 'dapp-market' && <form
                 onSubmit={handleSubmit}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={handleComposerDrop}

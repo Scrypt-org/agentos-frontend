@@ -7,9 +7,9 @@ import {
   createPublicClient,
   createWalletClient,
   http,
+  isAddress,
   parseEther,
   type Address,
-  type TransactionReceipt as ViemReceipt,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { getEthereumAddress } from '@injectivelabs/sdk-ts';
@@ -17,14 +17,15 @@ import { TransactionRequest, TransactionReceipt, ChainConfig, DEFAULT_CHAIN } fr
 import { estimateGas } from './estimateGas';
 
 function normalizeToEvmAddress(address: string): string {
-  if (address.startsWith('inj1')) {
+  const trimmed = address.trim();
+  if (trimmed.startsWith('inj1')) {
     try {
-      return getEthereumAddress(address);
+      return getEthereumAddress(trimmed);
     } catch {
       // fall through and return original
     }
   }
-  return address;
+  return trimmed;
 }
 
 /**
@@ -45,6 +46,9 @@ export async function sendTransaction(
 ): Promise<string> {
   try {
     const evmTo = normalizeToEvmAddress(to);
+    if (!isAddress(evmTo, { strict: false })) {
+      throw new Error('Invalid EVM recipient address.');
+    }
 
     // Convert private key to account
     const privateKeyHex = `0x${Array.from(privateKey)
@@ -54,10 +58,6 @@ export async function sendTransaction(
     const account = privateKeyToAccount(privateKeyHex);
 
     // Create clients
-    const publicClient = createPublicClient({
-      transport: http(chain.rpcUrl),
-    });
-
     const walletClient = createWalletClient({
       account,
       chain: {
@@ -87,8 +87,7 @@ export async function sendTransaction(
       value: parseEther(value),
       data: data,
       gas: gasEstimate.gasLimit,
-      maxFeePerGas: gasEstimate.maxFeePerGas,
-      maxPriorityFeePerGas: gasEstimate.maxPriorityFeePerGas,
+      gasPrice: gasEstimate.maxFeePerGas,
     });
 
     return hash;

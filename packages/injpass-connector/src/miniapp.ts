@@ -7,6 +7,8 @@ export interface InjPassMiniAppSession {
   address: string | null;
   walletName?: string;
   chainId: number;
+  /** INJ Pass interface language, such as en, de, fr, ko, ja, zh-Hans, or zh-Hant. */
+  language?: string;
 }
 
 export interface InjPassMiniAppConfig {
@@ -68,6 +70,7 @@ export class InjPassMiniAppConnector {
   private readonly hostOrigin: string;
   private readonly channel: string;
   private readonly timeoutMs: number;
+  private readonly homePath: string;
   private readonly pending = new Map<string, PendingRequest>();
   private readonly eventListeners = new Map<string, Set<EventHandler>>();
   private readonly sessionListeners = new Set<(session: InjPassMiniAppSession) => void>();
@@ -94,6 +97,7 @@ export class InjPassMiniAppConnector {
     this.hostOrigin = inferHostOrigin(config.hostOrigin);
     this.channel = config.channel || INJPASS_MINIAPP_CHANNEL;
     this.timeoutMs = config.timeoutMs || 120_000;
+    this.homePath = window.location.pathname || '/';
     this.provider = {
       isInjPass: true,
       isMetaMask: false,
@@ -257,7 +261,7 @@ export class InjPassMiniAppConnector {
     if (action === 'home') {
       this.navigationDepth = 0;
       this.navigationForwardDepth = 0;
-      window.location.assign('/');
+      window.location.assign(this.homePath);
       return;
     }
     if (action === 'reload') window.location.reload();

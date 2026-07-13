@@ -8,6 +8,7 @@ import {
   createPublicClient, 
   http,
   type Address,
+  type Hash,
 } from 'viem';
 import { NETWORK_CONFIG } from '@/config/network';
 import { DEFAULT_CHAIN_VIEM } from '@/types/chain';
@@ -88,6 +89,8 @@ export interface NFT {
   metadata?: NFTMetadata;
   collection: string;
   owner: Address;
+  tokenURI?: string;
+  mintTxHash?: Hash;
 }
 
 interface BlockscoutTokenInstance {

@@ -22,6 +22,12 @@ import { useWallet } from '@/contexts/WalletContext';
 import { usePin } from '@/contexts/PinContext';
 import type { DApp } from '@/config/dapps';
 import {
+  getMiniAppManifest,
+  isAllowedMiniAppOrigin,
+  resolveMiniAppUrl,
+  type MiniAppManifest,
+} from '@/config/mini-apps';
+import {
   compileCreativeContracts,
   confirmAgentAction,
   createCreativeBuild,
@@ -72,6 +78,12 @@ import { authenticateWalletSession } from '@/services/wallet-auth';
 import { createMySkill, getMySkills, getPublicSkills } from '@/services/skills';
 import { getN1NJ4NFTs, type NFT } from '@/services/nft';
 import { getUserStakingInfo, type StakingInfo } from '@/services/staking';
+import {
+  executeInjGiftCommand,
+  isInjGiftMessage,
+  parseInjGiftCommand,
+} from '@/services/inj-gift';
+import { handleMiniAppRpc, MiniAppHostError } from '@/services/mini-app-host';
 import { estimateGas, getBalance as getNativeBalance, getGasPrice, sendTransaction, waitForTransaction } from '@/wallet/chain';
 import {
   completeLocalWalletSetup,
@@ -94,7 +106,7 @@ import HCaptcha from '@hcaptcha/react-hcaptcha';
 
 type ShellEntry = 'home' | 'welcome' | 'dashboard';
 type ProductMode = 'chat' | 'creative';
-type ChatSurface = 'default' | 'dapp-market' | 'campaign' | 'skills' | 'cloud-drive';
+type ChatSurface = 'default' | 'dapp-market' | 'campaign' | 'skills' | 'cloud-drive' | 'mini-app';
 type WalletTab = 'tokens' | 'nfts' | 'defi' | 'activity';
 type WalletExecutionMode = 'sandbox' | 'main';
 type AssetWalletView = 'assets' | 'send' | 'receive';
@@ -141,6 +153,22 @@ interface DAppMarketItem {
   aiDriven: boolean;
 }
 
+interface MiniAppNavigationState {
+  path: string;
+  title: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+}
+
+type MiniAppNavigationAction = 'back' | 'forward' | 'home' | 'reload';
+
+const initialMiniAppNavigation: MiniAppNavigationState = {
+  path: '/',
+  title: '',
+  canGoBack: false,
+  canGoForward: false,
+};
+
 interface WalletActivityItem {
   hash: string;
   timestamp: string;
@@ -174,6 +202,8 @@ interface ComposerSuggestion {
   symbol: '@' | '#' | '$';
   app?: DAppMarketItem;
 }
+
+type ComposerToken = ComposerSuggestion;
 
 interface LocalUnlockResult {
   password: string;
@@ -957,6 +987,17 @@ const pinFreeWindows = [0, 1, 5, 15, 30, 60] as const;
 const QUICK_MENU_AUTO_HIDE_MS = 850;
 const reasoningOptions: ReasoningLevel[] = ['High', 'Medium', 'Low'];
 const agentModelOptions: AgentModel[] = ['AgentOS 1.5', 'AgentOS 1.0'];
+const erc721TransferAbi = [{
+  type: 'function',
+  name: 'safeTransferFrom',
+  stateMutability: 'nonpayable',
+  inputs: [
+    { name: 'from', type: 'address' },
+    { name: 'to', type: 'address' },
+    { name: 'tokenId', type: 'uint256' },
+  ],
+  outputs: [],
+}] as const;
 
 const dappMarketApps: DAppMarketItem[] = [
   {
@@ -1007,13 +1048,73 @@ const dappMarketApps: DAppMarketItem[] = [
     aiDriven: false,
   },
   {
-    id: 'mito',
-    name: 'Mito',
-    category: 'DeFi vaults',
-    body: 'Vault positions, automated strategies, deposits, and withdrawals.',
-    accent: 'from-violet-400 to-fuchsia-500',
-    url: 'https://mito.fi',
-    icon: getDAppIconUrl('https://mito.fi'),
+    id: 'injective-hub',
+    name: 'Injective Hub',
+    category: 'Governance & Staking',
+    body: 'Governance, staking, portfolio routes, and core Injective account actions.',
+    accent: 'from-indigo-400 to-sky-500',
+    url: 'https://hub.injective.network',
+    icon: '/injlogo.png',
+    aiDriven: false,
+  },
+  {
+    id: 'n1nj4',
+    name: 'N1nj4',
+    category: 'NFT Marketplace',
+    body: 'Discover Injective NFT collections, ownership, listings, and marketplace activity.',
+    accent: 'from-zinc-600 to-black',
+    url: 'https://n1nj4.com',
+    icon: '/N1NJ4.png',
+    aiDriven: false,
+  },
+  {
+    id: 'rarible',
+    name: 'Rarible',
+    category: 'Multichain NFT Marketplace',
+    body: 'Browse multichain NFT collections, listings, ownership, and offers.',
+    accent: 'from-yellow-300 to-lime-400',
+    url: 'https://rarible.com',
+    icon: getDAppIconUrl('https://rarible.com'),
+    aiDriven: false,
+  },
+  {
+    id: 'talis',
+    name: 'Talis',
+    category: 'NFTs',
+    body: 'NFT collection browsing, listing review, ownership checks, and offers.',
+    accent: 'from-pink-400 to-rose-500',
+    url: 'https://talis.art',
+    icon: getDAppIconUrl('https://talis.art'),
+    aiDriven: false,
+  },
+  {
+    id: 'choice',
+    name: 'Choice',
+    category: 'DEX Aggregator & Vaults',
+    body: 'Compare swap routes, vault positions, liquidity, and execution options.',
+    accent: 'from-cyan-400 to-violet-500',
+    url: 'https://choice.exchange',
+    icon: getDAppIconUrl('https://choice.exchange'),
+    aiDriven: false,
+  },
+  {
+    id: 'paradyze',
+    name: 'Paradyze',
+    category: 'Yield & Structured Products',
+    body: 'Explore structured yield strategies, positions, rewards, and risk.',
+    accent: 'from-fuchsia-400 to-indigo-500',
+    url: 'https://paradyze.io',
+    icon: getDAppIconUrl('https://paradyze.io'),
+    aiDriven: false,
+  },
+  {
+    id: 'name-service',
+    name: 'Name Service',
+    category: '.inj Domain Names',
+    body: 'Search, register, and manage human-readable Injective domain names.',
+    accent: 'from-blue-400 to-indigo-500',
+    url: 'https://injective.name',
+    icon: getDAppIconUrl('https://injective.name'),
     aiDriven: false,
   },
   {
@@ -1037,16 +1138,6 @@ const dappMarketApps: DAppMarketItem[] = [
     aiDriven: false,
   },
   {
-    id: 'talis',
-    name: 'Talis',
-    category: 'NFTs',
-    body: 'NFT collection browsing, listing review, ownership checks, and offers.',
-    accent: 'from-pink-400 to-rose-500',
-    url: 'https://talis.art',
-    icon: getDAppIconUrl('https://talis.art'),
-    aiDriven: false,
-  },
-  {
     id: 'injscan',
     name: 'InjScan',
     category: 'Explorer',
@@ -1054,16 +1145,6 @@ const dappMarketApps: DAppMarketItem[] = [
     accent: 'from-slate-400 to-zinc-700',
     url: 'https://injscan.com',
     icon: getDAppIconUrl('https://injscan.com'),
-    aiDriven: false,
-  },
-  {
-    id: 'injective-hub',
-    name: 'Injective Hub',
-    category: 'Portfolio',
-    body: 'Governance, staking, portfolio routes, and core Injective account actions.',
-    accent: 'from-indigo-400 to-sky-500',
-    url: 'https://hub.injective.network',
-    icon: getDAppIconUrl('https://hub.injective.network'),
     aiDriven: false,
   },
   {
@@ -1077,6 +1158,21 @@ const dappMarketApps: DAppMarketItem[] = [
     aiDriven: false,
   },
 ];
+
+const comingSoonDAppOrder = [
+  'Helix',
+  'Injective Hub',
+  'N1nj4',
+  'Rarible',
+  'Talis',
+  'Choice',
+  'Paradyze',
+  'Name Service',
+  'Hydro',
+  'DojoSwap',
+  'InjScan',
+  'Blockscout',
+] as const;
 
 const composerSkills: AgentSkill[] = [
   {
@@ -1175,6 +1271,16 @@ const newUserGuideLabelByLanguage: Record<LanguageCode, string> = {
   ja: '初心者ガイド',
   'zh-Hans': '新手引导',
   'zh-Hant': '新手引導',
+};
+
+const createOwnSkillCtaByLanguage: Record<LanguageCode, string> = {
+  en: 'Want to create your own skill?',
+  de: 'Möchtest du deinen eigenen Skill erstellen?',
+  fr: 'Envie de créer votre propre compétence ?',
+  ko: '나만의 스킬을 만들고 싶나요?',
+  ja: '自分だけのスキルを作りませんか？',
+  'zh-Hans': '想创造自己的技能吗？',
+  'zh-Hant': '想創作自己的技能嗎？',
 };
 
 const creativeShortcutsByLanguage: Record<LanguageCode, string[]> = {
@@ -1886,6 +1992,14 @@ function CloseIcon({ className = 'h-4 w-4' }: { className?: string }) {
   );
 }
 
+function CheckIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m6 12.5 3.8 3.8L18 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function TrashIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1961,6 +2075,67 @@ function PinIcon({ pinned = false, className = 'h-4 w-4' }: { pinned?: boolean; 
     <svg className={className} viewBox="0 0 24 24" fill={pinned ? 'currentColor' : 'none'} aria-hidden="true">
       <path d="m15.2 4.4 4.4 4.4-2.5 2.5.9 4.2-1.1 1.1-4.1-3.1-4.7 4.7-1.1-1.1 4.7-4.7-3.1-4.1 1.1-1.1 4.2.9 2.5-2.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
       <path d="M5 19 9.2 14.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function OpenAppIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 16 16.5 7.5M10.5 7.5h6v6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17.5 15.5v2a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ReloadIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M19 8.5V4.8l-2.2 2.1A7.5 7.5 0 1 0 19.2 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function BrowserBackIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m15 6-6 6 6 6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function BrowserForwardIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function HomeIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m4 10 8-6 8 6v9H4v-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9.5 19v-5h5v5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ShieldCheckIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3.2 19 6v5.2c0 4.2-2.8 7.7-7 9.6-4.2-1.9-7-5.4-7-9.6V6l7-2.8Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="m8.8 12 2 2 4.4-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MoreIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.35" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.35" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.35" fill="currentColor" />
     </svg>
   );
 }
@@ -2362,6 +2537,8 @@ function WalletDataPanel({
   copy: ShellCopy;
 }) {
   const title = walletTabs.find((item) => item.id === tab)?.label || 'Wallet';
+  const supportsTransfers = tab === 'tokens' || tab === 'nfts';
+  const canSend = tab === 'tokens' || Boolean(data.nfts?.length);
   return (
     <section className="mx-auto w-full max-w-4xl py-5">
       <div className={cx('flex items-end justify-between border-b pb-4', isLight ? 'border-black/8' : 'border-white/8')}>
@@ -2370,9 +2547,9 @@ function WalletDataPanel({
           <h2 className="inj-display-serif mt-1 text-3xl">{title}</h2>
         </div>
         <div className="flex items-center gap-2">
-          {tab === 'tokens' && (
+          {supportsTransfers && (
             <>
-              <button type="button" onClick={onSend} className={cx('h-9 rounded-full px-4 text-xs font-bold transition', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}>{copy.send}</button>
+              <button type="button" onClick={onSend} disabled={!canSend} className={cx('h-9 rounded-full px-4 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-35', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}>{copy.send}</button>
               <button type="button" onClick={onReceive} className={cx('h-9 rounded-full border px-4 text-xs font-bold transition', isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/12 hover:bg-white/8')}>{copy.receive}</button>
             </>
           )}
@@ -2448,6 +2625,7 @@ function WalletDataPanel({
 
 function WalletTransferPanel({
   mode,
+  assetLabel = 'Assets',
   address,
   privateKey,
   onRequirePrivateKey,
@@ -2457,6 +2635,7 @@ function WalletTransferPanel({
   copy,
 }: {
   mode: 'send' | 'receive';
+  assetLabel?: string;
   address: string | null;
   privateKey: Uint8Array | null;
   onRequirePrivateKey: () => Promise<Uint8Array>;
@@ -2632,7 +2811,7 @@ function WalletTransferPanel({
     <section className="mx-auto w-full max-w-3xl py-5">
       <div className={cx('flex items-end justify-between border-b pb-4', isLight ? 'border-black/8' : 'border-white/8')}>
         <div>
-          <div className={cx('text-[11px] font-bold uppercase tracking-[0.16em]', isLight ? 'text-black/38' : 'text-white/38')}>Assets</div>
+          <div className={cx('text-[11px] font-bold uppercase tracking-[0.16em]', isLight ? 'text-black/38' : 'text-white/38')}>{assetLabel}</div>
           <h2 className="inj-display-serif mt-1 text-3xl">{mode === 'send' ? copy.send : copy.receive}</h2>
         </div>
         <button type="button" onClick={onBack} className={cx('h-9 rounded-full px-4 text-xs font-bold transition', isLight ? 'bg-black/5 hover:bg-black/8' : 'bg-white/8 hover:bg-white/12')}>{copy.back}</button>
@@ -2714,11 +2893,181 @@ function WalletTransferPanel({
   );
 }
 
+function NFTTransferPanel({
+  nfts,
+  address,
+  privateKey,
+  onRequirePrivateKey,
+  isLight,
+  onComplete,
+  onBack,
+  copy,
+}: {
+  nfts: NFT[];
+  address: string | null;
+  privateKey: Uint8Array | null;
+  onRequirePrivateKey: () => Promise<Uint8Array>;
+  isLight: boolean;
+  onComplete: () => void;
+  onBack: () => void;
+  copy: ShellCopy;
+}) {
+  const [selectedKey, setSelectedKey] = useState(() => nfts[0] ? `${nfts[0].contractAddress}-${nfts[0].tokenId}` : '');
+  const [recipient, setRecipient] = useState('');
+  const [reviewing, setReviewing] = useState(false);
+  const [estimatingGas, setEstimatingGas] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [gasEstimate, setGasEstimate] = useState<GasEstimate | null>(null);
+  const [error, setError] = useState('');
+  const [txHash, setTxHash] = useState('');
+  const selectedNft = nfts.find((nft) => `${nft.contractAddress}-${nft.tokenId}` === selectedKey) || nfts[0];
+
+  const normalizeRecipient = (value: string): Address => {
+    const normalized = value.trim().startsWith('inj1') ? getEthereumAddress(value.trim()) : value.trim();
+    if (!/^0x[a-fA-F0-9]{40}$/.test(normalized)) throw new Error(copy.invalidRecipient);
+    return normalized as Address;
+  };
+
+  const getTransferData = () => {
+    if (!address || !selectedNft) throw new Error(!address ? copy.walletLocked : 'Select an NFT to send.');
+    return encodeFunctionData({
+      abi: erc721TransferAbi,
+      functionName: 'safeTransferFrom',
+      args: [address as Address, normalizeRecipient(recipient), BigInt(selectedNft.tokenId)],
+    });
+  };
+
+  const localizeError = (transferError: unknown) => {
+    const message = transferError instanceof Error ? transferError.message : String(transferError);
+    if (/invalid|address|recipient/i.test(message)) return copy.invalidRecipient;
+    if (/insufficient|funds for gas|balance/i.test(message)) return copy.insufficientBalance;
+    if (/owner|approved|authorization/i.test(message)) return 'This wallet is not authorized to transfer the selected NFT.';
+    return copy.agentUnavailable;
+  };
+
+  const reviewTransfer = async () => {
+    setReviewing(true);
+    setEstimatingGas(true);
+    setGasEstimate(null);
+    setError('');
+    setTxHash('');
+    try {
+      const data = getTransferData();
+      setGasEstimate(await estimateGas(address!, selectedNft.contractAddress, '0', data, INJECTIVE_MAINNET));
+    } catch (reviewError) {
+      setReviewing(false);
+      setError(localizeError(reviewError));
+    } finally {
+      setEstimatingGas(false);
+    }
+  };
+
+  const submitTransfer = async () => {
+    setSubmitting(true);
+    setError('');
+    try {
+      const data = getTransferData();
+      const signingKey = privateKey || await onRequirePrivateKey();
+      const hash = await sendTransaction(signingKey, selectedNft.contractAddress, '0', data, INJECTIVE_MAINNET);
+      setTxHash(hash);
+      setReviewing(false);
+      onComplete();
+    } catch (transferError) {
+      setError(localizeError(transferError));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <section className="mx-auto w-full max-w-3xl py-5">
+      <div className={cx('flex items-end justify-between border-b pb-4', isLight ? 'border-black/8' : 'border-white/8')}>
+        <div>
+          <div className={cx('text-[11px] font-bold uppercase tracking-[0.16em]', isLight ? 'text-black/38' : 'text-white/38')}>NFTs</div>
+          <h2 className="inj-display-serif mt-1 text-3xl">{copy.send}</h2>
+        </div>
+        <button type="button" onClick={onBack} className={cx('h-9 rounded-full px-4 text-xs font-bold transition', isLight ? 'bg-black/5 hover:bg-black/8' : 'bg-white/8 hover:bg-white/12')}>{copy.back}</button>
+      </div>
+
+      {!address ? (
+        <div className={cx('py-14 text-center text-sm', isLight ? 'text-black/52' : 'text-white/52')}>Log in to send an NFT.</div>
+      ) : nfts.length === 0 ? (
+        <div className={cx('py-14 text-center text-sm', isLight ? 'text-black/52' : 'text-white/52')}>No NFT is available to send.</div>
+      ) : (
+        <div className="mx-auto mt-8 max-w-xl space-y-5">
+          <div>
+            <div className={cx('mb-2 text-xs font-bold', isLight ? 'text-black/52' : 'text-white/52')}>Select NFT</div>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+              {nfts.map((nft) => {
+                const key = `${nft.contractAddress}-${nft.tokenId}`;
+                const selected = key === selectedKey;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedKey(key);
+                      setReviewing(false);
+                      setGasEstimate(null);
+                      setError('');
+                    }}
+                    className={cx('min-w-0 rounded-lg border p-2 text-left transition', selected ? 'border-violet-400 ring-2 ring-violet-400/15' : isLight ? 'border-black/9 hover:border-black/18' : 'border-white/11 hover:border-white/22')}
+                  >
+                    <div className={cx('relative aspect-square overflow-hidden rounded-md', isLight ? 'bg-black/5' : 'bg-white/7')}>
+                      {nft.image ? <Image src={nft.image} alt={nft.name} fill sizes="120px" unoptimized className="object-cover" /> : <div className="flex h-full items-center justify-center text-[10px] opacity-40">NFT</div>}
+                    </div>
+                    <div className="mt-2 truncate text-xs font-bold">{nft.name}</div>
+                    <div className={cx('mt-0.5 truncate text-[10px]', isLight ? 'text-black/42' : 'text-white/42')}>#{nft.tokenId}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <label className="block">
+            <span className={cx('text-xs font-bold', isLight ? 'text-black/52' : 'text-white/52')}>{copy.recipient}</span>
+            <input
+              value={recipient}
+              onChange={(event) => {
+                setRecipient(event.target.value);
+                setReviewing(false);
+                setGasEstimate(null);
+                setError('');
+              }}
+              placeholder="0x... or inj1..."
+              className={cx('mt-2 h-12 w-full rounded-xl border bg-transparent px-4 font-mono text-sm outline-none transition focus:border-violet-400', isLight ? 'border-black/10' : 'border-white/12')}
+            />
+          </label>
+
+          {reviewing && selectedNft && (
+            <div className={cx('border-y px-1 py-4 text-sm', isLight ? 'border-black/8' : 'border-white/9')}>
+              <div>Send <strong>{selectedNft.name}</strong> to <span className="font-mono">{truncateAddress(recipient)}</span>.</div>
+              <div className={cx('mt-3 grid grid-cols-2 gap-3 text-xs', isLight ? 'text-black/52' : 'text-white/52')}>
+                <span>{copy.gasLimit}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate?.gasLimit.toString() || '--'}</strong></span>
+                <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} INJ` : '--'}</strong></span>
+              </div>
+            </div>
+          )}
+          {error && <div className={cx('text-sm leading-6', isLight ? 'text-rose-700' : 'text-rose-200')}>{error}</div>}
+          {txHash && <a href={`https://blockscout.injective.network/tx/${txHash}`} target="_blank" rel="noreferrer" className="block truncate text-sm font-semibold text-emerald-500 underline underline-offset-4">Transaction submitted: {txHash}</a>}
+          <button
+            type="button"
+            onClick={() => reviewing ? void submitTransfer() : void reviewTransfer()}
+            disabled={submitting || estimatingGas || !selectedNft || (reviewing && Boolean(error))}
+            className={cx('h-11 w-full rounded-xl text-sm font-bold transition disabled:opacity-45', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}
+          >
+            {submitting ? copy.sending : estimatingGas ? copy.loading : reviewing ? copy.confirmAndSend : copy.reviewTransfer}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function DAppMarketGrid({
   apps,
   supported,
-  pinnedIds,
-  onTogglePin,
+  onOpenApp,
   onDragStart,
   onPointerDown,
   onPointerUp,
@@ -2727,8 +3076,7 @@ function DAppMarketGrid({
 }: {
   apps: DAppMarketItem[];
   supported: boolean;
-  pinnedIds: string[];
-  onTogglePin: (appId: string) => void;
+  onOpenApp: (app: DAppMarketItem) => void;
   onDragStart: (event: DragEvent<HTMLElement>, app: DAppMarketItem) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>, app: DAppMarketItem) => void;
   onPointerUp: () => void;
@@ -2736,9 +3084,8 @@ function DAppMarketGrid({
   copy: ShellCopy;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {apps.map((app, index) => {
-        const isPinned = pinnedIds.includes(app.id);
         return (
           <article
             key={app.id}
@@ -2747,7 +3094,7 @@ function DAppMarketGrid({
             onPointerDown={supported ? (event) => onPointerDown(event, app) : undefined}
             onPointerUp={supported ? onPointerUp : undefined}
             className={cx(
-              'inj-glass-surface group relative min-h-[178px] rounded-2xl border p-4 text-left transition duration-300 motion-safe:animate-[injFadeUp_620ms_cubic-bezier(0.22,1,0.36,1)_both]',
+              'inj-glass-surface group relative min-h-[168px] rounded-lg border p-4 text-left transition duration-300 motion-safe:animate-[injFadeUp_620ms_cubic-bezier(0.22,1,0.36,1)_both]',
               supported ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-70',
               isLight
                 ? 'border-black/8 bg-white/70 hover:border-black/14 hover:bg-white/90'
@@ -2758,23 +3105,25 @@ function DAppMarketGrid({
             {supported ? (
               <button
                 type="button"
-                onClick={() => onTogglePin(app.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenApp(app);
+                }}
                 className={cx(
-                  'absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border transition',
-                  isPinned
-                    ? isLight ? 'border-black/12 bg-black text-white' : 'border-white/12 bg-white text-black'
-                    : isLight ? 'border-black/8 bg-white/70 text-black/44 hover:text-black' : 'border-white/10 bg-black/20 text-white/46 hover:text-white'
+                  'absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border transition hover:-translate-y-0.5',
+                  isLight ? 'border-black/8 bg-white/80 text-black/50 hover:border-black/16 hover:text-black' : 'border-white/10 bg-black/24 text-white/54 hover:border-white/20 hover:text-white'
                 )}
-                aria-label={`${isPinned ? 'Unpin' : 'Pin'} ${app.name}`}
+                aria-label={`Open ${app.name}`}
+                title={`Open ${app.name}`}
               >
-                <PinIcon pinned={isPinned} className="h-3.5 w-3.5" />
+                <OpenAppIcon className="h-3.5 w-3.5" />
               </button>
             ) : (
               <span className={cx('absolute right-3 top-3 rounded-full px-2 py-1 text-[10px] font-bold', isLight ? 'bg-black/5 text-black/48' : 'bg-white/8 text-white/48')}>
                 {copy.comingSoon}
               </span>
             )}
-            <div className={cx('relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br text-sm font-black text-white', app.accent)}>
+            <div className={cx('relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br text-sm font-black text-white', app.accent)}>
               <DAppLogo app={app} />
             </div>
             <div className="mt-5 pr-9">
@@ -2791,8 +3140,7 @@ function DAppMarketGrid({
 
 function DAppMarketPanel({
   apps,
-  pinnedIds,
-  onTogglePin,
+  onOpenApp,
   onDragStart,
   onPointerDown,
   onPointerUp,
@@ -2800,8 +3148,7 @@ function DAppMarketPanel({
   copy,
 }: {
   apps: DAppMarketItem[];
-  pinnedIds: string[];
-  onTogglePin: (appId: string) => void;
+  onOpenApp: (app: DAppMarketItem) => void;
   onDragStart: (event: DragEvent<HTMLElement>, app: DAppMarketItem) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>, app: DAppMarketItem) => void;
   onPointerUp: () => void;
@@ -2809,44 +3156,307 @@ function DAppMarketPanel({
   copy: ShellCopy;
 }) {
   const supportedApps = apps.filter((app) => app.aiDriven);
-  const comingSoonApps = apps.filter((app) => !app.aiDriven);
+  const comingSoonApps = comingSoonDAppOrder
+    .map((name) => apps.find((app) => !app.aiDriven && normalizeDAppIdentity(app.name) === normalizeDAppIdentity(name)))
+    .filter((app): app is DAppMarketItem => Boolean(app));
+  const browserButtonClass = cx(
+    'flex h-8 w-8 shrink-0 items-center justify-center rounded-md opacity-35',
+    isLight ? 'text-black/62' : 'text-white/62',
+  );
 
   return (
     <section
       className={cx(
-        'mx-auto mt-5 w-full max-w-4xl motion-safe:animate-[injFadeUp_680ms_cubic-bezier(0.22,1,0.36,1)_140ms_both]',
-        isLight ? 'text-[#1d1d1f]' : 'text-white'
+        'relative mx-auto flex h-[calc(100dvh-7.15rem)] min-h-[620px] w-full max-w-[1280px] flex-col overflow-hidden rounded-lg border shadow-[0_20px_70px_rgba(0,0,0,0.09)] motion-safe:animate-[injFadeUp_520ms_cubic-bezier(0.22,1,0.36,1)_both]',
+        isLight ? 'border-black/10 bg-[#f7f7f8] text-[#1d1d1f]' : 'border-white/10 bg-[#0d0d0f] text-white shadow-black/35'
       )}
     >
-      <div className={cx('h-px bg-gradient-to-r', isLight ? 'from-transparent via-black/12 to-transparent' : 'from-transparent via-white/14 to-transparent')} />
-      <div className="flex flex-col gap-3 px-1 py-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className={cx('text-xs font-semibold uppercase tracking-[0.18em]', isLight ? 'text-black/42' : 'text-white/42')}>
-            {copy.dappMarket}
+      <div className={cx('flex h-10 shrink-0 items-end border-b px-2', isLight ? 'border-black/8 bg-[#ededf0]' : 'border-white/8 bg-[#161619]')}>
+        <div className={cx('flex h-9 min-w-0 max-w-[300px] items-center gap-2 rounded-t-md border-x border-t px-2.5', isLight ? 'border-black/8 bg-white text-black' : 'border-white/9 bg-[#0d0d0f] text-white')}>
+          <div className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}>
+            <DAppMarketIcon className="h-3.5 w-3.5" />
           </div>
-          <p className={cx('mt-2 max-w-2xl text-sm leading-6', isLight ? 'text-black/58' : 'text-white/58')}>
-            Choose Injective apps for the agent to inspect, route, and operate with your approval.
-          </p>
+          <span className="min-w-0 flex-1 truncate text-xs font-bold">{copy.dappMarket}</span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
         </div>
-        <div className={cx('text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>
-          {pinnedIds.length} pinned
+        <div className="flex-1" />
+        <div className={cx('mb-2 mr-2 hidden text-[10px] font-semibold uppercase tracking-[0.12em] sm:block', isLight ? 'text-black/34' : 'text-white/34')}>
+          INJ Pass Apps
         </div>
       </div>
 
-      <div className={cx('mb-3 text-xs font-bold uppercase tracking-[0.14em]', isLight ? 'text-black/52' : 'text-white/52')}>
-        {copy.worksWithAgentOs}
+      <div className={cx('flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:px-3', isLight ? 'border-black/8 bg-white' : 'border-white/8 bg-[#0d0d0f]')}>
+        <span className={browserButtonClass}><BrowserBackIcon /></span>
+        <span className={browserButtonClass}><BrowserForwardIcon /></span>
+        <span className={browserButtonClass}><ReloadIcon className="h-3.5 w-3.5" /></span>
+        <span className={cx(browserButtonClass, 'hidden sm:flex')}><HomeIcon className="h-3.5 w-3.5" /></span>
+        <div className={cx('flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 sm:px-3', isLight ? 'border-black/8 bg-black/[0.025]' : 'border-white/8 bg-white/[0.045]')}>
+          <ShieldCheckIcon className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+          <span className="min-w-0 truncate font-mono text-[11px] font-semibold">apps.injpass.com</span>
+        </div>
+        <div className={cx('hidden h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 md:flex', isLight ? 'border-black/8 text-black/58' : 'border-white/8 text-white/58')}>
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="text-[11px] font-semibold">Injective</span>
+        </div>
       </div>
-      <DAppMarketGrid apps={supportedApps} supported pinnedIds={pinnedIds} onTogglePin={onTogglePin} onDragStart={onDragStart} onPointerDown={onPointerDown} onPointerUp={onPointerUp} isLight={isLight} copy={copy} />
 
-      {comingSoonApps.length > 0 && (
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className={cx('text-xs font-semibold uppercase tracking-[0.18em]', isLight ? 'text-black/42' : 'text-white/42')}>
+              {copy.dappMarket}
+            </div>
+            <p className={cx('mt-2 max-w-2xl text-sm leading-6', isLight ? 'text-black/58' : 'text-white/58')}>
+              Choose Injective apps for the agent to inspect, route, and operate with your approval.
+            </p>
+          </div>
+          <div className={cx('text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>
+            {supportedApps.length} AgentOS
+          </div>
+        </div>
+
+        <div className={cx('mb-3 mt-6 text-xs font-bold uppercase tracking-[0.14em]', isLight ? 'text-black/52' : 'text-white/52')}>
+          {copy.worksWithAgentOs}
+        </div>
+        <DAppMarketGrid apps={supportedApps} supported onOpenApp={onOpenApp} onDragStart={onDragStart} onPointerDown={onPointerDown} onPointerUp={onPointerUp} isLight={isLight} copy={copy} />
+
+        <div className={cx('mb-3 mt-8 flex items-center justify-between text-xs font-bold uppercase tracking-[0.14em]', isLight ? 'text-black/42' : 'text-white/42')}>
+          <span>{copy.comingSoon}</span>
+          <span>{comingSoonApps.length}</span>
+        </div>
+        <DAppMarketGrid apps={comingSoonApps} supported={false} onOpenApp={onOpenApp} onDragStart={onDragStart} onPointerDown={onPointerDown} onPointerUp={onPointerUp} isLight={isLight} copy={copy} />
+      </div>
+    </section>
+  );
+}
+
+function MiniAppPanel({
+  app,
+  manifest,
+  src,
+  iframeKey,
+  iframeRef,
+  navigation,
+  isLoading,
+  address,
+  walletName,
+  isLight,
+  onClose,
+  onNavigate,
+  onOpenWallet,
+  onOpenExternal,
+  onFrameLoad,
+}: {
+  app: DAppMarketItem;
+  manifest: MiniAppManifest;
+  src: string;
+  iframeKey: string;
+  iframeRef: RefObject<HTMLIFrameElement | null>;
+  navigation: MiniAppNavigationState;
+  isLoading: boolean;
+  address: string | null;
+  walletName?: string;
+  isLight: boolean;
+  onClose: () => void;
+  onNavigate: (action: MiniAppNavigationAction) => void;
+  onOpenWallet: () => void;
+  onOpenExternal: () => void;
+  onFrameLoad: () => void;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const browserLocation = useMemo(() => {
+    try {
+      const url = new URL(src);
+      return {
+        host: url.host,
+        origin: url.origin,
+        isLocal: url.hostname === 'localhost' || url.hostname === '127.0.0.1',
+      };
+    } catch {
+      return { host: src, origin: src, isLocal: false };
+    }
+  }, [src]);
+  const visiblePath = navigation.path && navigation.path !== '/' ? navigation.path : '';
+  const browserButtonClass = cx(
+    'flex h-8 w-8 shrink-0 items-center justify-center rounded-md outline-none transition disabled:cursor-default disabled:opacity-25',
+    isLight ? 'text-black/62 hover:bg-black/6 hover:text-black' : 'text-white/62 hover:bg-white/9 hover:text-white',
+  );
+  const openWallet = () => {
+    setDetailsOpen(false);
+    onOpenWallet();
+  };
+
+  return (
+    <section
+      className={cx(
+        'relative mx-auto flex h-[calc(100dvh-7.15rem)] min-h-[560px] w-full max-w-[1280px] flex-col overflow-hidden rounded-lg border shadow-[0_20px_70px_rgba(0,0,0,0.09)]',
+        isLight ? 'border-black/10 bg-[#f7f7f8]' : 'border-white/10 bg-[#0d0d0f] shadow-black/35',
+      )}
+    >
+      <div className={cx('flex h-10 shrink-0 items-end border-b px-2', isLight ? 'border-black/8 bg-[#ededf0]' : 'border-white/8 bg-[#161619]')}>
+        <div
+          className={cx(
+            'flex h-9 min-w-0 max-w-[300px] items-center gap-2 rounded-t-md border-x border-t px-2.5',
+            isLight ? 'border-black/8 bg-white text-black' : 'border-white/9 bg-[#0d0d0f] text-white',
+          )}
+          title={navigation.title || app.name}
+        >
+          <div className={cx('relative h-5 w-5 shrink-0 overflow-hidden rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}>
+            <DAppLogo app={app} />
+          </div>
+          <span className="min-w-0 flex-1 truncate text-xs font-bold">{navigation.title || app.name}</span>
+          <span
+            className={cx(
+              'h-1.5 w-1.5 shrink-0 rounded-full',
+              isLoading ? 'animate-pulse bg-amber-400' : address ? 'bg-emerald-500' : isLight ? 'bg-black/24' : 'bg-white/30',
+            )}
+            aria-label={isLoading ? 'Loading' : address ? 'Wallet connected' : 'Guest session'}
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            className={cx('flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition', isLight ? 'hover:bg-black/6' : 'hover:bg-white/9')}
+            aria-label={`Close ${app.name}`}
+            title="Close app"
+          >
+            <CloseIcon className="h-3 w-3" />
+          </button>
+        </div>
+        <div className="flex-1" />
+        <div className={cx('mb-2 mr-2 hidden text-[10px] font-semibold uppercase tracking-[0.12em] sm:block', isLight ? 'text-black/34' : 'text-white/34')}>
+          INJ Pass Apps
+        </div>
+      </div>
+
+      <div className={cx('flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:px-3', isLight ? 'border-black/8 bg-white' : 'border-white/8 bg-[#0d0d0f]')}>
+        <button type="button" onClick={() => onNavigate('back')} disabled={!navigation.canGoBack} className={browserButtonClass} aria-label="Back" title="Back">
+          <BrowserBackIcon />
+        </button>
+        <button type="button" onClick={() => onNavigate('forward')} disabled={!navigation.canGoForward} className={browserButtonClass} aria-label="Forward" title="Forward">
+          <BrowserForwardIcon />
+        </button>
+        <button type="button" onClick={() => onNavigate('reload')} className={browserButtonClass} aria-label={`Reload ${app.name}`} title="Reload">
+          <ReloadIcon className={cx('h-3.5 w-3.5', isLoading && 'animate-spin')} />
+        </button>
+        <button type="button" onClick={() => onNavigate('home')} className={cx(browserButtonClass, 'hidden sm:flex')} aria-label={`${app.name} home`} title="Home">
+          <HomeIcon className="h-3.5 w-3.5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setDetailsOpen((current) => !current)}
+          className={cx(
+            'flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 text-left outline-none transition sm:px-3',
+            isLight ? 'border-black/8 bg-black/[0.025] hover:bg-black/[0.045]' : 'border-white/8 bg-white/[0.045] hover:bg-white/[0.065]',
+          )}
+          aria-expanded={detailsOpen}
+          title={`${browserLocation.origin}${visiblePath}`}
+        >
+          <ShieldCheckIcon className={cx('h-3.5 w-3.5 shrink-0', browserLocation.isLocal ? 'text-amber-500' : 'text-emerald-500')} />
+          <span className="min-w-0 truncate font-mono text-[11px]">
+            <span className={cx('font-semibold', isLight ? 'text-black/72' : 'text-white/72')}>{browserLocation.host}</span>
+            <span className={isLight ? 'text-black/42' : 'text-white/42'}>{visiblePath}</span>
+          </span>
+        </button>
+
+        <div className={cx('hidden h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 md:flex', isLight ? 'border-black/8 text-black/58' : 'border-white/8 text-white/58')} title={`${manifest.networkName} · Chain ${manifest.chainId}`}>
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="text-[11px] font-semibold">Injective Testnet</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={openWallet}
+          className={cx(
+            'flex h-8 max-w-[180px] shrink-0 items-center gap-2 rounded-md border px-2.5 text-xs font-semibold outline-none transition',
+            address
+              ? isLight ? 'border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100' : 'border-violet-300/18 bg-violet-300/10 text-violet-100 hover:bg-violet-300/15'
+              : isLight ? 'border-black/10 text-black/68 hover:bg-black/5' : 'border-white/10 text-white/68 hover:bg-white/8',
+          )}
+          title={address ? `${walletName || 'INJ Pass'} · ${address}` : 'Connect an INJ Pass wallet'}
+        >
+          <WalletIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="hidden min-w-0 truncate sm:block">
+            {address ? walletName || truncateAddress(address) : 'Connect'}
+          </span>
+        </button>
+
+        <button type="button" onClick={onOpenExternal} className={browserButtonClass} aria-label={`Open ${app.name} in a new tab`} title="Open in new tab">
+          <OpenAppIcon className="h-3.5 w-3.5" />
+        </button>
+        <button type="button" onClick={() => setDetailsOpen((current) => !current)} className={browserButtonClass} aria-label="App connection details" title="Connection details">
+          <MoreIcon />
+        </button>
+      </div>
+
+      <div className="relative h-0 shrink-0">
+        <div className={cx('absolute inset-x-0 top-0 z-10 h-[2px] origin-left bg-violet-500 transition-opacity', isLoading ? 'animate-pulse opacity-100' : 'opacity-0')} />
+      </div>
+
+      {detailsOpen && (
         <>
-          <div className={cx('mb-3 mt-8 text-xs font-bold uppercase tracking-[0.14em]', isLight ? 'text-black/42' : 'text-white/42')}>
-            {copy.comingSoon}
+          <button type="button" className="absolute inset-0 z-20 cursor-default" onClick={() => setDetailsOpen(false)} aria-label="Close connection details" />
+          <div
+            className={cx(
+              'absolute right-3 top-[5.7rem] z-30 w-[min(340px,calc(100%-1.5rem))] rounded-lg border p-4 shadow-2xl backdrop-blur-2xl',
+              isLight ? 'border-black/10 bg-white/96 text-black shadow-black/14' : 'border-white/12 bg-[#18181b]/96 text-white shadow-black/55',
+            )}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-bold">App connection</div>
+                <div className={cx('mt-1 text-xs', isLight ? 'text-black/48' : 'text-white/48')}>
+                  {browserLocation.isLocal ? 'Local development origin' : 'Verified INJ Pass origin'}
+                </div>
+              </div>
+              <ShieldCheckIcon className={cx('h-5 w-5', browserLocation.isLocal ? 'text-amber-500' : 'text-emerald-500')} />
+            </div>
+            <dl className={cx('mt-4 divide-y text-xs', isLight ? 'divide-black/8' : 'divide-white/9')}>
+              <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 py-2.5">
+                <dt className={isLight ? 'text-black/42' : 'text-white/42'}>Origin</dt>
+                <dd className="truncate text-right font-mono" title={browserLocation.origin}>{browserLocation.host}</dd>
+              </div>
+              <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 py-2.5">
+                <dt className={isLight ? 'text-black/42' : 'text-white/42'}>Network</dt>
+                <dd className="text-right font-semibold">{manifest.networkName} · {manifest.chainId}</dd>
+              </div>
+              <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 py-2.5">
+                <dt className={isLight ? 'text-black/42' : 'text-white/42'}>Wallet</dt>
+                <dd className="truncate text-right font-semibold" title={address || 'Guest'}>
+                  {address ? `${walletName || 'INJ Pass'} · ${truncateAddress(address)}` : 'Not connected'}
+                </dd>
+              </div>
+              <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 py-2.5">
+                <dt className={isLight ? 'text-black/42' : 'text-white/42'}>Access</dt>
+                <dd className="text-right font-semibold">{manifest.permissions.join(', ')}</dd>
+              </div>
+              <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 py-2.5">
+                <dt className={isLight ? 'text-black/42' : 'text-white/42'}>Contracts</dt>
+                <dd className="text-right font-semibold">{manifest.allowedContracts?.length || 0} allowlisted</dd>
+              </div>
+            </dl>
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={openWallet}
+                className={cx('h-8 rounded-md px-3 text-xs font-bold transition', isLight ? 'bg-black text-white hover:bg-black/80' : 'bg-white text-black hover:bg-white/84')}
+              >
+                {address ? 'Switch wallet' : 'Connect wallet'}
+              </button>
+            </div>
           </div>
-          <DAppMarketGrid apps={comingSoonApps} supported={false} pinnedIds={pinnedIds} onTogglePin={onTogglePin} onDragStart={onDragStart} onPointerDown={onPointerDown} onPointerUp={onPointerUp} isLight={isLight} copy={copy} />
         </>
       )}
-      <div className={cx('mt-5 h-px bg-gradient-to-r', isLight ? 'from-transparent via-black/8 to-transparent' : 'from-transparent via-white/10 to-transparent')} />
+
+      <iframe
+        key={iframeKey}
+        ref={iframeRef}
+        src={src}
+        title={`${app.name} mini app`}
+        allow="clipboard-read; clipboard-write; publickey-credentials-get; publickey-credentials-create"
+        onLoad={onFrameLoad}
+        className="min-h-0 flex-1 border-0 bg-white"
+      />
     </section>
   );
 }
@@ -2915,15 +3525,49 @@ function ConversationSearchModal({
   onClose: () => void;
   onOpenConversation: (id: string) => void;
 }) {
-  if (!open) return null;
+  const [rendered, setRendered] = useState(open);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    let revealFrame = 0;
+    if (open) {
+      const mountFrame = window.requestAnimationFrame(() => {
+        setRendered(true);
+        revealFrame = window.requestAnimationFrame(() => setVisible(true));
+      });
+      return () => {
+        window.cancelAnimationFrame(mountFrame);
+        if (revealFrame) window.cancelAnimationFrame(revealFrame);
+      };
+    }
+
+    const hideFrame = window.requestAnimationFrame(() => setVisible(false));
+    const timer = window.setTimeout(() => setRendered(false), 240);
+    return () => {
+      window.cancelAnimationFrame(hideFrame);
+      window.clearTimeout(timer);
+    };
+  }, [open]);
+
+  if (!rendered) return null;
   return (
     <OverlayPortal enabled>
-      <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className={cx(
+          'fixed inset-0 z-[120] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm transition-opacity duration-200 ease-out',
+          visible ? 'opacity-100' : 'opacity-0',
+        )}
+        onMouseDown={onClose}
+      >
         <section
           role="dialog"
           aria-modal="true"
           aria-label={copy.searchChats}
-          className={cx('inj-glass-surface w-full max-w-2xl overflow-hidden rounded-2xl border shadow-2xl', isLight ? 'border-black/9 bg-white/94 text-black shadow-black/14' : 'border-white/11 bg-[#171719]/94 text-white shadow-black/50')}
+          className={cx(
+            'inj-glass-surface w-full max-w-2xl overflow-hidden rounded-2xl border shadow-2xl transition-[opacity,transform] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
+            visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-3 scale-[0.985] opacity-0',
+            isLight ? 'border-black/9 bg-white/94 text-black shadow-black/14' : 'border-white/11 bg-[#171719]/94 text-white shadow-black/50',
+          )}
           onMouseDown={(event) => event.stopPropagation()}
         >
           <div className={cx('flex items-center gap-3 border-b px-5 py-4', isLight ? 'border-black/8' : 'border-white/9')}>
@@ -3187,13 +3831,26 @@ function SkillsPanel({
 }) {
   const [query, setQuery] = useState('');
   const [appFilter, setAppFilter] = useState('all');
+  const [appFilterMenuOpen, setAppFilterMenuOpen] = useState(false);
+  const [appFilterMenuIndex, setAppFilterMenuIndex] = useState(0);
   const [sortMode, setSortMode] = useState<'popular' | 'name'>('popular');
   const [creating, setCreating] = useState(false);
   const [draftSkill, setDraftSkill] = useState({ name: '', app: 'INJ Gift', body: '', prompt: '' });
+  const appFilterMenuRef = useRef<HTMLDivElement | null>(null);
+  const appFilterTriggerRef = useRef<HTMLButtonElement | null>(null);
   const appOptions = useMemo(
     () => Array.from(new Set(skills.map((skill) => skill.app))).sort((left, right) => left.localeCompare(right)),
     [skills],
   );
+  const appFilterOptions = useMemo(() => [
+    { value: 'all', label: 'All applications', count: skills.length },
+    ...appOptions.map((app) => ({
+      value: app,
+      label: app,
+      count: skills.filter((skill) => skill.app === app).length,
+    })),
+  ], [appOptions, skills]);
+  const selectedAppFilter = appFilterOptions.find((option) => option.value === appFilter) || appFilterOptions[0];
   const visibleSkills = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase();
     return skills
@@ -3206,6 +3863,52 @@ function SkillsPanel({
           : right.popularity - left.popularity;
       });
   }, [appFilter, query, skills, sortMode]);
+
+  useEffect(() => {
+    if (!appFilterMenuOpen) return;
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node) || appFilterMenuRef.current?.contains(target)) return;
+      setAppFilterMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+  }, [appFilterMenuOpen]);
+
+  const openAppFilterMenu = () => {
+    setAppFilterMenuIndex(Math.max(0, appFilterOptions.findIndex((option) => option.value === appFilter)));
+    setAppFilterMenuOpen((current) => !current);
+  };
+
+  const selectAppFilter = (value: string) => {
+    setAppFilter(value);
+    setAppFilterMenuOpen(false);
+    window.requestAnimationFrame(() => appFilterTriggerRef.current?.focus());
+  };
+
+  const handleAppFilterKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!appFilterMenuOpen) {
+        setAppFilterMenuOpen(true);
+        setAppFilterMenuIndex(Math.max(0, appFilterOptions.findIndex((option) => option.value === appFilter)));
+        return;
+      }
+      setAppFilterMenuIndex((current) => event.key === 'ArrowDown'
+        ? (current + 1) % appFilterOptions.length
+        : (current - 1 + appFilterOptions.length) % appFilterOptions.length);
+      return;
+    }
+    if (event.key === 'Enter' && appFilterMenuOpen) {
+      event.preventDefault();
+      selectAppFilter(appFilterOptions[appFilterMenuIndex]?.value || 'all');
+      return;
+    }
+    if (event.key === 'Escape' && appFilterMenuOpen) {
+      event.preventDefault();
+      setAppFilterMenuOpen(false);
+    }
+  };
 
   const saveSkill = () => {
     const name = draftSkill.name.trim();
@@ -3244,15 +3947,87 @@ function SkillsPanel({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
+        <div className="mt-5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_210px_auto]">
           <label className={cx('flex h-10 items-center gap-2 border-b px-1', isLight ? 'border-black/12' : 'border-white/14')}>
             <SearchIcon className={cx('h-4 w-4', isLight ? 'text-black/38' : 'text-white/38')} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by skill, app, or capability" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:opacity-40" />
           </label>
-          <select value={appFilter} onChange={(event) => setAppFilter(event.target.value)} className={cx('h-10 border-b bg-transparent px-1 text-sm outline-none', isLight ? 'border-black/12' : 'border-white/14')}>
-            <option value="all">All applications</option>
-            {appOptions.map((app) => <option key={app} value={app}>{app}</option>)}
-          </select>
+          <div ref={appFilterMenuRef} className="relative z-[75]">
+            <button
+              ref={appFilterTriggerRef}
+              type="button"
+              role="combobox"
+              aria-label="Filter skills by application"
+              aria-controls="skills-application-filter"
+              aria-expanded={appFilterMenuOpen}
+              aria-haspopup="listbox"
+              onClick={openAppFilterMenu}
+              onKeyDown={handleAppFilterKeyDown}
+              className={cx(
+                'flex h-10 w-full items-center gap-2 border-b px-1 text-left text-sm outline-none transition',
+                isLight ? 'border-black/12 hover:border-black/28' : 'border-white/14 hover:border-white/30',
+              )}
+            >
+              <span className={cx('relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold', isLight ? 'bg-black/[0.055] text-black/56' : 'bg-white/[0.08] text-white/58')}>
+                {appFilter === 'all' ? <DAppMarketIcon className="h-3.5 w-3.5" /> : (() => {
+                  const app = dappMarketApps.find((item) => item.name === selectedAppFilter?.label);
+                  return app ? <DAppLogo app={app} /> : selectedAppFilter?.label.slice(0, 2).toUpperCase();
+                })()}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-semibold">{selectedAppFilter?.label}</span>
+              <ChevronDownIcon className={cx('h-3.5 w-3.5 shrink-0 transition-transform duration-200', appFilterMenuOpen && 'rotate-180', isLight ? 'text-black/38' : 'text-white/38')} />
+            </button>
+
+            {appFilterMenuOpen && (
+              <div
+                id="skills-application-filter"
+                role="listbox"
+                aria-label="Applications"
+                className={cx(
+                  'inj-glass-surface inj-liquid-menu absolute right-0 top-[calc(100%+8px)] z-[90] max-h-[360px] w-[min(290px,calc(100vw-3rem))] overflow-y-auto rounded-2xl border p-1.5 shadow-2xl backdrop-blur-2xl motion-safe:animate-[injFadeDown_260ms_cubic-bezier(0.22,1,0.36,1)_both]',
+                  isLight ? 'border-black/10 bg-white/96 text-black shadow-black/16' : 'border-white/12 bg-[#19191c]/96 text-white shadow-black/55',
+                )}
+              >
+                <div className={cx('px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em]', isLight ? 'text-black/38' : 'text-white/38')}>
+                  Applications
+                </div>
+                {appFilterOptions.map((option, index) => {
+                  const marketApp = option.value === 'all' ? null : dappMarketApps.find((item) => item.name === option.label);
+                  const selected = option.value === appFilter;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      onPointerDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setAppFilterMenuIndex(index)}
+                      onClick={() => selectAppFilter(option.value)}
+                      className={cx(
+                        'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition',
+                        index === appFilterMenuIndex
+                          ? isLight ? 'bg-black/[0.065]' : 'bg-white/[0.1]'
+                          : isLight ? 'hover:bg-black/[0.04]' : 'hover:bg-white/[0.065]',
+                      )}
+                    >
+                      <span className={cx('relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold', isLight ? 'bg-black/[0.055] text-black/56' : 'bg-white/[0.08] text-white/58')}>
+                        {option.value === 'all'
+                          ? <DAppMarketIcon className="h-4 w-4" />
+                          : marketApp ? <DAppLogo app={marketApp} /> : option.label.slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold">{option.label}</span>
+                        <span className={cx('mt-0.5 block text-xs', isLight ? 'text-black/44' : 'text-white/44')}>
+                          {option.count} {option.count === 1 ? 'skill' : 'skills'}
+                        </span>
+                      </span>
+                      {selected && <CheckIcon className={cx('h-4 w-4 shrink-0', isLight ? 'text-violet-700' : 'text-violet-200')} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <div className={cx('grid grid-cols-2 rounded-lg border p-0.5', isLight ? 'border-black/10' : 'border-white/12')}>
             {(['popular', 'name'] as const).map((mode) => (
               <button key={mode} type="button" onClick={() => setSortMode(mode)} className={cx('h-8 rounded-md px-3 text-xs font-bold capitalize transition', sortMode === mode ? isLight ? 'bg-black text-white' : 'bg-white text-black' : isLight ? 'text-black/45' : 'text-white/45')}>{mode}</button>
@@ -4406,7 +5181,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [dappMarketOpen, setDappMarketOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [dappMarketItems, setDappMarketItems] = useState<DAppMarketItem[]>(dappMarketApps);
-  const [pinnedDAppIds, setPinnedDAppIds] = useState<string[]>([]);
+  const [activeMiniApp, setActiveMiniApp] = useState<DAppMarketItem | null>(null);
+  const [miniAppUrl, setMiniAppUrl] = useState('');
+  const [miniAppFrameNonce, setMiniAppFrameNonce] = useState(0);
+  const [miniAppNavigation, setMiniAppNavigation] = useState<MiniAppNavigationState>(initialMiniAppNavigation);
+  const [miniAppLoading, setMiniAppLoading] = useState(false);
   const [activeWalletTab, setActiveWalletTab] = useState<WalletTab | null>(null);
   const [assetWalletView, setAssetWalletView] = useState<AssetWalletView>('assets');
   const [walletPanelData, setWalletPanelData] = useState<WalletPanelData>({});
@@ -4420,8 +5199,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [composerSuggestionIndex, setComposerSuggestionIndex] = useState(0);
   const [composerAssetBalances, setComposerAssetBalances] = useState<Record<string, string>>({});
   const [composerAssetsAddress, setComposerAssetsAddress] = useState<string | null>(null);
+  const [composerTokens, setComposerTokens] = useState<ComposerToken[]>([]);
   const [droppedContext, setDroppedContext] = useState('');
-  const [attachedDApp, setAttachedDApp] = useState<DAppMarketItem | null>(null);
   const [walletExecutionMode, setWalletExecutionMode] = useState<WalletExecutionMode>(readInitialWalletExecutionMode);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [selectedReasoningLevel, setSelectedReasoningLevel] = useState<ReasoningLevel>('High');
@@ -4538,6 +5317,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const chatDraftRef = useRef('');
   const creativeDraftRef = useRef('');
   const pointerDAppRef = useRef<DAppMarketItem | null>(null);
+  const miniAppIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const miniAppLoadingTimerRef = useRef<number | null>(null);
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
   const composerSuggestionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -4556,6 +5337,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     resolve: (result: LocalUnlockResult) => void;
     reject: (error: Error) => void;
   } | null>(null);
+  const requireWalletPrivateKeyRef = useRef<() => Promise<Uint8Array>>(
+    async () => { throw new Error('Wallet unlock is not ready.'); },
+  );
   const composerToolsTimerRef = useRef<number | null>(null);
   const composerDemoResumeTimerRef = useRef<number | null>(null);
   const chatAbortControllerRef = useRef<AbortController | null>(null);
@@ -4600,6 +5384,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     && !creativeIntroOpen
     && !composerDemoDismissed
     && !draft
+    && composerTokens.length === 0
     && !droppedContext
     && messages.length === 0
     && !creativePrompt
@@ -4662,10 +5447,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     composerSuggestionRefs.current[composerSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
   }, [composerSuggestionIndex]);
   const pinnedDApps = useMemo(
-    () => pinnedDAppIds
-      .map((appId) => dappMarketItems.find((app) => app.id === appId))
-      .filter((app): app is DAppMarketItem => Boolean(app?.aiDriven)),
-    [dappMarketItems, pinnedDAppIds]
+    () => dappMarketItems.filter((app) => app.aiDriven),
+    [dappMarketItems]
+  );
+  const activeMiniAppManifest = useMemo(
+    () => activeMiniApp ? getMiniAppManifest(activeMiniApp.id) : null,
+    [activeMiniApp],
   );
   const visibleStoredConversations = useMemo(() => {
     return storedConversations
@@ -4695,6 +5482,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     chatAbortControllerRef.current?.abort();
     creativeAbortControllerRef.current?.abort();
     if (composerDemoResumeTimerRef.current) window.clearTimeout(composerDemoResumeTimerRef.current);
+    if (miniAppLoadingTimerRef.current) window.clearTimeout(miniAppLoadingTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -4759,6 +5547,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       if (activeChatSurface === 'cloud-drive') {
         return copy.createSpace;
       }
+      if (activeChatSurface === 'mini-app') {
+        return activeMiniApp?.name || copy.dappMarket;
+      }
       return guestSlogan || (isAuthenticated ? copy.titleAuthed : copy.titleGuest);
     }
     if (creativeStage === 'guide') {
@@ -4771,7 +5562,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       return copy.titleCreativeBuilding;
     }
     return copy.titleCreativePublished;
-  }, [activeChatSurface, activeMode, copy, creativeStage, guestSlogan, isAuthenticated]);
+  }, [activeChatSurface, activeMiniApp?.name, activeMode, copy, creativeStage, guestSlogan, isAuthenticated]);
 
   useEffect(() => {
     const slogans = guestSlogansByLanguage[selectedLanguageCode];
@@ -5052,11 +5843,15 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         ));
       const requiredAgentApps = dappMarketApps.filter((app) => app.aiDriven);
       const requiredNames = new Set(requiredAgentApps.map((app) => normalizeDAppIdentity(app.name)));
+      const approvedComingSoonNames = new Set(comingSoonDAppOrder.map(normalizeDAppIdentity));
       const prioritized = requiredAgentApps.map((required) => {
         const remote = mapped.find((app) => normalizeDAppIdentity(app.name) === normalizeDAppIdentity(required.name));
         return remote ? { ...remote, ...required, url: remote.url || required.url } : required;
       });
-      const remoteExtras = mapped.filter((app) => !requiredNames.has(normalizeDAppIdentity(app.name)));
+      const remoteExtras = mapped.filter((app) => {
+        const identity = normalizeDAppIdentity(app.name);
+        return !requiredNames.has(identity) && approvedComingSoonNames.has(identity);
+      });
       const remoteNames = new Set(remoteExtras.map((app) => normalizeDAppIdentity(app.name)));
       const localFallbacks = dappMarketApps.filter(
         (app) => !app.aiDriven && !remoteNames.has(normalizeDAppIdentity(app.name)),
@@ -5500,6 +6295,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     switchProductMode('chat');
     setActiveChatSurface('default');
     setActiveWalletTab(null);
+    setComposerTokens([]);
+    setDroppedContext('');
     if (cached) {
       setMessages(cached.messages);
       return;
@@ -5558,13 +6355,98 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setActiveChatSurface('default');
     setActiveWalletTab(null);
     setDroppedContext('');
+    setComposerTokens([]);
     setModelMenuOpen(false);
     setDraft('');
-    setAttachedDApp(null);
     setChatWorkStatus('working');
     const controller = new AbortController();
     chatAbortControllerRef.current?.abort();
     chatAbortControllerRef.current = controller;
+
+    if (isInjGiftMessage(trimmedText)) {
+      setIsAgentRunning(true);
+      try {
+        const command = parseInjGiftCommand(trimmedText);
+        const signingKey = command.kind === 'create' || command.kind === 'claim'
+          ? isAuthenticated ? await requireWalletPrivateKey() : undefined
+          : undefined;
+        if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+        const result = await executeInjGiftCommand(command, {
+          languageCode: selectedLanguageCode,
+          privateKey: signingKey,
+        });
+        if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+
+        const assistantMessage: ChatMessage = {
+          id: `a-${messageStamp}`,
+          role: 'assistant',
+          body: result.body,
+        };
+        setMessages((current) => [...current, assistantMessage]);
+        setChatWorkStatus('complete');
+
+        if (isAuthenticated) {
+          const conversationId = agentConversationId || uid('inj-gift');
+          const title = currentConversationTitle || trimmedText.slice(0, 48);
+          const history = [
+            ...messages
+              .filter((message) => message.role === 'user' || message.role === 'assistant')
+              .map((message) => ({
+                role: message.role as 'user' | 'assistant',
+                content: message.body,
+              })),
+            { role: 'user' as const, content: trimmedText },
+            { role: 'assistant' as const, content: result.body },
+          ];
+          setAgentConversationId(conversationId);
+          setSelectedStoredConversationId(conversationId);
+          conversationCacheRef.current.set(conversationId, {
+            title,
+            messages: [
+              ...messages,
+              { id: `u-${messageStamp}`, role: 'user', body: trimmedText },
+              assistantMessage,
+            ],
+          });
+          void syncAgentConversation({
+            conversationId,
+            title,
+            model: 'inj-gift',
+            messages: history,
+          }).then((synced) => {
+            if (!synced) return;
+            const now = new Date().toISOString();
+            upsertStoredConversation({
+              id: conversationId,
+              title,
+              model: 'inj-gift',
+              createdAt: now,
+              updatedAt: now,
+            });
+          });
+        }
+      } catch (error) {
+        if (isAbortError(error)) {
+          setChatWorkStatus('idle');
+          return;
+        }
+        setMessages((current) => [
+          ...current,
+          {
+            id: `a-${messageStamp}`,
+            role: 'assistant',
+            body: error instanceof Error ? error.message : copy.agentUnavailable,
+          },
+        ]);
+        setChatWorkStatus('idle');
+      } finally {
+        if (chatAbortControllerRef.current === controller) {
+          chatAbortControllerRef.current = null;
+          setIsAgentRunning(false);
+        }
+      }
+      return;
+    }
 
     if (!isAuthenticated) {
       setIsAgentRunning(true);
@@ -5715,10 +6597,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     switchProductMode('chat');
     setActiveChatSurface('default');
     setActiveWalletTab(tab);
-    if (tab === 'tokens') setAssetWalletView('assets');
+    if (tab === 'tokens' || tab === 'nfts') setAssetWalletView('assets');
     setModelMenuOpen(false);
     setPendingConfirmation(null);
     setDraft('');
+    setComposerTokens([]);
+    setDroppedContext('');
     setWalletPanelError('');
     if (!isAuthenticated || !address) return;
     const cached = tab === 'tokens'
@@ -5953,19 +6837,35 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }
   };
 
+  const addComposerToken = (token: ComposerToken) => {
+    setComposerTokens((current) => [
+      ...current.filter((item) => item.id !== token.id),
+      token,
+    ]);
+  };
+
+  const removeComposerToken = (tokenId: string) => {
+    setComposerTokens((current) => current.filter((token) => token.id !== tokenId));
+  };
+
+  const addAppComposerToken = (app: DAppMarketItem) => {
+    addComposerToken({
+      id: `app-${app.id}`,
+      label: app.name,
+      caption: app.category,
+      symbol: '@',
+      app,
+    });
+  };
+
   const selectComposerSuggestion = (suggestion: ComposerSuggestion) => {
     if (!composerTrigger) return;
     const prefix = draft.slice(0, composerTrigger.start).trimEnd();
-    const nextDraft = suggestion.app
-      ? prefix ? `${prefix} ` : ''
-      : `${prefix ? `${prefix} ` : ''}${suggestion.symbol}${suggestion.label} `;
+    const nextDraft = prefix ? `${prefix} ` : '';
     setComposerDemoDismissed(true);
     setDraft(nextDraft);
+    addComposerToken(suggestion);
     setComposerSuggestionIndex(0);
-    if (suggestion.app) {
-      setAttachedDApp(suggestion.app);
-      setDroppedContext(`DApp: ${suggestion.app.name} (${suggestion.app.category}) - ${suggestion.app.body}`);
-    }
     window.requestAnimationFrame(() => {
       composerInputRef.current?.focus();
       composerInputRef.current?.setSelectionRange(nextDraft.length, nextDraft.length);
@@ -5973,6 +6873,19 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const handleComposerInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if ((event.key === 'Backspace' || event.key === 'Delete') && draft.length === 0) {
+      const lastToken = composerTokens[composerTokens.length - 1];
+      if (lastToken) {
+        event.preventDefault();
+        removeComposerToken(lastToken.id);
+        return;
+      }
+      if (droppedContext) {
+        event.preventDefault();
+        setDroppedContext('');
+        return;
+      }
+    }
     if (!composerTrigger || composerSuggestions.length === 0) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
@@ -5999,22 +6912,25 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const draftText = draft.trim();
-    const appReference = attachedDApp ? `@${attachedDApp.name}` : '';
-    const draftAlreadyContainsApp = Boolean(
-      appReference
-      && draftText.toLocaleLowerCase().startsWith(appReference.toLocaleLowerCase())
-    );
-    const text = appReference && !draftAlreadyContainsApp
-      ? `${appReference}${draftText ? ` ${draftText}` : ''}`
-      : draftText || (droppedContext ? 'Use the attached context.' : '');
+    const tokenReferences = composerTokens.map((token) => `${token.symbol}${token.label}`).join(' ');
+    const text = [tokenReferences, draftText].filter(Boolean).join(' ')
+      || (droppedContext ? 'Use the attached context.' : '');
     if (!text) return;
 
+    const tokenContext = composerTokens
+      .filter((token) => token.app)
+      .map((token) => `DApp: ${token.app?.name} (${token.app?.category}) - ${token.app?.body}`)
+      .join('\n');
+    const context = [tokenContext, droppedContext].filter(Boolean).join('\n');
+
     if (activeMode === 'creative') {
+      setComposerTokens([]);
+      setDroppedContext('');
       void requestCreativeProjectPlan(text);
       return;
     }
 
-    void sendChatMessage(text, { context: droppedContext });
+    void sendChatMessage(text, { context });
   };
 
   const handleComposerDrop = (event: DragEvent<HTMLFormElement>) => {
@@ -6024,9 +6940,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     const droppedFile = event.dataTransfer.files?.[0]?.name;
     const droppedText = event.dataTransfer.getData('text/plain');
     const nextContext = droppedFile || droppedText || 'Dropped asset or dApp';
-    setDroppedContext(nextContext.length > 86 ? `${nextContext.slice(0, 83)}...` : nextContext);
     const draggedDApp = dappMarketItems.find((app) => droppedText.includes(`DApp: ${app.name}`));
-    setAttachedDApp(draggedDApp || null);
+    if (draggedDApp) {
+      addAppComposerToken(draggedDApp);
+      return;
+    }
+    setDroppedContext(nextContext.length > 86 ? `${nextContext.slice(0, 83)}...` : nextContext);
   };
 
   const handleDAppDragStart = (event: DragEvent<HTMLElement>, app: DAppMarketItem) => {
@@ -6037,8 +6956,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const attachDAppToComposer = (app: DAppMarketItem) => {
     switchProductMode('chat');
     setActiveChatSurface('default');
-    setDroppedContext(`DApp: ${app.name} (${app.category}) - ${app.body}`);
-    setAttachedDApp(app);
+    addAppComposerToken(app);
     if (app.prompt) {
       setDraft(app.prompt);
     }
@@ -6065,6 +6983,68 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setActiveChatSurface('dapp-market');
     setActiveWalletTab(null);
     setDappMarketOpen((current) => !current);
+  };
+
+  const openDApp = (app: DAppMarketItem, path = '/') => {
+    const manifest = getMiniAppManifest(app.id);
+    if (manifest) {
+      try {
+        const url = resolveMiniAppUrl(manifest, path);
+        const parsedUrl = new URL(url);
+        parsedUrl.searchParams.delete('injpass_miniapp');
+        parsedUrl.searchParams.delete('injpass_host_origin');
+        const initialPath = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}` || '/';
+        setActiveMiniApp(app);
+        setMiniAppUrl(url);
+        setMiniAppNavigation({
+          path: initialPath,
+          title: app.name,
+          canGoBack: initialPath !== '/',
+          canGoForward: false,
+        });
+        setMiniAppLoading(true);
+        setMiniAppFrameNonce((current) => current + 1);
+        switchProductMode('chat');
+        setActiveChatSurface('mini-app');
+        setActiveWalletTab(null);
+        setConversationSearchOpen(false);
+        return;
+      } catch (error) {
+        console.warn('[MiniApp] Invalid INJ Gift URL:', error);
+      }
+    }
+
+    if (app.url) {
+      window.open(app.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    attachDAppToComposer(app);
+  };
+
+  const navigateMiniApp = (action: MiniAppNavigationAction) => {
+    if (!activeMiniApp || !miniAppUrl) return;
+    const manifest = getMiniAppManifest(activeMiniApp.id);
+    if (!manifest) return;
+
+    let miniAppOrigin: string;
+    try {
+      miniAppOrigin = new URL(miniAppUrl).origin;
+    } catch {
+      return;
+    }
+    if (!isAllowedMiniAppOrigin(manifest, miniAppOrigin)) return;
+
+    setMiniAppLoading(true);
+    if (miniAppLoadingTimerRef.current) window.clearTimeout(miniAppLoadingTimerRef.current);
+    miniAppLoadingTimerRef.current = window.setTimeout(() => {
+      setMiniAppLoading(false);
+      miniAppLoadingTimerRef.current = null;
+    }, 4_000);
+    miniAppIframeRef.current?.contentWindow?.postMessage({
+      channel: 'injpass-miniapp-v1',
+      type: 'navigation-command',
+      action,
+    }, miniAppOrigin);
   };
 
   const openCampaign = () => {
@@ -6118,6 +7098,43 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     window.setTimeout(() => composerInputRef.current?.focus(), 60);
   };
 
+  const startNewSkillBuild = () => {
+    chatAbortControllerRef.current?.abort();
+    creativeAbortControllerRef.current?.abort();
+    creativeDraftRef.current = '';
+    switchProductMode('creative');
+    chatDraftRef.current = '';
+    setActiveChatSurface('default');
+    setMessages([]);
+    setCurrentConversationTitle('');
+    setAgentConversationId(undefined);
+    setSelectedStoredConversationId(undefined);
+    setCreativeConversationId(undefined);
+    setCreativePrompt('');
+    setCreativeStage('guide');
+    setCreativePlan(null);
+    setCreativeBuild(null);
+    setCreativeCompileResult(null);
+    setCreativeCompileStatus('idle');
+    setCreativeBuildError('');
+    setCreativeError('');
+    setCreativeBuildStep(0);
+    setSelectedCreativeFileIndex(0);
+    setIsCreativePlanning(false);
+    setPendingConfirmation(null);
+    setActiveWalletTab(null);
+    setConversationSearchOpen(false);
+    setDroppedContext('');
+    setComposerTokens([]);
+    setDraft('');
+    setChatWorkStatus('idle');
+    setCreativeWorkStatus('idle');
+    setModelMenuOpen(false);
+    setComposerToolsOpen(false);
+    setComposerDemoDismissed(false);
+    window.setTimeout(() => composerInputRef.current?.focus(), 60);
+  };
+
   const joinCampaign = () => {
     const injGift = dappMarketItems.find((app) => app.id === 'inj-gift') || dappMarketApps.find((app) => app.id === 'inj-gift');
     if (injGift) {
@@ -6128,15 +7145,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           : 'Help me join the Make Elon Musk Go Broke campaign and prepare the INJ Gift claim steps.',
       });
     }
-  };
-
-  const togglePinnedDApp = (appId: string) => {
-    setDappMarketOpen(true);
-    setPinnedDAppIds((current) => (
-      current.includes(appId)
-        ? current.filter((currentId) => currentId !== appId)
-        : [...current, appId]
-    ));
   };
 
   const startCreativeFromShortcut = (text: string) => {
@@ -6153,7 +7161,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setCreativeCompileStatus('idle');
     setCreativeBuildError('');
     setCreativeBuildStep(0);
-    setCreativeProgressOpen(false);
+    setCreativeProgressOpen(true);
     setSelectedCreativeFileIndex(0);
     setCreativeWorkStatus('working');
     const controller = new AbortController();
@@ -6457,6 +7465,119 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     unlockWithWalletKey(nextPrivateKey, keystore);
     return nextPrivateKey;
   };
+
+  useEffect(() => {
+    requireWalletPrivateKeyRef.current = requireWalletPrivateKey;
+  });
+
+  useEffect(() => {
+    if (!activeMiniApp || !miniAppUrl) return;
+    const manifest = getMiniAppManifest(activeMiniApp.id);
+    if (!manifest) return;
+
+    let miniAppOrigin: string;
+    try {
+      miniAppOrigin = new URL(miniAppUrl).origin;
+    } catch {
+      return;
+    }
+    if (!isAllowedMiniAppOrigin(manifest, miniAppOrigin)) return;
+
+    const postToMiniApp = (payload: Record<string, unknown>) => {
+      miniAppIframeRef.current?.contentWindow?.postMessage({
+        channel: 'injpass-miniapp-v1',
+        ...payload,
+      }, miniAppOrigin);
+    };
+    const sendSession = () => postToMiniApp({
+      type: 'session',
+      session: {
+        authenticated: isAuthenticated,
+        address: address || null,
+        walletName: keystore?.walletName,
+        chainId: manifest.chainId,
+      },
+    });
+
+    const handleMiniAppMessage = (event: MessageEvent) => {
+      if (
+        event.origin !== miniAppOrigin
+        || event.source !== miniAppIframeRef.current?.contentWindow
+      ) return;
+      const message = event.data as Record<string, unknown> | null;
+      if (!message || message.channel !== 'injpass-miniapp-v1') return;
+      if (message.type === 'navigation' && typeof message.path === 'string') {
+        const nextPath = message.path.startsWith('/') ? message.path.slice(0, 2_048) : '/';
+        setMiniAppNavigation({
+          path: nextPath,
+          title: typeof message.title === 'string' ? message.title.slice(0, 160) : activeMiniApp.name,
+          canGoBack: message.canGoBack === true,
+          canGoForward: message.canGoForward === true,
+        });
+        setMiniAppLoading(false);
+        if (miniAppLoadingTimerRef.current) {
+          window.clearTimeout(miniAppLoadingTimerRef.current);
+          miniAppLoadingTimerRef.current = null;
+        }
+        return;
+      }
+      if (message.type === 'ready') {
+        sendSession();
+        return;
+      }
+      if (
+        message.type !== 'rpc-request'
+        || typeof message.id !== 'string'
+        || typeof message.method !== 'string'
+      ) return;
+
+      const respond = (result?: unknown, error?: { code: number; message: string; data?: unknown }) => {
+        postToMiniApp({
+          type: 'rpc-response',
+          id: message.id,
+          ...(error ? { error } : { result }),
+        });
+      };
+
+      if (message.method === 'injpass_requestLogin') {
+        setAuthMethod('mnemonic');
+        setAuthMenuOpen(true);
+        respond(true);
+        return;
+      }
+
+      if (message.method === 'injpass_requestLogout') {
+        void logout()
+          .then(() => respond(true))
+          .catch((error) => respond(undefined, {
+            code: -32603,
+            message: error instanceof Error ? error.message : 'Unable to sign out.',
+          }));
+        return;
+      }
+
+      void handleMiniAppRpc(
+        message.method,
+        Array.isArray(message.params) ? message.params : [],
+        {
+          manifest,
+          address: address ? address as Address : null,
+          getPrivateKey: () => requireWalletPrivateKeyRef.current(),
+        },
+      ).then((result) => respond(result)).catch((error) => {
+        const bridgeError = error instanceof MiniAppHostError ? error : null;
+        respond(undefined, {
+          code: bridgeError?.code ?? -32603,
+          message: error instanceof Error ? error.message : 'INJ Pass mini app request failed.',
+          data: bridgeError?.data,
+        });
+      });
+    };
+
+    window.addEventListener('message', handleMiniAppMessage);
+    sendSession();
+    return () => window.removeEventListener('message', handleMiniAppMessage);
+  }, [activeMiniApp, address, isAuthenticated, keystore?.walletName, logout, miniAppUrl]);
 
   const refreshAccountDeletionStatus = async () => {
     if (!isAuthenticated || accountActionState === 'deleted') {
@@ -6906,6 +8027,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 setActiveWalletTab(null);
                 setConversationSearchOpen(false);
                 setDraft('');
+                setComposerTokens([]);
+                setDroppedContext('');
                 chatDraftRef.current = '';
                 setChatWorkStatus('idle');
                 setCreativeWorkStatus('idle');
@@ -7032,11 +8155,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   onDragStart={(event) => handleDAppDragStart(event, app)}
                   onPointerDown={(event) => handleDAppPointerDown(event, app)}
                   onPointerUp={clearPointerDApp}
-                  onClick={() => attachDAppToComposer(app)}
+                  onClick={() => openDApp(app)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      attachDAppToComposer(app);
+                      openDApp(app);
                     }
                   }}
                   className={cx(
@@ -7899,7 +9022,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               <div className="pointer-events-auto flex items-center gap-2 lg:hidden">
                 <div className="text-sm font-bold">INJ Pass</div>
               </div>
-              {!activeWalletTab && <div className="pointer-events-auto absolute left-1/2 top-12 -translate-x-1/2 sm:top-0">
+              {!activeWalletTab && activeChatSurface !== 'mini-app' && activeChatSurface !== 'skills' && <div className="pointer-events-auto absolute left-1/2 top-12 -translate-x-1/2 sm:top-0">
                   <ModeToggle
                     activeMode={activeMode}
                     setActiveMode={switchProductMode}
@@ -7982,10 +9105,15 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         <button
                           type="button"
                           onClick={() => openTraditionalWalletWizard('create')}
-                          className={cx('flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
+                          className={cx(
+                            'flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition duration-300',
+                            isLight
+                              ? 'border-white bg-black/[0.025] shadow-[0_0_0_1px_rgba(0,0,0,0.07)] hover:bg-black/5'
+                              : 'border-white/35 bg-white/[0.035] shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:border-white/55 hover:bg-white/8',
+                          )}
                         >
                           <span>
-                            <span className="block text-sm font-bold">{localWallets.length > 0 ? 'Create another wallet' : 'Create traditional wallet'}</span>
+                            <span className="block text-sm font-bold">Create New Wallet</span>
                             <span className={cx('mt-0.5 block text-xs', isLight ? 'text-black/46' : 'text-white/46')}>24 words + encrypted local password</span>
                           </span>
                           <span className="shrink-0 text-xs font-semibold">Create</span>
@@ -8008,10 +9136,15 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                           type="button"
                           onClick={openPasskeyWalletWizard}
                           disabled={authPendingAction !== null}
-                          className={cx('flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition disabled:opacity-55', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
+                          className={cx(
+                            'flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition duration-300 disabled:opacity-55',
+                            isLight
+                              ? 'border-white bg-black/[0.025] shadow-[0_0_0_1px_rgba(0,0,0,0.07)] hover:bg-black/5'
+                              : 'border-white/35 bg-white/[0.035] shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:border-white/55 hover:bg-white/8',
+                          )}
                         >
                           <span>
-                            <span className="block text-sm font-bold">Create Passkey wallet</span>
+                            <span className="block text-sm font-bold">Create New Wallet</span>
                             <span className={cx('mt-0.5 block text-xs', isLight ? 'text-black/46' : 'text-white/46')}>Guided setup with this device&apos;s system Passkey</span>
                           </span>
                           <span className="text-xs font-semibold">Create</span>
@@ -8104,6 +9237,32 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                               setWalletPanelData({});
                             }}
                           />
+                        ) : activeWalletTab === 'nfts' && assetWalletView === 'send' ? (
+                          <NFTTransferPanel
+                            nfts={walletPanelData.nfts || []}
+                            address={address}
+                            privateKey={privateKey}
+                            onRequirePrivateKey={requireWalletPrivateKey}
+                            isLight={isLight}
+                            copy={copy}
+                            onBack={() => setAssetWalletView('assets')}
+                            onComplete={() => {
+                              resetTxAuth();
+                              setWalletPanelData((current) => ({ ...current, nfts: undefined }));
+                            }}
+                          />
+                        ) : activeWalletTab === 'nfts' && assetWalletView === 'receive' ? (
+                          <WalletTransferPanel
+                            mode="receive"
+                            assetLabel="NFTs"
+                            address={address}
+                            privateKey={privateKey}
+                            onRequirePrivateKey={requireWalletPrivateKey}
+                            isLight={isLight}
+                            copy={copy}
+                            onBack={() => setAssetWalletView('assets')}
+                            onComplete={() => undefined}
+                          />
                         ) : (
                           <WalletDataPanel
                             tab={activeWalletTab}
@@ -8194,8 +9353,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   {activeChatSurface === 'dapp-market' && (
                     <DAppMarketPanel
                       apps={dappMarketItems}
-                      pinnedIds={pinnedDAppIds}
-                      onTogglePin={togglePinnedDApp}
+                      onOpenApp={openDApp}
                       onDragStart={handleDAppDragStart}
                       onPointerDown={handleDAppPointerDown}
                       onPointerUp={clearPointerDApp}
@@ -8216,6 +9374,53 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                       isAuthenticated={isAuthenticated}
                       address={address}
                       onRequirePrivateKey={requireWalletPrivateKey}
+                    />
+                  )}
+                  {activeChatSurface === 'mini-app' && activeMiniApp && activeMiniAppManifest && miniAppUrl && (
+                    <MiniAppPanel
+                      app={activeMiniApp}
+                      manifest={activeMiniAppManifest}
+                      src={miniAppUrl}
+                      iframeKey={`${activeMiniApp.id}-${address || 'guest'}-${miniAppFrameNonce}`}
+                      iframeRef={miniAppIframeRef}
+                      navigation={miniAppNavigation}
+                      isLoading={miniAppLoading}
+                      address={address}
+                      walletName={keystore?.walletName}
+                      isLight={isLight}
+                      onClose={() => {
+                        if (miniAppLoadingTimerRef.current) {
+                          window.clearTimeout(miniAppLoadingTimerRef.current);
+                          miniAppLoadingTimerRef.current = null;
+                        }
+                        setActiveMiniApp(null);
+                        setMiniAppUrl('');
+                        setMiniAppNavigation(initialMiniAppNavigation);
+                        setMiniAppLoading(false);
+                        setActiveChatSurface('dapp-market');
+                      }}
+                      onNavigate={navigateMiniApp}
+                      onOpenWallet={() => {
+                        setAuthError('');
+                        setOrphanWalletAddress(null);
+                        setLocalWallets(loadWallets());
+                        void detectPrfSupport().then(setPrfDetection).catch(() => undefined);
+                        authMenuPinnedRef.current = true;
+                        setAuthMenuOpen(true);
+                      }}
+                      onOpenExternal={() => {
+                        const externalUrl = new URL(miniAppNavigation.path || '/', miniAppUrl);
+                        externalUrl.searchParams.delete('injpass_miniapp');
+                        externalUrl.searchParams.delete('injpass_host_origin');
+                        window.open(externalUrl.toString(), '_blank', 'noopener,noreferrer');
+                      }}
+                      onFrameLoad={() => {
+                        setMiniAppLoading(false);
+                        if (miniAppLoadingTimerRef.current) {
+                          window.clearTimeout(miniAppLoadingTimerRef.current);
+                          miniAppLoadingTimerRef.current = null;
+                        }
+                      }}
                     />
                   )}
                 </>
@@ -8317,7 +9522,24 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 </div>
               )}
 
-              {activeChatSurface !== 'cloud-drive' && <form
+              {activeMode === 'chat' && activeChatSurface === 'skills' && (
+                <div className="sticky bottom-8 z-30 mx-auto mt-auto flex w-full max-w-3xl justify-center py-5">
+                  <button
+                    type="button"
+                    onClick={startNewSkillBuild}
+                    className={cx(
+                      'text-sm font-semibold underline decoration-1 underline-offset-8 transition-[color,text-decoration-color] duration-200',
+                      isLight
+                        ? 'text-black/58 decoration-black/24 hover:text-black hover:decoration-black/70'
+                        : 'text-white/58 decoration-white/24 hover:text-white hover:decoration-white/70',
+                    )}
+                  >
+                    {createOwnSkillCtaByLanguage[selectedLanguageCode]}
+                  </button>
+                </div>
+              )}
+
+              {activeChatSurface !== 'cloud-drive' && activeChatSurface !== 'mini-app' && activeChatSurface !== 'skills' && <form
                 onSubmit={handleSubmit}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={handleComposerDrop}
@@ -8490,17 +9712,46 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   </div>
                 )}
                 <div className="relative flex min-w-0 flex-1 items-center gap-2">
+                  {composerTokens.length > 0 && (
+                    <div className="flex max-w-[58%] shrink-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {composerTokens.map((token) => (
+                        <span
+                          key={token.id}
+                          className={cx(
+                            'inline-flex h-7 max-w-40 shrink-0 items-center gap-1 rounded-md border px-2 text-xs font-bold',
+                            token.symbol === '@'
+                              ? isLight ? 'border-violet-200/70 bg-violet-100/70 text-violet-800' : 'border-violet-300/18 bg-violet-300/14 text-violet-100'
+                              : token.symbol === '#'
+                                ? isLight ? 'border-amber-200/80 bg-amber-100/75 text-amber-800' : 'border-amber-300/18 bg-amber-300/12 text-amber-100'
+                                : isLight ? 'border-emerald-200/80 bg-emerald-100/75 text-emerald-800' : 'border-emerald-300/18 bg-emerald-300/12 text-emerald-100',
+                          )}
+                        >
+                          <span className="truncate">{token.symbol}{token.label}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              removeComposerToken(token.id);
+                              window.requestAnimationFrame(() => composerInputRef.current?.focus());
+                            }}
+                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full opacity-60 transition hover:opacity-100"
+                            aria-label={`${copy.remove} ${token.symbol}${token.label}`}
+                          >
+                            <CloseIcon className="h-2.5 w-2.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {droppedContext && (
                     <span className={cx(
-                      'inline-flex h-7 max-w-[42%] shrink-0 items-center gap-1 rounded-md px-2 text-xs font-bold',
-                      isLight ? 'bg-violet-100/75 text-violet-800' : 'bg-violet-300/14 text-violet-100',
+                      'inline-flex h-7 max-w-[34%] shrink-0 items-center gap-1 rounded-md border px-2 text-xs font-bold',
+                      isLight ? 'border-black/8 bg-black/[0.045] text-black/62' : 'border-white/9 bg-white/[0.07] text-white/62',
                     )}>
-                      <span className="truncate">{attachedDApp ? `@${attachedDApp.name}` : 'Attachment'}</span>
+                      <span className="truncate">Attachment</span>
                       <button
                         type="button"
                         onClick={() => {
                           setDroppedContext('');
-                          setAttachedDApp(null);
                           window.requestAnimationFrame(() => composerInputRef.current?.focus());
                         }}
                         className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full opacity-60 transition hover:opacity-100"
@@ -8642,7 +9893,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 <button
                   type={activeAiRunning ? 'button' : 'submit'}
                   onClick={activeAiRunning ? stopActiveAiTask : undefined}
-                  disabled={!activeAiRunning && !draft.trim() && !droppedContext}
+                  disabled={!activeAiRunning && !draft.trim() && composerTokens.length === 0 && !droppedContext}
                   className={cx(
                     'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition disabled:opacity-35',
                     activeAiRunning && 'before:absolute before:inset-[-3px] before:rounded-full before:border before:border-current before:border-t-transparent before:opacity-45 before:motion-safe:animate-spin',
@@ -8702,7 +9953,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 </div>
               )}
 
-              <div className={cx(
+              {activeChatSurface !== 'mini-app' && <div className={cx(
                 'pointer-events-none mx-auto mt-8 flex w-full max-w-3xl items-center justify-center gap-1.5 pb-16 text-[11px] transition-[left] duration-300 sm:fixed sm:bottom-1 sm:left-1/2 sm:z-20 sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:py-1 sm:pb-0',
                 sidebarCollapsed ? 'lg:left-[calc(50%+38px)]' : 'lg:left-[calc(50%+143px)]',
                 isLight ? 'text-black/38' : 'text-white/38'
@@ -8715,7 +9966,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   height={96}
                   className="h-[14px] w-auto object-contain"
                 />
-              </div>
+              </div>}
 
             </div>
           </div>

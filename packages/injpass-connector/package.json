@@ -1,6 +1,6 @@
 {
   "name": "@injpass/cli",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Lightweight SDK for connecting INJ Pass wallets to dApps with isolated EVM signing",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

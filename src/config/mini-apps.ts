@@ -32,7 +32,9 @@ export const MINI_APP_MANIFESTS: readonly MiniAppManifest[] = [
     slug: 'gift',
     name: 'INJ Gift',
     developmentUrl: process.env.NEXT_PUBLIC_INJ_GIFT_APP_URL || 'http://localhost:3002',
-    productionUrl: 'https://gift.injpass.com',
+    // Fallback only. The embed URL normally follows the dApp record's `url`
+    // (see resolveMiniAppUrl's baseOverride); this is used when that is absent.
+    productionUrl: 'https://www.inj-gift.fun',
     networkName: NETWORK_CONFIG.testnet.name,
     chainId: NETWORK_CONFIG.testnet.chainId,
     rpcUrl: NETWORK_CONFIG.testnet.rpcUrl,
@@ -45,10 +47,30 @@ export function getMiniAppManifest(appId: string): MiniAppManifest | null {
   return MINI_APP_MANIFESTS.find((manifest) => manifest.appId === appId) || null;
 }
 
-export function resolveMiniAppUrl(manifest: MiniAppManifest, path = '/'): string {
-  const base = process.env.NODE_ENV === 'development' && manifest.developmentUrl
+function isValidHttpUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The base URL used to embed the mini app. A valid `baseOverride` (e.g. the
+ * dApp directory record's `url` coming from the backend/database) wins so the
+ * embed follows the deployed domain; otherwise we fall back to the manifest.
+ */
+export function resolveMiniAppBase(manifest: MiniAppManifest, baseOverride?: string): string {
+  if (isValidHttpUrl(baseOverride)) return baseOverride;
+  return process.env.NODE_ENV === 'development' && manifest.developmentUrl
     ? manifest.developmentUrl
     : manifest.productionUrl;
+}
+
+export function resolveMiniAppUrl(manifest: MiniAppManifest, path = '/', baseOverride?: string): string {
+  const base = resolveMiniAppBase(manifest, baseOverride);
   const url = new URL(path, base.endsWith('/') ? base : `${base}/`);
   url.searchParams.set('injpass_miniapp', '1');
   if (typeof window !== 'undefined') {
@@ -57,8 +79,16 @@ export function resolveMiniAppUrl(manifest: MiniAppManifest, path = '/'): string
   return url.toString();
 }
 
-export function isAllowedMiniAppOrigin(manifest: MiniAppManifest, origin: string): boolean {
-  const allowed = [manifest.productionUrl, manifest.developmentUrl]
+export function isAllowedMiniAppOrigin(
+  manifest: MiniAppManifest,
+  origin: string,
+  baseOverride?: string,
+): boolean {
+  const allowed = [
+    isValidHttpUrl(baseOverride) ? baseOverride : undefined,
+    manifest.productionUrl,
+    manifest.developmentUrl,
+  ]
     .filter((value): value is string => Boolean(value))
     .map((value) => new URL(value).origin);
   return allowed.includes(origin);

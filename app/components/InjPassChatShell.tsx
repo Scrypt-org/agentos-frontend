@@ -6989,7 +6989,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     const manifest = getMiniAppManifest(app.id);
     if (manifest) {
       try {
-        const url = resolveMiniAppUrl(manifest, path);
+        const url = resolveMiniAppUrl(manifest, path, app.url);
         const parsedUrl = new URL(url);
         parsedUrl.searchParams.delete('injpass_miniapp');
         parsedUrl.searchParams.delete('injpass_host_origin');
@@ -7032,7 +7032,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     } catch {
       return;
     }
-    if (!isAllowedMiniAppOrigin(manifest, miniAppOrigin)) return;
+    if (!isAllowedMiniAppOrigin(manifest, miniAppOrigin, activeMiniApp.url)) return;
 
     setMiniAppLoading(true);
     if (miniAppLoadingTimerRef.current) window.clearTimeout(miniAppLoadingTimerRef.current);
@@ -7481,7 +7481,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     } catch {
       return;
     }
-    if (!isAllowedMiniAppOrigin(manifest, miniAppOrigin)) return;
+    if (!isAllowedMiniAppOrigin(manifest, miniAppOrigin, activeMiniApp.url)) return;
 
     const postToMiniApp = (payload: Record<string, unknown>) => {
       miniAppIframeRef.current?.contentWindow?.postMessage({

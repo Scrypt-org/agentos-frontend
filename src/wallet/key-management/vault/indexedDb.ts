@@ -1,8 +1,28 @@
 import type { LocalMnemonicVaultV1 } from './types';
 
 const DB_NAME = 'inj-pass';
-const DB_VERSION = 1;
 const STORE_NAME = 'mnemonic-vaults';
+
+function ensureVaultStore(database: IDBDatabase): void {
+  if (!database.objectStoreNames.contains(STORE_NAME)) {
+    database.createObjectStore(STORE_NAME, { keyPath: 'address' });
+  }
+}
+
+function finishOpen(database: IDBDatabase): IDBDatabase {
+  database.onversionchange = () => database.close();
+  return database;
+}
+
+function upgradeDatabase(version: number): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, version);
+    request.onupgradeneeded = () => ensureVaultStore(request.result);
+    request.onsuccess = () => resolve(finishOpen(request.result));
+    request.onerror = () => reject(request.error ?? new Error('Unable to upgrade encrypted wallet storage.'));
+    request.onblocked = () => reject(new Error('Close other INJ Pass tabs, then try opening the wallet again.'));
+  });
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -10,13 +30,19 @@ function openDatabase(): Promise<IDBDatabase> {
       reject(new Error('Encrypted wallet storage is not available in this browser.'));
       return;
     }
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME, { keyPath: 'address' });
+    const request = indexedDB.open(DB_NAME);
+    request.onupgradeneeded = () => ensureVaultStore(request.result);
+    request.onsuccess = () => {
+      const database = request.result;
+      if (database.objectStoreNames.contains(STORE_NAME)) {
+        resolve(finishOpen(database));
+        return;
       }
+
+      const nextVersion = database.version + 1;
+      database.close();
+      void upgradeDatabase(nextVersion).then(resolve, reject);
     };
-    request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error('Unable to open encrypted wallet storage.'));
   });
 }
@@ -26,8 +52,16 @@ function transact<T>(
   run: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
   return openDatabase().then((database) => new Promise<T>((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, mode);
-    const request = run(transaction.objectStore(STORE_NAME));
+    let transaction: IDBTransaction;
+    let request: IDBRequest<T>;
+    try {
+      transaction = database.transaction(STORE_NAME, mode);
+      request = run(transaction.objectStore(STORE_NAME));
+    } catch (error) {
+      database.close();
+      reject(error);
+      return;
+    }
     transaction.oncomplete = () => {
       resolve(request.result);
       database.close();

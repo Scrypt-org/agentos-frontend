@@ -6,7 +6,7 @@ import {
   isValidMnemonic,
   normalizeMnemonic,
 } from './mnemonic';
-import { encryptMnemonic, putVault } from './vault';
+import { deleteVault, encryptMnemonic, getVault, putVault } from './vault';
 import type { LocalMnemonicVaultV1 } from './vault';
 
 export interface CreateMnemonicVaultResult {
@@ -14,6 +14,11 @@ export interface CreateMnemonicVaultResult {
   privateKey: Uint8Array;
   keyScheme: 'local-mnemonic-v1';
   mnemonicForBackup: string;
+}
+
+export interface PreparedMnemonicWallet {
+  address: string;
+  mnemonic: string;
 }
 
 function validatePassword(password: string): void {
@@ -41,17 +46,30 @@ async function persistMnemonicWallet(params: {
     updatedAt: now,
   };
 
-  await putVault(vault);
+  let indexedDbPersisted = false;
+  try {
+    await putVault(vault);
+    indexedDbPersisted = Boolean(await getVault(address));
+  } catch {
+    // The serialized encrypted copy below is sufficient to unlock the wallet
+    // when IndexedDB is unavailable or being migrated.
+  }
   const keystore: LocalKeystore = {
     address,
     encryptedPrivateKey: '',
     source: 'import',
     keyScheme: 'local-mnemonic-v1',
+    encryptedMnemonicVault: JSON.stringify(vault),
     mnemonicBackupConfirmed: false,
     createdAt: now,
     walletName: params.walletName || 'My INJ Pass',
   };
-  saveWallet(keystore);
+  try {
+    saveWallet(keystore);
+  } catch (error) {
+    if (indexedDbPersisted) await deleteVault(address).catch(() => undefined);
+    throw error;
+  }
 
   return {
     address,
@@ -64,12 +82,19 @@ async function persistMnemonicWallet(params: {
 export function completeLocalWalletSetup(params: {
   password: string;
   walletName?: string;
+  mnemonic?: string;
 }): Promise<CreateMnemonicVaultResult> {
   return persistMnemonicWallet({
-    mnemonic: generateStandardMnemonic(),
+    mnemonic: params.mnemonic || generateStandardMnemonic(),
     password: params.password,
     walletName: params.walletName,
   });
+}
+
+export function prepareLocalWalletSetup(): PreparedMnemonicWallet {
+  const mnemonic = generateStandardMnemonic();
+  const { address } = deriveInjectiveWalletFromMnemonic(mnemonic);
+  return { address, mnemonic };
 }
 
 export function importMnemonicWallet(params: {

@@ -15,6 +15,7 @@ import { DEFAULT_CHAIN_VIEM } from '@/types/chain';
 
 // N1NJ4 NFT Contract Address on Injective EVM
 export const N1NJ4_CONTRACT_ADDRESS = '0x816070929010a3d202d8a6b89f92bee33b7e8769' as Address;
+export const N1NJ4_COLLECTION_NAME = 'N1NJ4:Origin';
 
 // ERC-721 ABI for basic NFT operations
 const ERC721_ABI = [
@@ -60,6 +61,13 @@ const ERC721_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ] as const;
 
 /**
@@ -70,6 +78,7 @@ export interface NFTMetadata {
   description?: string;
   image?: string;
   edition?: number;
+  dna?: string;
   attributes?: Array<{
     trait_type: string;
     value: string | number;
@@ -88,6 +97,9 @@ export interface NFT {
   image?: string;
   metadata?: NFTMetadata;
   collection: string;
+  collectionSymbol?: string;
+  standard?: string;
+  totalSupply?: string;
   owner: Address;
   tokenURI?: string;
   mintTxHash?: Hash;
@@ -103,6 +115,9 @@ interface BlockscoutTokenInstance {
   } | null;
   token?: {
     name?: string | null;
+    symbol?: string | null;
+    total_supply?: string | null;
+    type?: string | null;
   } | null;
 }
 
@@ -111,6 +126,11 @@ interface BlockscoutTokenInstancesResponse {
 }
 
 function extractTokenIdFromBlockscoutItem(item: BlockscoutTokenInstance): string | null {
+  const instanceId = item.id?.trim();
+  if (instanceId && /^\d+$/.test(instanceId)) {
+    return instanceId;
+  }
+
   const edition = item.metadata?.edition;
   if (typeof edition === 'number' && Number.isFinite(edition)) {
     return String(edition);
@@ -130,6 +150,13 @@ function extractTokenIdFromBlockscoutItem(item: BlockscoutTokenInstance): string
   return null;
 }
 
+export function resolveNFTUri(uri?: string | null): string | undefined {
+  if (!uri) return undefined;
+  return uri.startsWith('ipfs://')
+    ? uri.replace('ipfs://', NETWORK_CONFIG.ipfsGateway)
+    : uri;
+}
+
 /**
  * Create public client for reading blockchain data
  */
@@ -146,10 +173,7 @@ function createClient() {
 async function fetchMetadata(tokenURI: string): Promise<NFTMetadata | null> {
   try {
     // Handle IPFS URIs
-    let url = tokenURI;
-    if (tokenURI.startsWith('ipfs://')) {
-      url = tokenURI.replace('ipfs://', NETWORK_CONFIG.ipfsGateway);
-    }
+    const url = resolveNFTUri(tokenURI) || tokenURI;
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -160,9 +184,7 @@ async function fetchMetadata(tokenURI: string): Promise<NFTMetadata | null> {
     const metadata = await response.json() as NFTMetadata;
     
     // Handle IPFS image URLs in metadata
-    if (metadata.image?.startsWith('ipfs://')) {
-      metadata.image = metadata.image.replace('ipfs://', NETWORK_CONFIG.ipfsGateway);
-    }
+    metadata.image = resolveNFTUri(metadata.image);
 
     return metadata;
   } catch (error) {
@@ -199,9 +221,8 @@ async function getNFTsFromBlockscout(
 
         const metadata = item.metadata || undefined;
         const name = metadata?.name || `${item.token?.name || 'NFT'} #${tokenId}`;
-        const image = metadata?.image?.startsWith('ipfs://')
-          ? metadata.image.replace('ipfs://', NETWORK_CONFIG.ipfsGateway)
-          : (metadata?.image || item.image_url || undefined);
+        const image = resolveNFTUri(metadata?.image || item.image_url || item.media_url);
+        const isN1NJ4 = contractAddress.toLowerCase() === N1NJ4_CONTRACT_ADDRESS.toLowerCase();
 
         return {
           contractAddress,
@@ -210,7 +231,10 @@ async function getNFTsFromBlockscout(
           description: metadata?.description,
           image,
           metadata,
-          collection: item.token?.name || 'Unknown',
+          collection: item.token?.name || (isN1NJ4 ? N1NJ4_COLLECTION_NAME : 'Unknown'),
+          collectionSymbol: item.token?.symbol || (isN1NJ4 ? 'N1NJ4' : undefined),
+          standard: item.token?.type || 'ERC-721',
+          totalSupply: item.token?.total_supply || (isN1NJ4 ? '500' : undefined),
           owner: ((item.owner?.hash as Address) || ownerAddress),
         } as NFT;
       })
@@ -281,11 +305,13 @@ export async function getTokenByIndex(
 export async function getCollectionInfo(contractAddress: Address): Promise<{
   name: string;
   symbol: string;
+  standard: string;
+  totalSupply?: string;
 }> {
   try {
     const client = createClient();
-    
-    const [name, symbol] = await Promise.all([
+
+    const [nameResult, symbolResult, totalSupplyResult] = await Promise.allSettled([
       client.readContract({
         address: contractAddress,
         abi: ERC721_ABI,
@@ -296,12 +322,31 @@ export async function getCollectionInfo(contractAddress: Address): Promise<{
         abi: ERC721_ABI,
         functionName: 'symbol',
       }) as Promise<string>,
+      client.readContract({
+        address: contractAddress,
+        abi: ERC721_ABI,
+        functionName: 'totalSupply',
+      }) as Promise<bigint>,
     ]);
 
-    return { name, symbol };
+    const isN1NJ4 = contractAddress.toLowerCase() === N1NJ4_CONTRACT_ADDRESS.toLowerCase();
+    return {
+      name: nameResult.status === 'fulfilled' ? nameResult.value : (isN1NJ4 ? N1NJ4_COLLECTION_NAME : 'Unknown'),
+      symbol: symbolResult.status === 'fulfilled' ? symbolResult.value : (isN1NJ4 ? 'N1NJ4' : 'UNKNOWN'),
+      standard: 'ERC-721',
+      totalSupply: totalSupplyResult.status === 'fulfilled'
+        ? totalSupplyResult.value.toString()
+        : (isN1NJ4 ? '500' : undefined),
+    };
   } catch (error) {
     console.error('Failed to get collection info:', error);
-    return { name: 'Unknown', symbol: 'UNKNOWN' };
+    const isN1NJ4 = contractAddress.toLowerCase() === N1NJ4_CONTRACT_ADDRESS.toLowerCase();
+    return {
+      name: isN1NJ4 ? N1NJ4_COLLECTION_NAME : 'Unknown',
+      symbol: isN1NJ4 ? 'N1NJ4' : 'UNKNOWN',
+      standard: 'ERC-721',
+      totalSupply: isN1NJ4 ? '500' : undefined,
+    };
   }
 }
 
@@ -343,7 +388,11 @@ export async function getNFTDetails(
       image: metadata?.image,
       metadata: metadata || undefined,
       collection: collectionInfo.name,
+      collectionSymbol: collectionInfo.symbol,
+      standard: collectionInfo.standard,
+      totalSupply: collectionInfo.totalSupply,
       owner,
+      tokenURI,
     };
   } catch (error) {
     console.error(`Failed to get NFT details for token ${tokenId}:`, error);
@@ -414,6 +463,11 @@ export async function getUserNFTs(
  * Get all N1NJ4 NFTs for a user
  */
 export async function getN1NJ4NFTs(ownerAddress: Address): Promise<NFT[]> {
+  const indexedNFTs = await getNFTsFromBlockscout(N1NJ4_CONTRACT_ADDRESS, ownerAddress);
+  if (indexedNFTs.length > 0) {
+    return indexedNFTs;
+  }
+
   return getUserNFTs(N1NJ4_CONTRACT_ADDRESS, ownerAddress);
 }
 

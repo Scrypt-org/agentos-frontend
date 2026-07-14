@@ -77,8 +77,9 @@ import { getDAppIconUrl } from '@/services/dapp-icons';
 import { claimDailyCheckIn, getNinjaStatus, getTransactions, type NinjaStatusResponse, type PointsTransaction } from '@/services/points';
 import { getUserProfile, type UserProfileResponse } from '@/services/user';
 import { authenticateWalletSession } from '@/services/wallet-auth';
+import { validateInviteCode } from '@/services/referral';
 import { createMySkill, getMySkills, getPublicSkills } from '@/services/skills';
-import { getN1NJ4NFTs, type NFT } from '@/services/nft';
+import { getN1NJ4NFTs, getNFTDetails, resolveNFTUri, type NFT } from '@/services/nft';
 import { getCatNFTDetails, getCatNFTsForOwner, mintSponsoredCatNFT } from '@/services/catnft';
 import { getUserStakingInfo, type StakingInfo } from '@/services/staking';
 import {
@@ -86,6 +87,12 @@ import {
   isInjGiftMessage,
   parseInjGiftCommand,
 } from '@/services/inj-gift';
+import {
+  formatMiniAppAgentResult,
+  parseMiniAppAgentCommand,
+  type MiniAppAgentCommand,
+  type MiniAppAgentCommandResult,
+} from '@/services/mini-app-commands';
 import { handleMiniAppRpc, MiniAppHostError } from '@/services/mini-app-host';
 import { estimateGas, getBalance as getNativeBalance, getGasPrice, sendTransaction, waitForTransaction } from '@/wallet/chain';
 import {
@@ -94,10 +101,11 @@ import {
   detectPrfSupport,
   importMnemonicWallet,
   markMnemonicBackedUp,
-  recoverWallet,
+  prepareLocalWalletSetup,
   revealWalletMnemonic,
   unlockWalletKey,
   PrfUnsupportedError,
+  type PreparedMnemonicWallet,
   type PrfDetection,
 } from '@/wallet/key-management';
 import { deleteWallet, deleteWalletByAddress, loadWallet, loadWallets, setActiveWallet } from '@/wallet/keystore';
@@ -129,6 +137,7 @@ type AccountActionState = 'idle' | 'sweeping' | 'deleting' | 'deleted';
 type AuthMethod = 'mnemonic' | 'passkey';
 type WalletSetupMethod = 'traditional' | 'passkey';
 type TraditionalWalletWizardMode = 'create' | 'recover';
+type InviteValidationState = 'idle' | 'checking' | 'valid' | 'invalid';
 
 const INJECTIVE_FAUCET_HCAPTCHA_SITE_KEY =
   process.env.NEXT_PUBLIC_INJECTIVE_FAUCET_HCAPTCHA_SITE_KEY
@@ -143,6 +152,7 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
   body: string;
   isError?: boolean;
+  action?: 'login';
 }
 
 interface ThinkingProgressState {
@@ -162,11 +172,30 @@ interface DAppMarketItem {
   aiDriven: boolean;
 }
 
+interface MiniAppBrowserTab {
+  id: string;
+  app: DAppMarketItem | null;
+}
+
 interface MiniAppNavigationState {
   path: string;
   title: string;
   canGoBack: boolean;
   canGoForward: boolean;
+}
+
+interface MiniAppAgentRun {
+  id: string;
+  command: MiniAppAgentCommand;
+  manifest: MiniAppManifest;
+  src: string;
+}
+
+interface MiniAppAgentResolver {
+  resolve: (result: MiniAppAgentCommandResult) => void;
+  reject: (error: Error) => void;
+  timer: number;
+  cleanupAbort?: () => void;
 }
 
 type MiniAppNavigationAction = 'back' | 'forward' | 'home' | 'reload';
@@ -183,6 +212,7 @@ interface WalletActivityItem {
   timestamp: string;
   method: string;
   status: string;
+  confirmations: number | null;
   from?: string;
   to?: string;
 }
@@ -230,7 +260,7 @@ interface AgentSkill {
   custom?: boolean;
 }
 
-type ComposerDemoKind = 'omisper' | 'inj-gift' | 'hash-mahjong';
+type ComposerDemoKind = 'omisper' | 'inj-gift' | 'bankrupt-elon';
 
 interface ComposerDemoSelection {
   kind: ComposerDemoKind;
@@ -256,9 +286,9 @@ const walletTabs: Array<{
 
 const LAM_PURCHASE_CONTRACT = process.env.NEXT_PUBLIC_CHANCE_CONTRACT_ADDRESS as Address | undefined;
 const LAM_PURCHASE_PLANS = [
-  { id: 'go', planId: 1, lam: 3 },
-  { id: 'pro', planId: 2, lam: 12 },
-  { id: 'max', planId: 3, lam: 30 },
+  { id: 'go', planId: 1, lam: 3, inj: '0.033' },
+  { id: 'pro', planId: 2, lam: 12, inj: '0.108' },
+  { id: 'max', planId: 3, lam: 30, inj: '0.33' },
 ] as const;
 
 const LAM_PURCHASE_ABI = [
@@ -334,8 +364,8 @@ const shellCopyEn = {
   dappMarket: 'Apps',
   campaign: 'Campaign',
   campaignTitle: 'Make Elon Musk Go Broke',
-  campaignBody: 'Join an INJ Gift community campaign and let AgentOS prepare the claim flow with your wallet approval.',
-  joinCampaign: 'Join campaign',
+  campaignBody: 'Start with $50B in simulated capital, trade global markets, use leverage, and see whether you can bankrupt Elon before the market bankrupts you.',
+  joinCampaign: 'Start playing',
   skills: 'Skills',
   skillsCaption: 'Reusable AgentOS capabilities for common Injective work.',
   useSkill: 'Use skill',
@@ -572,8 +602,8 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     dappMarket: '应用',
     campaign: '活动',
     campaignTitle: '让马斯克倾家荡产',
-    campaignBody: '加入 INJ Gift 社区活动，让 AgentOS 帮你准备领取流程，并由钱包确认 Injective 操作。',
-    joinCampaign: '参加活动',
+    campaignBody: '带着 500 亿美元模拟资金进入全球市场，买卖资产、使用杠杆，看看是你先让马斯克倾家荡产，还是市场先让你爆仓。',
+    joinCampaign: '开始挑战',
     skills: '技能',
     skillsCaption: '用于常见 Injective 操作的可复用 AgentOS 能力。',
     useSkill: '使用技能',
@@ -1020,12 +1050,13 @@ const dappMarketApps: DAppMarketItem[] = [
     aiDriven: true,
   },
   {
-    id: 'hash-mahjong',
-    name: 'Hash Mahjong',
-    category: 'Game',
-    body: 'Play verified Injective rounds through AgentOS with approval-aware wallet actions.',
-    accent: 'from-rose-400 to-amber-500',
-    icon: '/hashmahjong.png',
+    id: 'bankrupt-elon-musk',
+    name: 'Bankrupt Elon Musk',
+    category: 'Campaign',
+    body: 'Start with $50B, trade hundreds of global assets, use leverage, and compete on the loss leaderboard.',
+    accent: 'from-amber-300 to-rose-500',
+    icon: '/bankrupt-elon-musk.png',
+    prompt: 'Use Bankrupt Elon Musk to show my simulated balance, inspect my portfolio, trade an asset, or check my ranking.',
     aiDriven: true,
   },
   {
@@ -1238,18 +1269,18 @@ const composerSkills: AgentSkill[] = [
   },
   {
     id: 'omisper-scheduled-message',
-    name: 'Scheduled Message',
-    body: 'Schedule a private P2P or group message with a clear delivery time.',
-    prompt: 'Use Omisper to schedule a private message and ask me for the recipient, message, and delivery time.',
+    name: 'Encrypted Messenger',
+    body: 'Send a private or group message and inspect the encrypted inbox or conversation history.',
+    prompt: 'Use Omisper to send an encrypted message, check my inbox, or read my recent history with an address.',
     app: 'Omisper',
     popularity: 4870,
   },
   {
-    id: 'hash-mahjong-join-table',
-    name: 'Join Table',
-    body: 'Find a suitable on-chain table and prepare the game entry.',
-    prompt: 'Use Hash Mahjong to find an available table and prepare me to join a new on-chain game.',
-    app: 'Hash Mahjong',
+    id: 'bankrupt-elon-market-order',
+    name: 'Market Order',
+    body: 'Inspect a simulated market asset, buy or sell it, and report the updated portfolio.',
+    prompt: 'Use Bankrupt Elon Musk to show my balance and help me buy or sell a supported market asset.',
+    app: 'Bankrupt Elon Musk',
     popularity: 4220,
   },
   {
@@ -1293,23 +1324,23 @@ const createOwnSkillCtaByLanguage: Record<LanguageCode, string> = {
 };
 
 const creativeShortcutsByLanguage: Record<LanguageCode, string[]> = {
-  en: ['Create a complete NFT collection and marketplace', 'Build an AgentOS airdrop skill', 'Launch an on-chain mahjong game', 'Design a reusable treasury workflow'],
-  de: ['Eine komplette NFT-Kollektion mit Marktplatz erstellen', 'Einen AgentOS-Airdrop-Skill bauen', 'Ein Onchain-Mahjong-Spiel starten', 'Einen wiederverwendbaren Treasury-Workflow entwerfen'],
-  fr: ['Créer une collection NFT complète et sa marketplace', 'Créer une compétence AgentOS d’airdrop', 'Lancer un jeu de mah-jong on-chain', 'Concevoir un workflow de trésorerie réutilisable'],
-  ko: ['완전한 NFT 컬렉션과 마켓 만들기', 'AgentOS 에어드롭 스킬 만들기', '온체인 마작 게임 출시하기', '재사용 가능한 트레저리 워크플로 설계하기'],
-  ja: ['完全な NFT コレクションと市場を作る', 'AgentOS エアドロップスキルを作る', 'オンチェーン麻雀ゲームを公開する', '再利用可能なトレジャーワークフローを設計する'],
-  'zh-Hans': ['创建一套完整的 NFT 与交易市场', '创作一个 AgentOS 空投技能', '构建一个链上麻将游戏', '设计一个可复用的金库工作流'],
-  'zh-Hant': ['建立一套完整的 NFT 與交易市場', '創作一個 AgentOS 空投技能', '建構一個鏈上麻將遊戲', '設計一個可重用的金庫工作流程'],
+  en: ['NFT marketplace', 'Airdrop skill', 'Mahjong game', 'Treasury flow', 'Token launch'],
+  de: ['NFT-Marktplatz', 'Airdrop-Skill', 'Mahjong-Spiel', 'Treasury-Ablauf', 'Token-Launch'],
+  fr: ['Marché NFT', 'Compétence airdrop', 'Jeu de mah-jong', 'Flux de trésorerie', 'Lancement de token'],
+  ko: ['NFT 마켓', '에어드롭 스킬', '마작 게임', '트레저리 흐름', '토큰 출시'],
+  ja: ['NFT マーケット', 'エアドロップスキル', '麻雀ゲーム', 'トレジャリーフロー', 'トークン公開'],
+  'zh-Hans': ['NFT 市场', '空投技能', '麻将游戏', '金库工作流', '代币发行'],
+  'zh-Hant': ['NFT 市場', '空投技能', '麻將遊戲', '金庫工作流', '代幣發行'],
 };
 
 const creativeSkillDemoDataByLanguage: Record<LanguageCode, Array<{ app: string; skill: string }>> = {
-  en: [{ app: 'Omisper', skill: 'Scheduled Message' }, { app: 'INJ Gift', skill: 'Group Gift' }, { app: 'Hash Mahjong', skill: 'Auto Play' }],
-  de: [{ app: 'Omisper', skill: 'Geplante Nachricht' }, { app: 'INJ Gift', skill: 'Gruppengeschenk' }, { app: 'Hash Mahjong', skill: 'Automatisch spielen' }],
-  fr: [{ app: 'Omisper', skill: 'Message programmé' }, { app: 'INJ Gift', skill: 'Cadeau groupé' }, { app: 'Hash Mahjong', skill: 'Jeu automatique' }],
-  ko: [{ app: 'Omisper', skill: '예약 전송' }, { app: 'INJ Gift', skill: '그룹 선물' }, { app: 'Hash Mahjong', skill: '자동 플레이' }],
-  ja: [{ app: 'Omisper', skill: '予約送信' }, { app: 'INJ Gift', skill: '一斉ギフト' }, { app: 'Hash Mahjong', skill: '自動プレイ' }],
-  'zh-Hans': [{ app: 'Omisper', skill: '定时发送' }, { app: 'INJ Gift', skill: '群发红包' }, { app: 'Hash Mahjong', skill: '自动搓麻将' }],
-  'zh-Hant': [{ app: 'Omisper', skill: '定時發送' }, { app: 'INJ Gift', skill: '群發紅包' }, { app: 'Hash Mahjong', skill: '自動打麻將' }],
+  en: [{ app: 'Omisper', skill: 'Direct Message' }, { app: 'INJ Gift', skill: 'Group Gift' }, { app: 'Bankrupt Elon Musk', skill: 'Market Order' }],
+  de: [{ app: 'Omisper', skill: 'Direktnachricht' }, { app: 'INJ Gift', skill: 'Gruppengeschenk' }, { app: 'Bankrupt Elon Musk', skill: 'Marktorder' }],
+  fr: [{ app: 'Omisper', skill: 'Message direct' }, { app: 'INJ Gift', skill: 'Cadeau groupé' }, { app: 'Bankrupt Elon Musk', skill: 'Ordre de marché' }],
+  ko: [{ app: 'Omisper', skill: '개인 메시지' }, { app: 'INJ Gift', skill: '그룹 선물' }, { app: 'Bankrupt Elon Musk', skill: '시장 주문' }],
+  ja: [{ app: 'Omisper', skill: 'ダイレクトメッセージ' }, { app: 'INJ Gift', skill: '一斉ギフト' }, { app: 'Bankrupt Elon Musk', skill: '成行注文' }],
+  'zh-Hans': [{ app: 'Omisper', skill: '单点发送' }, { app: 'INJ Gift', skill: '群发红包' }, { app: 'Bankrupt Elon Musk', skill: '市场买卖' }],
+  'zh-Hant': [{ app: 'Omisper', skill: '單點傳送' }, { app: 'INJ Gift', skill: '群發紅包' }, { app: 'Bankrupt Elon Musk', skill: '市場買賣' }],
 };
 
 function formatCreativeSkillDemoSegments(
@@ -1569,37 +1600,37 @@ const composerDemoSkillsByLanguage: Record<LanguageCode, Record<ComposerDemoKind
   en: {
     omisper: ['Group Chat', 'Direct Message', 'Scheduled Message'],
     'inj-gift': ['Send Gift', 'Receive Gift', 'Group Gift'],
-    'hash-mahjong': ['Auto Play', 'Join Table', 'Claim Rewards'],
+    'bankrupt-elon': ['Check Balance', 'Buy Asset', 'Loss Ranking'],
   },
   de: {
     omisper: ['Gruppenchat', 'Direktnachricht', 'Geplante Nachricht'],
     'inj-gift': ['Geschenk senden', 'Geschenk empfangen', 'Gruppengeschenk'],
-    'hash-mahjong': ['Automatisch spielen', 'Tisch beitreten', 'Belohnung abholen'],
+    'bankrupt-elon': ['Kontostand prüfen', 'Asset kaufen', 'Verlust-Rang'],
   },
   fr: {
     omisper: ['Discussion de groupe', 'Message direct', 'Message programmé'],
     'inj-gift': ['Envoyer un cadeau', 'Recevoir un cadeau', 'Cadeau groupé'],
-    'hash-mahjong': ['Jeu automatique', 'Rejoindre une table', 'Réclamer les récompenses'],
+    'bankrupt-elon': ['Voir le solde', 'Acheter un actif', 'Classement des pertes'],
   },
   ko: {
     omisper: ['그룹 채팅', '개인 메시지', '예약 전송'],
     'inj-gift': ['선물 보내기', '선물 받기', '그룹 선물'],
-    'hash-mahjong': ['자동 플레이', '테이블 참가', '보상 받기'],
+    'bankrupt-elon': ['잔액 확인', '자산 매수', '손실 순위'],
   },
   ja: {
     omisper: ['グループチャット', 'ダイレクトメッセージ', '予約送信'],
     'inj-gift': ['ギフト送信', 'ギフト受取', '一斉ギフト'],
-    'hash-mahjong': ['自動プレイ', '卓に参加', '報酬受取'],
+    'bankrupt-elon': ['残高確認', '資産購入', '損失ランキング'],
   },
   'zh-Hans': {
     omisper: ['群聊', '单点发送', '定时发送'],
     'inj-gift': ['发送红包', '领取红包', '群发红包'],
-    'hash-mahjong': ['自动搓麻将', '加入牌桌', '领取奖励'],
+    'bankrupt-elon': ['查看余额', '买入资产', '亏损排名'],
   },
   'zh-Hant': {
     omisper: ['群聊', '單點發送', '定時發送'],
     'inj-gift': ['發送紅包', '領取紅包', '群發紅包'],
-    'hash-mahjong': ['自動打麻將', '加入牌桌', '領取獎勵'],
+    'bankrupt-elon': ['查看餘額', '買入資產', '虧損排名'],
   },
 };
 
@@ -1608,37 +1639,37 @@ function getComposerDemoTemplate(language: LanguageCode, kind: ComposerDemoKind)
     en: {
       omisper: 'Use {skill} in {app} to deliver a private P2P message.',
       'inj-gift': 'Use {skill} in {app} to send {asset} gifts to friends.',
-      'hash-mahjong': 'Use {skill} in {app} to join an on-chain mahjong table.',
+      'bankrupt-elon': 'Use {skill} in {app} to manage the simulated market portfolio.',
     },
     de: {
       omisper: 'Nutze {skill} in {app}, um eine private P2P-Nachricht zu senden.',
       'inj-gift': 'Nutze {skill} in {app}, um Freunden {asset} zu schenken.',
-      'hash-mahjong': 'Nutze {skill} in {app}, um einem Onchain-Mahjong-Tisch beizutreten.',
+      'bankrupt-elon': 'Nutze {skill} in {app}, um das simulierte Marktportfolio zu verwalten.',
     },
     fr: {
       omisper: 'Utilisez {skill} dans {app} pour envoyer un message P2P privé.',
       'inj-gift': 'Utilisez {skill} dans {app} pour offrir des {asset} à vos amis.',
-      'hash-mahjong': 'Utilisez {skill} dans {app} pour rejoindre une table de mah-jong on-chain.',
+      'bankrupt-elon': 'Utilisez {skill} dans {app} pour gérer le portefeuille de marché simulé.',
     },
     ko: {
       omisper: '{app}에서 {skill}으로 P2P 메시지를 보내 줘.',
       'inj-gift': '{app}에서 {skill}으로 친구들에게 {asset} 선물을 보내 줘.',
-      'hash-mahjong': '{app}에서 {skill}으로 온체인 마작 테이블에 참가해 줘.',
+      'bankrupt-elon': '{app}에서 {skill}으로 모의 시장 포트폴리오를 관리해 줘.',
     },
     ja: {
       omisper: '{app} で {skill} を使い、P2P メッセージを送信して。',
       'inj-gift': '{app} で {skill} を使い、友人に {asset} ギフトを送って。',
-      'hash-mahjong': '{app} で {skill} を使い、オンチェーン麻雀に参加して。',
+      'bankrupt-elon': '{app} で {skill} を使い、シミュレーション市場のポートフォリオを管理して。',
     },
     'zh-Hans': {
       omisper: '在 {app} 中使用 {skill}，按计划发送一条 P2P 消息。',
       'inj-gift': '在 {app} 中使用 {skill}，把 {asset} 红包发送给朋友。',
-      'hash-mahjong': '在 {app} 中使用 {skill}，加入一局链上麻将。',
+      'bankrupt-elon': '在 {app} 中使用 {skill}，管理模拟市场投资组合。',
     },
     'zh-Hant': {
       omisper: '在 {app} 中使用 {skill}，按計畫發送一則 P2P 訊息。',
       'inj-gift': '在 {app} 中使用 {skill}，把 {asset} 紅包發送給朋友。',
-      'hash-mahjong': '在 {app} 中使用 {skill}，加入一局鏈上麻將。',
+      'bankrupt-elon': '在 {app} 中使用 {skill}，管理模擬市場投資組合。',
     },
   };
   return templates[language][kind];
@@ -1838,7 +1869,7 @@ const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
     sponsored: 'INJ Pass sponsored the network fee for this mint.',
     transaction: 'View transaction',
     login: 'Log in to INJ Pass and unlock a wallet before minting an eric mfer.',
-    noCredits: 'This wallet has already used its complimentary eric mfer mint.',
+    noCredits: 'This INJ Pass account has already minted its eric mfer.',
     failed: 'The eric mfer mint could not be completed. Please try again.',
     rarity: 'Rarity',
   },
@@ -1847,7 +1878,7 @@ const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
     sponsored: 'INJ Pass hat die Netzwerkgebühr für diesen Mint übernommen.',
     transaction: 'Transaktion ansehen',
     login: 'Melde dich bei INJ Pass an und entsperre eine Wallet, bevor du einen eric mfer mintest.',
-    noCredits: 'Diese Wallet hat ihren kostenlosen eric mfer Mint bereits verwendet.',
+    noCredits: 'Dieses INJ Pass Konto hat bereits einen eric mfer gemintet.',
     failed: 'Der eric mfer Mint konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
     rarity: 'Seltenheit',
   },
@@ -1856,7 +1887,7 @@ const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
     sponsored: 'INJ Pass a pris en charge les frais réseau de ce mint.',
     transaction: 'Voir la transaction',
     login: 'Connectez-vous à INJ Pass et déverrouillez un portefeuille avant de minter un eric mfer.',
-    noCredits: 'Ce portefeuille a déjà utilisé son mint eric mfer offert.',
+    noCredits: 'Ce compte INJ Pass a déjà minté son eric mfer.',
     failed: 'Le mint eric mfer n’a pas pu être terminé. Réessayez.',
     rarity: 'Rareté',
   },
@@ -1865,7 +1896,7 @@ const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
     sponsored: '이번 민팅의 네트워크 수수료는 INJ Pass가 지원했습니다.',
     transaction: '트랜잭션 보기',
     login: 'eric mfer를 민팅하려면 INJ Pass에 로그인하고 지갑 잠금을 해제하세요.',
-    noCredits: '이 지갑은 무료 eric mfer 민팅을 이미 사용했습니다.',
+    noCredits: '이 INJ Pass 계정은 이미 eric mfer를 민팅했습니다.',
     failed: 'eric mfer 민팅을 완료하지 못했습니다. 다시 시도하세요.',
     rarity: '희귀도',
   },
@@ -1874,7 +1905,7 @@ const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
     sponsored: '今回のミントのネットワーク手数料はINJ Passが負担しました。',
     transaction: 'トランザクションを見る',
     login: 'eric mferをミントする前にINJ Passへログインし、ウォレットを解除してください。',
-    noCredits: 'このウォレットは無料のeric mferミントをすでに使用しています。',
+    noCredits: 'このINJ Passアカウントはすでにeric mferをミントしています。',
     failed: 'eric mferのミントを完了できませんでした。もう一度お試しください。',
     rarity: 'レア度',
   },
@@ -1883,7 +1914,7 @@ const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
     sponsored: '本次 Mint 的网络费由 INJ Pass 赞助。',
     transaction: '查看交易',
     login: '请先登录 INJ Pass 并解锁钱包，再 Mint eric mfer。',
-    noCredits: '这个钱包已经使用过一次免费的 eric mfer Mint。',
+    noCredits: '这个 INJ Pass 账户已经 Mint 过一个 eric mfer。',
     failed: 'eric mfer Mint 未能完成，请稍后重试。',
     rarity: '稀有度',
   },
@@ -1892,7 +1923,7 @@ const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
     sponsored: '本次 Mint 的網路費由 INJ Pass 贊助。',
     transaction: '查看交易',
     login: '請先登入 INJ Pass 並解鎖錢包，再 Mint eric mfer。',
-    noCredits: '這個錢包已經使用過一次免費的 eric mfer Mint。',
+    noCredits: '這個 INJ Pass 帳戶已經 Mint 過一個 eric mfer。',
     failed: 'eric mfer Mint 未能完成，請稍後重試。',
     rarity: '稀有度',
   },
@@ -1912,7 +1943,7 @@ function formatEricMferMintMessage(
   const text = ericMferMintCopy[languageCode];
   const tokenNumber = formatNFTTokenNumber(result.tokenId);
   const name = nft?.name || `eric mfer ${tokenNumber}`;
-  const sponsorship = result.gasSponsored ? `\n\n${text.sponsored}` : '';
+  const sponsorship = result.gasSponsored ? `\n\n[${text.sponsored}](#injpass-sponsored-mint)` : '';
   const image = nft?.image
     ? `\n\n![${name.replace(/[\[\]]/g, '')}](${nft.image})`
     : '';
@@ -1925,6 +1956,39 @@ function localizeEricMferMintError(error: unknown, languageCode: LanguageCode) {
   if (/INJPASS_LOGIN_REQUIRED|unlock|locked|authentication/i.test(message)) return text.login;
   if (/insufficient mint credits|complimentary mint|already.*mint/i.test(message)) return text.noCredits;
   return text.failed;
+}
+
+function responseRequiresWalletLogin(message: string) {
+  const loginPatterns = [
+    /\b(?:please\s+)?(?:log|sign)\s*in\b/i,
+    /\b(?:please\s+)?connect\s+(?:your\s+)?wallet\b/i,
+    /\b(?:please\s+)?unlock\s+(?:your\s+)?wallet\b/i,
+    /\b(?:logged|signed)\s+in\s+(?:first|before|to)\b/i,
+    /\b(?:anmelden|einloggen|wallet\s+(?:verbinden|entsperren))\b/i,
+    /\b(?:connectez-vous|se\s+connecter|portefeuille\s+(?:connecter|déverrouiller))\b/i,
+    /(?:로그인|지갑.{0,12}(?:연결|잠금\s*해제))/,
+    /(?:ログイン|ウォレット.{0,12}(?:接続|解除))/,
+    /(?:请|請|需要|需|先|必须|必須).{0,16}(?:登录|登入|连接|連接|解锁|解鎖)/,
+  ];
+  return loginPatterns.some((pattern) => pattern.test(message));
+}
+
+function isWalletInteractionRequest(message: string) {
+  const walletIntentPatterns = [
+    /\b(?:show|check|view|list|get|find|read)\b.{0,48}\b(?:my\s+)?(?:wallet\s+address|balance|assets?|tokens?|nfts?|portfolio|positions?|history|transactions?|approvals?)\b/i,
+    /\bmy\b.{0,40}\b(?:wallet|address|balance|assets?|tokens?|nfts?|portfolio|positions?|history|transactions?|approvals?)\b/i,
+    /\b(?:send|receive|swap|stake|unstake|claim|mint|transfer|approve|revoke|bridge|deposit|withdraw)\b.{0,64}\b(?:inj|usdt|usdc|xaut|token|nft|asset|wallet|address|dapp)\b/i,
+    /(?:显示|顯示|查看|查询|查詢|检查|檢查|列出|发送|發送|接收|收款|兑换|兌換|质押|質押|解质押|解質押|领取|領取|铸造|鑄造|转账|轉帳|授权|授權|撤销|撤銷|跨链|跨鏈|充值|提现|提現).{0,36}(?:我的|我的钱包|我的錢包|钱包|錢包|地址|余额|餘額|资产|資產|代币|代幣|NFT|持仓|持倉|历史|歷史|交易|授权|授權|INJ|USDT|USDC|XAUT)/i,
+    /(?:내|나의).{0,24}(?:지갑|주소|잔액|자산|토큰|NFT|거래|내역|승인)/i,
+    /(?:私の|自分の).{0,24}(?:ウォレット|アドレス|残高|資産|トークン|NFT|取引|履歴|承認)/i,
+    /\b(?:mein|meine|meinen)\b.{0,32}\b(?:wallet|adresse|guthaben|vermögen|token|nft|transaktionen|verlauf)\b/i,
+    /\b(?:mon|ma|mes)\b.{0,32}\b(?:portefeuille|adresse|solde|actifs|jetons|nft|transactions|historique)\b/i,
+  ];
+  return walletIntentPatterns.some((pattern) => pattern.test(message));
+}
+
+function shouldOfferWalletLogin(prompt: string, response: string) {
+  return responseRequiresWalletLogin(response) || isWalletInteractionRequest(prompt);
 }
 
 const thinkingFallbacks: Record<LanguageCode, Record<ThinkingMode | 'mint', string[]>> = {
@@ -2027,6 +2091,36 @@ function formatShortDate(value?: string | number | null) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function isSuccessfulTransactionStatus(status: string) {
+  return ['ok', 'success', 'confirmed'].includes(status.trim().toLowerCase());
+}
+
+function formatBlockConfirmations(item: WalletActivityItem, languageCode: LanguageCode) {
+  if (!isSuccessfulTransactionStatus(item.status)) return item.status;
+  if (item.confirmations === null) {
+    return {
+      en: 'Confirmed',
+      de: 'Bestätigt',
+      fr: 'Confirmée',
+      ko: '확인됨',
+      ja: '確認済み',
+      'zh-Hans': '已确认',
+      'zh-Hant': '已確認',
+    }[languageCode];
+  }
+
+  const count = Math.max(0, Math.floor(item.confirmations));
+  return {
+    en: `${count} block confirmation${count === 1 ? '' : 's'}`,
+    de: `${count} Blockbestätigung${count === 1 ? '' : 'en'}`,
+    fr: `${count} confirmation${count === 1 ? '' : 's'} de bloc`,
+    ko: `${count}개 블록 확인`,
+    ja: `${count} ブロック確認`,
+    'zh-Hans': `${count} 个区块确认`,
+    'zh-Hant': `${count} 個區塊確認`,
+  }[languageCode];
+}
+
 function describePointsTransaction(transaction: PointsTransaction) {
   return transaction.type
     .replace(/_/g, ' ')
@@ -2048,7 +2142,7 @@ function formatCreativePlanForHistory(plan: CreativePlan): string {
 function getBundledDAppIcon(name: string): string | undefined {
   const normalized = name.trim().toLowerCase();
   if (normalized.includes('omisper')) return '/omisper.png';
-  if (normalized.includes('hash mahjong')) return '/hashmahjong.png';
+  if (normalized.includes('bankrupt elon') || normalized.includes('elon musk')) return '/bankrupt-elon-musk.png';
   if (normalized.includes('n1nj4')) return '/N1NJ4.png';
   if (normalized.includes('injective hub')) return '/injlogo.png';
   return undefined;
@@ -2065,7 +2159,7 @@ function getGoogleFavicon(url?: string): string | undefined {
 
 function isAgentOsSupported(name: string, id?: string): boolean {
   const value = `${id || ''} ${name}`.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-  return value.includes('hash mahjong') || value.includes('omisper') || value.includes('inj gift');
+  return value.includes('eric mfer') || value.includes('bankrupt elon') || value.includes('omisper') || value.includes('inj gift');
 }
 
 function normalizeDAppIdentity(value: string): string {
@@ -2121,7 +2215,11 @@ function MarkdownMessage({ body, isLight }: { body: string; isLight: boolean }) 
             {children}
           </code>
         ),
-        a: ({ href, children }) => (
+        a: ({ href, children }) => href === '#injpass-sponsored-mint' ? (
+          <span className={cx('font-semibold', isLight ? 'text-emerald-700' : 'text-emerald-400')}>
+            {children}
+          </span>
+        ) : (
           <a href={href} target="_blank" rel="noreferrer" className="underline decoration-current/35 underline-offset-4">
             {children}
           </a>
@@ -2739,7 +2837,7 @@ function ComposerSyntaxIntroModal({
   const item = pages[page] || pages[0];
   const symbol = (['@', '#', '$'] as const)[page] || '@';
   const examples = page === 0
-    ? ['INJ Gift', 'Hash Mahjong', 'Omisper']
+    ? ['INJ Gift', 'Bankrupt Elon Musk', 'Omisper']
     : page === 1
       ? ['Portfolio Lens', 'Transaction Guard', 'Contract Studio']
       : ['INJ', 'USDT', 'LAM'];
@@ -2801,6 +2899,7 @@ function WalletDataPanel({
   onSend,
   onReceive,
   isLight,
+  languageCode,
   copy,
 }: {
   tab: WalletTab;
@@ -2813,12 +2912,41 @@ function WalletDataPanel({
   onSend: () => void;
   onReceive: () => void;
   isLight: boolean;
+  languageCode: LanguageCode;
   copy: ShellCopy;
 }) {
   const title = walletTabs.find((item) => item.id === tab)?.label || 'Wallet';
   const supportsTransfers = tab === 'tokens' || tab === 'nfts';
   const canSend = tab === 'tokens' || Boolean(data.nfts?.length);
   const [selectedNft, setSelectedNft] = useState<NFT | null>(null);
+  const [selectedNftLoading, setSelectedNftLoading] = useState(false);
+  const nftDetailRequestRef = useRef(0);
+  const selectedNftUri = resolveNFTUri(selectedNft?.tokenURI);
+
+  const openNftDetails = (nft: NFT) => {
+    const requestId = ++nftDetailRequestRef.current;
+    setSelectedNft(nft);
+    if (!/^\d+$/.test(nft.tokenId)) return;
+
+    setSelectedNftLoading(true);
+    void getNFTDetails(nft.contractAddress, BigInt(nft.tokenId))
+      .then((details) => {
+        if (!details || requestId !== nftDetailRequestRef.current) return;
+        setSelectedNft((current) => current && current.contractAddress.toLowerCase() === nft.contractAddress.toLowerCase() && current.tokenId === nft.tokenId
+          ? { ...nft, ...details }
+          : current);
+      })
+      .finally(() => {
+        if (requestId === nftDetailRequestRef.current) setSelectedNftLoading(false);
+      });
+  };
+
+  const closeNftDetails = () => {
+    nftDetailRequestRef.current += 1;
+    setSelectedNftLoading(false);
+    setSelectedNft(null);
+  };
+
   return (
     <>
     <section className="mx-auto w-full max-w-4xl py-5">
@@ -2862,7 +2990,7 @@ function WalletDataPanel({
               <button
                 key={`${nft.contractAddress}-${nft.tokenId}`}
                 type="button"
-                onClick={() => setSelectedNft(nft)}
+                onClick={() => openNftDetails(nft)}
                 className="group min-w-0 text-left outline-none"
                 aria-label={`View ${nft.name} details`}
               >
@@ -2870,7 +2998,11 @@ function WalletDataPanel({
                   {nft.image ? <Image src={nft.image} alt={nft.name} fill sizes="180px" unoptimized className="object-cover transition duration-300 group-hover:scale-[1.025]" /> : <div className="flex h-full items-center justify-center text-xs opacity-45">No image</div>}
                   <span className={cx('absolute inset-0 rounded-xl ring-1 ring-inset transition', isLight ? 'ring-black/0 group-hover:ring-black/14' : 'ring-white/0 group-hover:ring-white/18')} />
                 </div>
-                <div className="mt-2 truncate text-sm font-bold">{nft.name}</div><div className={cx('text-xs', isLight ? 'text-black/42' : 'text-white/42')}>#{nft.tokenId}</div>
+                <div className="mt-2 truncate text-sm font-bold">{nft.name}</div>
+                <div className={cx('mt-0.5 flex items-center justify-between gap-2 text-xs', isLight ? 'text-black/42' : 'text-white/42')}>
+                  <span className="truncate">{nft.collection}</span>
+                  <span className="shrink-0 font-mono">#{nft.tokenId}</span>
+                </div>
               </button>
             ))}
           </div>
@@ -2898,12 +3030,15 @@ function WalletDataPanel({
       {isAuthenticated && !error && tab === 'activity' && data.activity && (
         data.activity.length > 0 ? (
           <div className="mt-3">
-            {data.activity.map((item) => (
-              <a key={item.hash} href={`https://blockscout.injective.network/tx/${item.hash}`} target="_blank" rel="noreferrer" className={cx('grid grid-cols-[minmax(0,1fr)_auto] items-center border-b py-4 transition', isLight ? 'border-black/6 hover:bg-black/[0.02]' : 'border-white/7 hover:bg-white/[0.03]')}>
-                <div className="min-w-0"><div className="truncate text-sm font-bold">{item.method || 'Transaction'}</div><div className={cx('mt-1 truncate font-mono text-xs', isLight ? 'text-black/42' : 'text-white/42')}>{item.hash}</div></div>
-                <div className="ml-4 text-right"><div className={cx('text-xs font-bold', item.status === 'ok' ? 'text-emerald-600' : isLight ? 'text-black/48' : 'text-white/48')}>{item.status}</div><div className={cx('mt-1 text-xs', isLight ? 'text-black/38' : 'text-white/38')}>{formatShortDate(item.timestamp)}</div></div>
-              </a>
-            ))}
+            {data.activity.map((item) => {
+              const successful = isSuccessfulTransactionStatus(item.status);
+              return (
+                <a key={item.hash} href={`https://blockscout.injective.network/tx/${item.hash}`} target="_blank" rel="noreferrer" className={cx('grid grid-cols-[minmax(0,1fr)_auto] items-center border-b py-4 transition', isLight ? 'border-black/6 hover:bg-black/[0.02]' : 'border-white/7 hover:bg-white/[0.03]')}>
+                  <div className="min-w-0"><div className="truncate text-sm font-bold">{item.method || 'Transaction'}</div><div className={cx('mt-1 truncate font-mono text-xs', isLight ? 'text-black/42' : 'text-white/42')}>{item.hash}</div></div>
+                  <div className="ml-4 text-right"><div className={cx('text-xs font-bold', successful ? 'text-emerald-600' : isLight ? 'text-black/48' : 'text-white/48')}>{formatBlockConfirmations(item, languageCode)}</div><div className={cx('mt-1 text-xs', isLight ? 'text-black/38' : 'text-white/38')}>{formatShortDate(item.timestamp)}</div></div>
+                </a>
+              );
+            })}
           </div>
         ) : <div className={cx('py-14 text-center text-sm', isLight ? 'text-black/46' : 'text-white/46')}>No recent EVM activity.</div>
       )}
@@ -2913,7 +3048,7 @@ function WalletDataPanel({
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-8">
           <button
             type="button"
-            onClick={() => setSelectedNft(null)}
+            onClick={closeNftDetails}
             className="absolute inset-0 bg-black/62 backdrop-blur-md"
             aria-label="Close NFT details"
           />
@@ -2922,11 +3057,11 @@ function WalletDataPanel({
             aria-modal="true"
             aria-labelledby="wallet-nft-detail-title"
             className={cx(
-              'relative z-10 grid w-full max-w-3xl overflow-hidden rounded-lg border shadow-[0_28px_90px_rgba(0,0,0,0.3)] motion-safe:animate-[injFadeUp_420ms_cubic-bezier(0.22,1,0.36,1)_both] md:grid-cols-[minmax(260px,0.9fr)_minmax(320px,1.1fr)]',
+              'relative z-10 grid max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg border shadow-[0_28px_90px_rgba(0,0,0,0.3)] motion-safe:animate-[injFadeUp_420ms_cubic-bezier(0.22,1,0.36,1)_both] md:grid-cols-[minmax(260px,0.9fr)_minmax(320px,1.1fr)]',
               isLight ? 'border-black/10 bg-[#fbfbfa] text-black' : 'border-white/12 bg-[#151517] text-white shadow-black/60',
             )}
           >
-            <div className={cx('relative min-h-[300px] md:min-h-[520px]', isLight ? 'bg-black/5' : 'bg-white/5')}>
+            <div className={cx('relative aspect-square min-h-[300px] self-start md:sticky md:top-0 md:min-h-0', isLight ? 'bg-black/5' : 'bg-white/5')}>
               {selectedNft.image ? (
                 <Image src={selectedNft.image} alt={selectedNft.name} fill sizes="(max-width: 768px) 100vw, 380px" unoptimized className="object-cover" />
               ) : (
@@ -2936,7 +3071,7 @@ function WalletDataPanel({
             <div className="relative flex min-w-0 flex-col p-6 sm:p-8">
               <button
                 type="button"
-                onClick={() => setSelectedNft(null)}
+                onClick={closeNftDetails}
                 className={cx('absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full transition', isLight ? 'hover:bg-black/6' : 'hover:bg-white/9')}
                 aria-label="Close NFT details"
               >
@@ -2944,8 +3079,10 @@ function WalletDataPanel({
               </button>
               <div className={cx('pr-10 text-[10px] font-bold uppercase tracking-[0.18em]', isLight ? 'text-black/38' : 'text-white/38')}>{selectedNft.collection}</div>
               <h2 id="wallet-nft-detail-title" className="inj-display-serif mt-2 pr-10 text-3xl leading-tight">{selectedNft.name}</h2>
+              {selectedNftLoading && <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-500">Reading on-chain details...</div>}
               <div className="mt-4 flex flex-wrap gap-2">
-                <span className={cx('rounded-md px-2.5 py-1.5 font-mono text-xs font-bold', isLight ? 'bg-black text-white' : 'bg-white text-black')}>{formatNFTTokenNumber(selectedNft.tokenId)}</span>
+                <span className={cx('rounded-md px-2.5 py-1.5 font-mono text-xs font-bold', isLight ? 'bg-black text-white' : 'bg-white text-black')}>Token ID · {formatNFTTokenNumber(selectedNft.tokenId)}</span>
+                {selectedNft.metadata?.edition !== undefined && <span className={cx('rounded-md border px-2.5 py-1.5 text-xs font-bold', isLight ? 'border-black/10 bg-black/[0.025]' : 'border-white/12 bg-white/[0.05]')}>Edition · #{String(selectedNft.metadata.edition).padStart(3, '0')}</span>}
                 <span className={cx('rounded-md border px-2.5 py-1.5 text-xs font-bold', isLight ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-violet-300/16 bg-violet-300/10 text-violet-200')}>Rarity · {getNFTRarity(selectedNft)}</span>
               </div>
 
@@ -2953,7 +3090,7 @@ function WalletDataPanel({
 
               {selectedNft.metadata?.attributes && selectedNft.metadata.attributes.length > 0 && (
                 <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3">
-                  {selectedNft.metadata.attributes.slice(0, 8).map((attribute, index) => (
+                  {selectedNft.metadata.attributes.map((attribute, index) => (
                     <div key={`${attribute.trait_type}-${index}`} className={cx('border-t pt-2', isLight ? 'border-black/8' : 'border-white/9')}>
                       <div className={cx('truncate text-[10px] uppercase', isLight ? 'text-black/38' : 'text-white/38')}>{attribute.trait_type}</div>
                       <div className="mt-1 truncate text-xs font-bold">{String(attribute.value)}</div>
@@ -2963,6 +3100,16 @@ function WalletDataPanel({
               )}
 
               <dl className={cx('mt-auto divide-y pt-6 text-xs', isLight ? 'divide-black/8' : 'divide-white/9')}>
+                <div className="grid grid-cols-2 gap-4 py-3">
+                  <div>
+                    <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Standard</dt>
+                    <dd className="mt-1 font-semibold">{selectedNft.standard || 'ERC-721'}</dd>
+                  </div>
+                  <div>
+                    <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Collection supply</dt>
+                    <dd className="mt-1 font-semibold">{selectedNft.totalSupply || '—'} {selectedNft.collectionSymbol || ''}</dd>
+                  </div>
+                </div>
                 <div className="py-3">
                   <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Contract</dt>
                   <dd className="mt-1 break-all font-mono">{selectedNft.contractAddress}</dd>
@@ -2971,6 +3118,20 @@ function WalletDataPanel({
                   <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Owner</dt>
                   <dd className="mt-1 break-all font-mono">{selectedNft.owner}</dd>
                 </div>
+                {selectedNft.metadata?.dna && (
+                  <div className="py-3">
+                    <dt className={isLight ? 'text-black/38' : 'text-white/38'}>DNA</dt>
+                    <dd className="mt-1 break-all font-mono">{selectedNft.metadata.dna}</dd>
+                  </div>
+                )}
+                {selectedNft.tokenURI && (
+                  <div className="py-3">
+                    <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Token URI</dt>
+                    {selectedNftUri ? (
+                      <dd className="mt-1"><a href={selectedNftUri} target="_blank" rel="noreferrer" className="break-all font-mono text-violet-500 underline underline-offset-4">{selectedNft.tokenURI}</a></dd>
+                    ) : <dd className="mt-1 break-all font-mono">{selectedNft.tokenURI}</dd>}
+                  </div>
+                )}
                 {selectedNft.mintTxHash && (
                   <div className="py-3">
                     <dt className={isLight ? 'text-black/38' : 'text-white/38'}>Mint transaction</dt>
@@ -3517,21 +3678,17 @@ function DAppMarketGrid({
 
 function MiniAppTabStrip({
   tabs,
-  activeAppId,
-  appsHomeActive,
-  onSelectApp,
-  onCloseApp,
-  onSelectAppsHome,
+  activeTabId,
+  onSelectTab,
+  onCloseTab,
   onAddApp,
   isLight,
   appsLabel,
 }: {
-  tabs: DAppMarketItem[];
-  activeAppId: string | null;
-  appsHomeActive: boolean;
-  onSelectApp: (app: DAppMarketItem) => void;
-  onCloseApp: (appId: string) => void;
-  onSelectAppsHome: () => void;
+  tabs: MiniAppBrowserTab[];
+  activeTabId: string | null;
+  onSelectTab: (tab: MiniAppBrowserTab) => void;
+  onCloseTab: (tabId: string) => void;
   onAddApp: () => void;
   isLight: boolean;
   appsLabel: string;
@@ -3540,7 +3697,8 @@ function MiniAppTabStrip({
     <div className={cx('flex h-10 shrink-0 items-end border-b px-2', isLight ? 'border-black/8 bg-[#ededf0]' : 'border-white/8 bg-[#161619]')}>
       <div role="tablist" aria-label="Open INJ Pass apps" className="flex min-w-0 items-end gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((tab) => {
-          const active = activeAppId === tab.id;
+          const active = activeTabId === tab.id;
+          const label = tab.app?.name || appsLabel;
           return (
             <div
               key={tab.id}
@@ -3551,15 +3709,18 @@ function MiniAppTabStrip({
                   : isLight ? 'border-transparent bg-black/[0.025] text-black/55 hover:bg-black/[0.045]' : 'border-transparent bg-white/[0.025] text-white/55 hover:bg-white/[0.05]',
               )}
             >
-              <button type="button" role="tab" aria-selected={active} onClick={() => onSelectApp(tab)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                <span className={cx('relative h-5 w-5 shrink-0 overflow-hidden rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}><DAppLogo app={tab} /></span>
-                <span className="min-w-0 flex-1 truncate text-xs font-bold">{tab.name}</span>
+              <button type="button" role="tab" aria-selected={active} onClick={() => onSelectTab(tab)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                <span className={cx('relative flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}>
+                  {tab.app ? <DAppLogo app={tab.app} /> : <DAppMarketIcon className="h-3.5 w-3.5" />}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs font-bold">{label}</span>
+                {!tab.app && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />}
               </button>
               <button
                 type="button"
-                onClick={() => onCloseApp(tab.id)}
+                onClick={() => onCloseTab(tab.id)}
                 className={cx('ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition', isLight ? 'hover:bg-black/6' : 'hover:bg-white/9')}
-                aria-label={`Close ${tab.name}`}
+                aria-label={`Close ${label}`}
                 title="Close app"
               >
                 <CloseIcon className="h-3 w-3" />
@@ -3567,22 +3728,6 @@ function MiniAppTabStrip({
             </div>
           );
         })}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={appsHomeActive}
-          onClick={onSelectAppsHome}
-          className={cx(
-            'flex h-9 min-w-[145px] items-center gap-2 rounded-t-md border-x border-t px-2.5 text-left transition',
-            appsHomeActive
-              ? isLight ? 'border-black/8 bg-white text-black' : 'border-white/9 bg-[#0d0d0f] text-white'
-              : isLight ? 'border-transparent bg-black/[0.025] text-black/55 hover:bg-black/[0.045]' : 'border-transparent bg-white/[0.025] text-white/55 hover:bg-white/[0.05]',
-          )}
-        >
-          <span className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-md', isLight ? 'bg-black/5' : 'bg-white/8')}><DAppMarketIcon className="h-3.5 w-3.5" /></span>
-          <span className="min-w-0 flex-1 truncate text-xs font-bold">{appsLabel}</span>
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-        </button>
         <button
           type="button"
           onClick={onAddApp}
@@ -3602,8 +3747,10 @@ function MiniAppTabStrip({
 function DAppMarketPanel({
   apps,
   tabs,
+  activeTabId,
   onOpenApp,
-  onCloseApp,
+  onSelectTab,
+  onCloseTab,
   onAddApp,
   onDragStart,
   onPointerDown,
@@ -3612,9 +3759,11 @@ function DAppMarketPanel({
   copy,
 }: {
   apps: DAppMarketItem[];
-  tabs: DAppMarketItem[];
+  tabs: MiniAppBrowserTab[];
+  activeTabId: string | null;
   onOpenApp: (app: DAppMarketItem) => void;
-  onCloseApp: (appId: string) => void;
+  onSelectTab: (tab: MiniAppBrowserTab) => void;
+  onCloseTab: (tabId: string) => void;
   onAddApp: () => void;
   onDragStart: (event: DragEvent<HTMLElement>, app: DAppMarketItem) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>, app: DAppMarketItem) => void;
@@ -3634,11 +3783,11 @@ function DAppMarketPanel({
   return (
     <section
       className={cx(
-        'relative mx-auto flex h-[calc(100dvh-7.15rem)] min-h-[620px] w-full max-w-[1280px] flex-col overflow-hidden rounded-lg border shadow-[0_20px_70px_rgba(0,0,0,0.09)] motion-safe:animate-[injFadeUp_520ms_cubic-bezier(0.22,1,0.36,1)_both]',
+        'relative mx-auto flex h-[calc(100dvh-7.15rem)] min-h-[620px] w-full max-w-[1440px] flex-col overflow-hidden rounded-lg border shadow-[0_20px_70px_rgba(0,0,0,0.09)] motion-safe:animate-[injFadeUp_520ms_cubic-bezier(0.22,1,0.36,1)_both]',
         isLight ? 'border-black/10 bg-[#f7f7f8] text-[#1d1d1f]' : 'border-white/10 bg-[#0d0d0f] text-white shadow-black/35'
       )}
     >
-      <MiniAppTabStrip tabs={tabs} activeAppId={null} appsHomeActive onSelectApp={onOpenApp} onCloseApp={onCloseApp} onSelectAppsHome={onAddApp} onAddApp={onAddApp} isLight={isLight} appsLabel={copy.dappMarket} />
+      <MiniAppTabStrip tabs={tabs} activeTabId={activeTabId} onSelectTab={onSelectTab} onCloseTab={onCloseTab} onAddApp={onAddApp} isLight={isLight} appsLabel={copy.dappMarket} />
 
       <div className={cx('flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:px-3', isLight ? 'border-black/8 bg-white' : 'border-white/8 bg-[#0d0d0f]')}>
         <span className={browserButtonClass}><BrowserBackIcon /></span>
@@ -3688,6 +3837,7 @@ function DAppMarketPanel({
 function MiniAppPanel({
   app,
   tabs,
+  activeTabId,
   manifest,
   src,
   iframeKey,
@@ -3697,8 +3847,8 @@ function MiniAppPanel({
   address,
   walletName,
   isLight,
-  onSelectApp,
-  onCloseApp,
+  onSelectTab,
+  onCloseTab,
   onAddApp,
   onNavigate,
   onOpenWallet,
@@ -3706,7 +3856,8 @@ function MiniAppPanel({
   onFrameLoad,
 }: {
   app: DAppMarketItem;
-  tabs: DAppMarketItem[];
+  tabs: MiniAppBrowserTab[];
+  activeTabId: string | null;
   manifest: MiniAppManifest;
   src: string;
   iframeKey: string;
@@ -3716,8 +3867,8 @@ function MiniAppPanel({
   address: string | null;
   walletName?: string;
   isLight: boolean;
-  onSelectApp: (app: DAppMarketItem) => void;
-  onCloseApp: (appId: string) => void;
+  onSelectTab: (tab: MiniAppBrowserTab) => void;
+  onCloseTab: (tabId: string) => void;
   onAddApp: () => void;
   onNavigate: (action: MiniAppNavigationAction) => void;
   onOpenWallet: () => void;
@@ -3750,11 +3901,11 @@ function MiniAppPanel({
   return (
     <section
       className={cx(
-        'relative mx-auto flex h-[calc(100dvh-7.15rem)] min-h-[560px] w-full max-w-[1280px] flex-col overflow-hidden rounded-lg border shadow-[0_20px_70px_rgba(0,0,0,0.09)]',
+        'relative mx-auto flex h-[calc(100dvh-7.15rem)] min-h-[560px] w-full max-w-[1440px] flex-col overflow-hidden rounded-lg border shadow-[0_20px_70px_rgba(0,0,0,0.09)]',
         isLight ? 'border-black/10 bg-[#f7f7f8]' : 'border-white/10 bg-[#0d0d0f] shadow-black/35',
       )}
     >
-      <MiniAppTabStrip tabs={tabs} activeAppId={app.id} appsHomeActive={false} onSelectApp={onSelectApp} onCloseApp={onCloseApp} onSelectAppsHome={onAddApp} onAddApp={onAddApp} isLight={isLight} appsLabel="Apps" />
+      <MiniAppTabStrip tabs={tabs} activeTabId={activeTabId} onSelectTab={onSelectTab} onCloseTab={onCloseTab} onAddApp={onAddApp} isLight={isLight} appsLabel="Apps" />
 
       <div className={cx('flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:px-3', isLight ? 'border-black/8 bg-white' : 'border-white/8 bg-[#0d0d0f]')}>
         <button type="button" onClick={() => onNavigate('back')} disabled={!navigation.canGoBack} className={browserButtonClass} aria-label="Back" title="Back">
@@ -3906,12 +4057,12 @@ function CampaignPanel({
       <div className={cx('mt-5 grid gap-6 border-y py-7 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center', isLight ? 'border-black/8' : 'border-white/10')}>
         <div>
           <div className="flex items-center gap-3">
-            <div className={cx('relative h-11 w-11 overflow-hidden rounded-full border', isLight ? 'border-black/10 bg-white' : 'border-white/12 bg-white/6')}>
-              <Image src="/NINJA.png" alt="INJ Gift" fill sizes="44px" className="object-cover" />
+            <div className={cx('relative h-11 w-11 overflow-hidden rounded-xl border', isLight ? 'border-black/10 bg-white' : 'border-white/12 bg-white/6')}>
+              <Image src="/bankrupt-elon-musk.png" alt="Bankrupt Elon Musk" fill sizes="44px" className="object-cover" />
             </div>
             <div>
               <h2 className="inj-display-serif text-3xl leading-tight">{copy.campaignTitle}</h2>
-              <div className={cx('mt-1 text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>INJ Gift · Injective</div>
+              <div className={cx('mt-1 text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>Bankrupt Elon Musk · Injective</div>
             </div>
           </div>
           <p className={cx('mt-5 max-w-2xl text-sm leading-6', isLight ? 'text-black/58' : 'text-white/58')}>{copy.campaignBody}</p>
@@ -4794,6 +4945,17 @@ function CreativeProgressMenu({
   );
 }
 
+function normalizeWalletInviteCode(value: string) {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+}
+
+function readInviteCodeFromLocation() {
+  if (typeof window === 'undefined') return '';
+  return normalizeWalletInviteCode(
+    new URLSearchParams(window.location.search).get('invite') || '',
+  );
+}
+
 function WalletSetupWizard({
   open,
   method,
@@ -4803,6 +4965,10 @@ function WalletSetupWizard({
   password,
   passwordConfirm,
   recoveryMnemonic,
+  preparedWalletAddress,
+  inviteCode,
+  inviteValidation,
+  inviteValidationMessage,
   busy,
   error,
   prfDetection,
@@ -4812,6 +4978,8 @@ function WalletSetupWizard({
   onPassword,
   onPasswordConfirm,
   onRecoveryMnemonic,
+  onInviteCode,
+  onValidateInvite,
   onClearError,
   onClose,
   onSubmit,
@@ -4824,6 +4992,10 @@ function WalletSetupWizard({
   password: string;
   passwordConfirm: string;
   recoveryMnemonic: string;
+  preparedWalletAddress: string | null;
+  inviteCode: string;
+  inviteValidation: InviteValidationState;
+  inviteValidationMessage: string;
   busy: boolean;
   error: string;
   prfDetection: PrfDetection | null;
@@ -4833,6 +5005,8 @@ function WalletSetupWizard({
   onPassword: (value: string) => void;
   onPasswordConfirm: (value: string) => void;
   onRecoveryMnemonic: (value: string) => void;
+  onInviteCode: (value: string) => void;
+  onValidateInvite: () => void;
   onClearError: () => void;
   onClose: () => void;
   onSubmit: () => void;
@@ -4844,6 +5018,7 @@ function WalletSetupWizard({
     ? [
       { id: 'security', label: 'Security', title: 'Use your system Passkey', body: 'INJ Pass will ask this device to create a Passkey and require system verification.' },
       { id: 'name', label: 'Name', title: 'Name your INJ Pass', body: 'Choose a name that makes this wallet easy to recognize on this device.' },
+      { id: 'invite', label: 'Invite', title: 'Have an invite code?', body: 'Apply an INJ Pass invite code to connect your account with the person who invited you. You can also skip this step.' },
       { id: 'review', label: 'Create', title: 'Ready to create', body: 'Review the wallet protection method before opening the system Passkey prompt.' },
     ]
     : mode === 'recover'
@@ -4856,6 +5031,7 @@ function WalletSetupWizard({
     : [
       { id: 'name', label: 'Name', title: 'Name your INJ Pass', body: 'Choose a name that makes this wallet easy to recognize on this device.' },
       { id: 'password', label: 'Protect', title: 'Set a local password', body: 'Your password encrypts the new 24-word recovery phrase before it is stored in this browser.' },
+      { id: 'invite', label: 'Invite', title: 'Have an invite code?', body: 'Apply an INJ Pass invite code to connect your account with the person who invited you. You can also skip this step.' },
       { id: 'review', label: 'Create', title: 'Ready to create', body: 'The wallet and its 24-word recovery phrase will be generated locally on this device.' },
     ];
   const activeStep = Math.min(step, stages.length - 1);
@@ -4871,6 +5047,8 @@ function WalletSetupWizard({
       ? walletName.trim().length > 0
       : stage.id === 'password'
         ? passwordLongEnough && passwordsMatch
+        : stage.id === 'invite'
+          ? inviteValidation === 'valid'
         : true;
   const isFinalStep = activeStep === stages.length - 1;
   const usesPrf = prfDetection?.capabilityPrf === true;
@@ -4879,7 +5057,12 @@ function WalletSetupWizard({
     : 'Checking this device...';
 
   const advance = () => {
-    if (!canContinue || busy) return;
+    if (busy || inviteValidation === 'checking') return;
+    if (stage.id === 'invite' && inviteCode && inviteValidation !== 'valid') {
+      onValidateInvite();
+      return;
+    }
+    if (!canContinue) return;
     if (isFinalStep) {
       onSubmit();
       return;
@@ -4983,7 +5166,7 @@ function WalletSetupWizard({
                   placeholder="My INJ Pass"
                   className={cx('mt-3 h-12 w-full rounded-xl border bg-transparent px-4 text-base outline-none transition focus:border-violet-400', isLight ? 'border-black/12' : 'border-white/14')}
                 />
-                <span className={cx('mt-2 block text-xs', isLight ? 'text-black/42' : 'text-white/42')}>You can create and switch between multiple wallets later.</span>
+                <span className={cx('mt-2 block text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>You can create and switch between multiple wallets later.</span>
               </label>
             )}
 
@@ -5018,9 +5201,78 @@ function WalletSetupWizard({
                     className={cx('mt-3 h-12 w-full rounded-xl border bg-transparent px-4 text-base outline-none transition focus:border-violet-400', isLight ? 'border-black/12' : 'border-white/14')}
                   />
                 </label>
-                <div className={cx('flex flex-wrap gap-x-5 gap-y-1 text-xs', isLight ? 'text-black/42' : 'text-white/42')}>
+                <div className={cx('flex flex-wrap gap-x-5 gap-y-1 text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>
                   <span className={passwordLongEnough ? 'text-emerald-600' : ''}>At least 10 characters</span>
                   <span className={passwordsMatch ? 'text-emerald-600' : ''}>Passwords match</span>
+                </div>
+              </div>
+            )}
+
+            {stage.id === 'invite' && (
+              <div>
+                <label className="block">
+                  <span className="text-sm font-bold">Invite code</span>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      autoFocus
+                      value={inviteCode}
+                      onChange={(event) => onInviteCode(event.target.value)}
+                      placeholder="8-character code"
+                      autoComplete="off"
+                      spellCheck={false}
+                      className={cx(
+                        'h-12 min-w-0 flex-1 rounded-xl border bg-transparent px-4 font-mono text-base uppercase tracking-[0.14em] outline-none transition',
+                        inviteValidation === 'valid'
+                          ? 'border-emerald-500'
+                          : inviteValidation === 'invalid'
+                            ? 'border-rose-500'
+                            : isLight
+                              ? 'border-black/12 focus:border-violet-400'
+                              : 'border-white/14 focus:border-violet-400',
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={onValidateInvite}
+                      disabled={inviteCode.length !== 8 || inviteValidation === 'checking'}
+                      className={cx(
+                        'h-12 shrink-0 rounded-xl border px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-35',
+                        isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/12 hover:bg-white/8',
+                      )}
+                    >
+                      {inviteValidation === 'checking' ? 'Checking...' : inviteValidation === 'valid' ? 'Applied' : 'Check'}
+                    </button>
+                  </div>
+                </label>
+                <div className="mt-3 min-h-6">
+                  {inviteValidationMessage && (
+                    <p className={cx(
+                      'text-xs leading-5',
+                      inviteValidation === 'valid'
+                        ? 'text-emerald-600'
+                        : inviteValidation === 'invalid'
+                          ? isLight ? 'text-rose-700' : 'text-rose-200'
+                          : isLight ? 'text-black/42' : 'text-white/42',
+                    )}>
+                      {inviteValidationMessage}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onInviteCode('');
+                      onClearError();
+                      onStep(activeStep + 1);
+                    }}
+                    disabled={busy || inviteValidation === 'checking'}
+                    className={cx(
+                      'text-xs font-bold underline decoration-current/40 underline-offset-4 transition disabled:opacity-40',
+                      inviteValidationMessage ? 'mt-2' : '',
+                      isLight ? 'text-black/54 hover:text-black' : 'text-white/54 hover:text-white',
+                    )}
+                  >
+                    I don&apos;t have an invite code
+                  </button>
                 </div>
               </div>
             )}
@@ -5033,13 +5285,32 @@ function WalletSetupWizard({
                     <strong className="text-sm">{walletName.trim() || 'My INJ Pass'}</strong>
                   </div>
                   <div className="flex items-center justify-between gap-4 py-4">
-                    <span className={cx('text-sm', isLight ? 'text-black/48' : 'text-white/48')}>{isPasskey ? 'Security' : 'Recovery phrase'}</span>
-                    <strong className="text-right text-sm">{isPasskey ? passkeyProtectionLabel : mode === 'recover' ? '24 words ready' : 'Generated on this device'}</strong>
+                    <span className={cx('text-sm', isLight ? 'text-black/48' : 'text-white/48')}>{isPasskey ? 'Security' : mode === 'recover' ? 'Recovery phrase' : 'Address'}</span>
+                    <strong className={cx(
+                      'text-right text-sm',
+                      !isPasskey && mode === 'create'
+                        ? isLight ? 'font-mono text-emerald-700' : 'font-mono text-emerald-400'
+                        : '',
+                    )}>
+                      {isPasskey
+                        ? passkeyProtectionLabel
+                        : mode === 'recover'
+                          ? '24 words ready'
+                          : preparedWalletAddress ? truncateAddress(preparedWalletAddress) : 'Preparing...'}
+                    </strong>
                   </div>
-                  <div className="flex items-center justify-between gap-4 py-4">
-                    <span className={cx('text-sm', isLight ? 'text-black/48' : 'text-white/48')}>{isPasskey ? 'Recovery' : 'Storage'}</span>
-                    <strong className="text-right text-sm">{isPasskey ? 'System Passkey PRF' : 'Encrypted in this browser'}</strong>
-                  </div>
+                  {isPasskey && (
+                    <div className="flex items-center justify-between gap-4 py-4">
+                      <span className={cx('text-sm', isLight ? 'text-black/48' : 'text-white/48')}>Recovery</span>
+                      <strong className="text-right text-sm">System Passkey PRF</strong>
+                    </div>
+                  )}
+                  {mode !== 'recover' && (
+                    <div className="flex items-center justify-between gap-4 py-4">
+                      <span className={cx('text-sm', isLight ? 'text-black/48' : 'text-white/48')}>Invite code</span>
+                      <strong className="font-mono text-sm">{inviteCode || 'Skipped'}</strong>
+                    </div>
+                  )}
                 </div>
                 <p className={cx('mt-4 text-xs leading-5', isLight ? 'text-black/46' : 'text-white/46')}>
                   {isPasskey
@@ -5058,8 +5329,10 @@ function WalletSetupWizard({
               {activeStep > 0 && (
                 <button type="button" onClick={() => { onClearError(); onStep(activeStep - 1); }} disabled={busy} className={cx('h-10 rounded-full border px-5 text-sm font-bold transition disabled:opacity-40', isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/12 hover:bg-white/8')}>Back</button>
               )}
-              <button type="submit" disabled={!canContinue || busy} className={cx('h-10 rounded-full px-6 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-35', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}>
-                {busy
+              <button type="submit" disabled={!canContinue || busy || inviteValidation === 'checking'} className={cx('h-10 rounded-full px-6 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-35', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}>
+                {inviteValidation === 'checking'
+                  ? 'Checking...'
+                  : busy
                   ? mode === 'recover' && !isPasskey ? 'Recovering...' : 'Creating...'
                   : isFinalStep
                     ? isPasskey ? 'Create with Passkey' : mode === 'recover' ? 'Recover wallet' : 'Create wallet'
@@ -5239,6 +5512,7 @@ function LocalWalletUnlockModal({
   onPasswordChange,
   onSubmit,
   onClose,
+  onRecoverOrphan,
   onRemoveOrphan,
 }: {
   wallet: LocalKeystore | null;
@@ -5250,6 +5524,7 @@ function LocalWalletUnlockModal({
   onPasswordChange: (value: string) => void;
   onSubmit: () => void;
   onClose: () => void;
+  onRecoverOrphan: () => void;
   onRemoveOrphan: () => void;
 }) {
   if (!wallet) return null;
@@ -5286,10 +5561,13 @@ function LocalWalletUnlockModal({
             />
           )}
           {error && <p className={cx('mt-3 text-sm leading-6', isLight ? 'text-rose-700' : 'text-rose-200')}>{error}</p>}
-          <div className="mt-6 flex justify-end gap-2">
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
             <button type="button" onClick={onClose} className={cx('h-10 rounded-full px-4 text-sm font-bold', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}>Cancel</button>
             {orphaned ? (
-              <button type="button" onClick={onRemoveOrphan} className={cx('h-10 rounded-full px-5 text-sm font-bold', isLight ? 'bg-rose-600 text-white' : 'bg-rose-400 text-black')}>Remove local record</button>
+              <>
+                <button type="button" onClick={onRemoveOrphan} className={cx('h-10 rounded-full px-4 text-sm font-bold', isLight ? 'text-rose-700 hover:bg-rose-50' : 'text-rose-200 hover:bg-rose-300/10')}>Remove device record</button>
+                <button type="button" onClick={onRecoverOrphan} className={cx('h-10 rounded-full px-5 text-sm font-bold', isLight ? 'bg-black text-white' : 'bg-white text-black')}>Recover with 24 words</button>
+              </>
             ) : (
               <button type="submit" disabled={busy || !password} className={cx('h-10 rounded-full px-5 text-sm font-bold disabled:opacity-45', isLight ? 'bg-black text-white' : 'bg-white text-black')}>{busy ? 'Unlocking...' : 'Unlock'}</button>
             )}
@@ -5660,12 +5938,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [dappMarketOpen, setDappMarketOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [dappMarketItems, setDappMarketItems] = useState<DAppMarketItem[]>(dappMarketApps);
-  const [miniAppTabs, setMiniAppTabs] = useState<DAppMarketItem[]>([]);
+  const [miniAppTabs, setMiniAppTabs] = useState<MiniAppBrowserTab[]>([]);
+  const [activeMiniAppTabId, setActiveMiniAppTabId] = useState<string | null>(null);
   const [activeMiniApp, setActiveMiniApp] = useState<DAppMarketItem | null>(null);
   const [miniAppUrl, setMiniAppUrl] = useState('');
   const [miniAppFrameNonce, setMiniAppFrameNonce] = useState(0);
   const [miniAppNavigation, setMiniAppNavigation] = useState<MiniAppNavigationState>(initialMiniAppNavigation);
   const [miniAppLoading, setMiniAppLoading] = useState(false);
+  const [miniAppAgentRun, setMiniAppAgentRun] = useState<MiniAppAgentRun | null>(null);
   const [activeWalletTab, setActiveWalletTab] = useState<WalletTab | null>(null);
   const [assetWalletView, setAssetWalletView] = useState<AssetWalletView>('assets');
   const [walletPanelData, setWalletPanelData] = useState<WalletPanelData>({});
@@ -5758,6 +6038,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [newWalletPassword, setNewWalletPassword] = useState('');
   const [newWalletPasswordConfirm, setNewWalletPasswordConfirm] = useState('');
   const [recoveryMnemonic, setRecoveryMnemonic] = useState('');
+  const [preparedMnemonicWallet, setPreparedMnemonicWallet] = useState<PreparedMnemonicWallet | null>(null);
+  const [walletInviteCode, setWalletInviteCode] = useState('');
+  const [walletInviteValidation, setWalletInviteValidation] = useState<InviteValidationState>('idle');
+  const [walletInviteValidationMessage, setWalletInviteValidationMessage] = useState('');
   const [traditionalWalletWizardOpen, setTraditionalWalletWizardOpen] = useState(false);
   const [walletSetupMethod, setWalletSetupMethod] = useState<WalletSetupMethod>('traditional');
   const [traditionalWalletWizardMode, setTraditionalWalletWizardMode] = useState<TraditionalWalletWizardMode>('create');
@@ -5801,6 +6085,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const creativeDraftRef = useRef('');
   const pointerDAppRef = useRef<DAppMarketItem | null>(null);
   const miniAppIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const miniAppWindowRef = useRef<WindowProxy | null>(null);
+  const miniAppAgentIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const miniAppAgentWindowRef = useRef<WindowProxy | null>(null);
+  const miniAppAgentResolverRef = useRef<MiniAppAgentResolver | null>(null);
   const miniAppLoadingTimerRef = useRef<number | null>(null);
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
@@ -5816,6 +6104,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const authMenuPinnedRef = useRef(false);
   const authMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const authMenuPanelRef = useRef<HTMLDivElement | null>(null);
+  const walletInviteValidationRequestRef = useRef(0);
   const localUnlockResolverRef = useRef<{
     resolve: (result: LocalUnlockResult) => void;
     reject: (error: Error) => void;
@@ -6101,13 +6390,13 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         setComposerDemoStep((current) => current + 1);
         return;
       }
-      const kinds: ComposerDemoKind[] = ['omisper', 'inj-gift', 'hash-mahjong'];
+      const kinds: ComposerDemoKind[] = ['omisper', 'inj-gift', 'bankrupt-elon'];
       const kind = kinds[Math.floor(Math.random() * kinds.length)] || 'inj-gift';
       const skills = composerDemoSkillsByLanguage[selectedLanguageCode][kind];
       const skill = skills[Math.floor(Math.random() * skills.length)] || skills[0];
       setComposerDemoSelection({
         kind,
-        app: kind === 'omisper' ? 'Omisper' : kind === 'inj-gift' ? 'INJ Gift' : 'Hash Mahjong',
+        app: kind === 'omisper' ? 'Omisper' : kind === 'inj-gift' ? 'INJ Gift' : 'Bankrupt Elon Musk',
         skill,
         asset: kind === 'inj-gift' ? 'INJ' : undefined,
       });
@@ -6527,13 +6816,24 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
     try {
       const publicClient = createPublicClient({ transport: http(INJECTIVE_MAINNET.rpcUrl) });
-      const [priceWei, , , active] = await publicClient.readContract({
+      const [priceWei, purchasedLamRaw, , active] = await publicClient.readContract({
         address: LAM_PURCHASE_CONTRACT,
         abi: LAM_PURCHASE_ABI,
         functionName: 'plans',
         args: [selectedPlan.planId],
       });
       if (!active) throw new Error('This LAM package is not active right now.');
+      const purchasedLam = Number(purchasedLamRaw);
+      if (!Number.isFinite(purchasedLam) || purchasedLam <= 0) {
+        throw new Error('This LAM package has an invalid on-chain amount.');
+      }
+      if (purchasedLam !== selectedPlan.lam) {
+        throw new Error(`This package now credits ${purchasedLam} LAM. Refresh before purchasing.`);
+      }
+      const priceInj = formatEther(priceWei);
+      if (Number(priceInj) !== Number(selectedPlan.inj)) {
+        throw new Error(`This package now costs ${priceInj} INJ. Refresh before purchasing.`);
+      }
 
       const clientRef = keccak256(stringToHex(`lam-${selectedPlan.id}-${Date.now()}`));
       const data = encodeFunctionData({
@@ -6544,17 +6844,26 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       const hash = await sendTransaction(
         privateKey,
         LAM_PURCHASE_CONTRACT,
-        formatEther(priceWei),
+        priceInj,
         data,
         INJECTIVE_MAINNET,
       );
       setLamPurchaseState('confirming');
       await waitForTransaction(hash, INJECTIVE_MAINNET, 1);
 
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 2200));
+      let creditedBalance: number | null = null;
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2500));
         const status = await getNinjaStatus();
-        if (status.balance > balanceBefore) break;
+        if (status.balance >= balanceBefore + purchasedLam - 0.000001) {
+          creditedBalance = status.balance;
+          setAiTokenStatus(status);
+          setSidebarWalletSummary((current) => ({ ...current, lam: status.balance }));
+          break;
+        }
+      }
+      if (creditedBalance === null) {
+        throw new Error('The transaction is confirmed. LAM is still being indexed; refresh shortly.');
       }
       await refreshAiTokenPanel();
       setLamPurchaseState('complete');
@@ -6933,6 +7242,53 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     });
   };
 
+  const runMiniAppAgentCommand = (
+    command: MiniAppAgentCommand,
+    signal: AbortSignal,
+  ): Promise<MiniAppAgentCommandResult> => {
+    const manifest = getMiniAppManifest(command.appId);
+    if (!manifest) return Promise.reject(new Error(`Mini app ${command.appId} is not registered.`));
+
+    const previous = miniAppAgentResolverRef.current;
+    if (previous) {
+      window.clearTimeout(previous.timer);
+      previous.cleanupAbort?.();
+      previous.reject(new Error('A newer mini app command replaced this request.'));
+      miniAppAgentResolverRef.current = null;
+    }
+
+    const id = uid('miniapp-agent');
+    const src = resolveMiniAppUrl(manifest);
+    setMiniAppAgentRun({ id, command, manifest, src });
+
+    return new Promise((resolve, reject) => {
+      const onAbort = () => {
+        const pending = miniAppAgentResolverRef.current;
+        if (!pending || pending.reject !== reject) return;
+        window.clearTimeout(pending.timer);
+        pending.cleanupAbort?.();
+        miniAppAgentResolverRef.current = null;
+        setMiniAppAgentRun((current) => current?.id === id ? null : current);
+        reject(new DOMException('Stopped', 'AbortError'));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      const timer = window.setTimeout(() => {
+        const pending = miniAppAgentResolverRef.current;
+        if (!pending || pending.reject !== reject) return;
+        pending.cleanupAbort?.();
+        miniAppAgentResolverRef.current = null;
+        setMiniAppAgentRun((current) => current?.id === id ? null : current);
+        reject(new Error(`${manifest.name} did not respond in time.`));
+      }, 180_000);
+      miniAppAgentResolverRef.current = {
+        resolve,
+        reject,
+        timer,
+        cleanupAbort: () => signal.removeEventListener('abort', onAbort),
+      };
+    });
+  };
+
   const streamAssistantMessage = async (
     assistantMessage: ChatMessage,
     signal: AbortSignal,
@@ -6997,6 +7353,47 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     chatAbortControllerRef.current = controller;
     beginThinkingProgress(trimmedText, 'chat');
 
+    const miniAppCommand = parseMiniAppAgentCommand(trimmedText, selectedLanguageCode);
+    if (miniAppCommand) {
+      setIsAgentRunning(true);
+      try {
+        const result = await runMiniAppAgentCommand(miniAppCommand, controller.signal);
+        if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+        const assistantMessage: ChatMessage = {
+          id: `a-${messageStamp}`,
+          role: 'assistant',
+          body: formatMiniAppAgentResult(result, selectedLanguageCode),
+          action: result.key === 'login_required' ? 'login' : undefined,
+        };
+        stopThinkingProgress();
+        await streamAssistantMessage(assistantMessage, controller.signal);
+        setChatWorkStatus(result.ok ? 'complete' : 'idle');
+        persistCommandConversation(messageStamp, trimmedText, assistantMessage, miniAppCommand.appId);
+      } catch (error) {
+        if (isAbortError(error)) {
+          setChatWorkStatus('idle');
+          return;
+        }
+        const assistantMessage: ChatMessage = {
+          id: `a-${messageStamp}`,
+          role: 'assistant',
+          body: error instanceof Error
+            ? error.message
+            : formatMiniAppAgentResult({ ok: false, key: 'unknown_error' }, selectedLanguageCode),
+        };
+        setMessages((current) => [...current, assistantMessage]);
+        setChatWorkStatus('idle');
+        persistCommandConversation(messageStamp, trimmedText, assistantMessage, miniAppCommand.appId);
+      } finally {
+        stopThinkingProgress();
+        if (chatAbortControllerRef.current === controller) {
+          chatAbortControllerRef.current = null;
+          setIsAgentRunning(false);
+        }
+      }
+      return;
+    }
+
     if (isEricMferMintMessage(trimmedText)) {
       setIsAgentRunning(true);
       try {
@@ -7029,6 +7426,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           id: `a-${messageStamp}`,
           role: 'assistant',
           body: localizeEricMferMintError(error, selectedLanguageCode),
+          action: !isAuthenticated ? 'login' : undefined,
         };
         setMessages((current) => [...current, assistantMessage]);
         setChatWorkStatus('idle');
@@ -7061,6 +7459,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           id: `a-${messageStamp}`,
           role: 'assistant',
           body: result.body,
+          action: !isAuthenticated && shouldOfferWalletLogin(trimmedText, result.body)
+            ? 'login'
+            : undefined,
         };
         setMessages((current) => [...current, assistantMessage]);
         setChatWorkStatus('complete');
@@ -7116,6 +7517,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             id: `a-${messageStamp}`,
             role: 'assistant',
             body: error instanceof Error ? error.message : copy.agentUnavailable,
+            action: !isAuthenticated ? 'login' : undefined,
           },
         ]);
         setChatWorkStatus('idle');
@@ -7146,10 +7548,15 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         if (!result.ok || !result.message) {
           throw new Error(result.error || 'AI request failed');
         }
-        setMessages((current) => [
-          ...current,
-          { id: `a-${messageStamp}`, role: 'assistant', body: result.message || '' },
-        ]);
+        const assistantMessage: ChatMessage = {
+          id: `a-${messageStamp}`,
+          role: 'assistant',
+          body: result.message || '',
+          action: shouldOfferWalletLogin(trimmedText, result.message || '')
+            ? 'login'
+            : undefined,
+        };
+        setMessages((current) => [...current, assistantMessage]);
         setChatWorkStatus('complete');
       } catch (error) {
         if (isAbortError(error)) {
@@ -7323,15 +7730,29 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       } else {
         const response = await fetch(`/api/transactions?address=${encodeURIComponent(address)}&network=mainnet`);
         if (!response.ok) throw new Error('Unable to load Injective history.');
-        const payload = await response.json() as { items?: Array<Record<string, unknown>> };
-        const activity = (payload.items || []).slice(0, 24).map((item): WalletActivityItem => ({
-          hash: typeof item.hash === 'string' ? item.hash : '',
-          timestamp: typeof item.timestamp === 'string' ? item.timestamp : '',
-          method: typeof item.method === 'string' && item.method ? item.method : 'Transaction',
-          status: typeof item.status === 'string' ? item.status : 'confirmed',
-          from: typeof item.from === 'object' && item.from && 'hash' in item.from ? String((item.from as { hash?: unknown }).hash || '') : undefined,
-          to: typeof item.to === 'object' && item.to && 'hash' in item.to ? String((item.to as { hash?: unknown }).hash || '') : undefined,
-        })).filter((item) => item.hash);
+        const payload = await response.json() as { current_block?: unknown; items?: Array<Record<string, unknown>> };
+        const latestBlock = typeof payload.current_block === 'number' && Number.isSafeInteger(payload.current_block)
+          ? payload.current_block
+          : null;
+        const activity = (payload.items || []).slice(0, 24).map((item): WalletActivityItem => {
+          const transactionBlock = typeof item.block_number === 'number'
+            ? item.block_number
+            : typeof item.block_number === 'string'
+              ? Number.parseInt(item.block_number, 10)
+              : Number.NaN;
+          const confirmations = latestBlock !== null && Number.isSafeInteger(transactionBlock)
+            ? Math.max(0, latestBlock - transactionBlock + 1)
+            : null;
+          return {
+            hash: typeof item.hash === 'string' ? item.hash : '',
+            timestamp: typeof item.timestamp === 'string' ? item.timestamp : '',
+            method: typeof item.method === 'string' && item.method ? item.method : 'Transaction',
+            status: typeof item.status === 'string' ? item.status : 'confirmed',
+            confirmations,
+            from: typeof item.from === 'object' && item.from && 'hash' in item.from ? String((item.from as { hash?: unknown }).hash || '') : undefined,
+            to: typeof item.to === 'object' && item.to && 'hash' in item.to ? String((item.to as { hash?: unknown }).hash || '') : undefined,
+          };
+        }).filter((item) => item.hash);
         if (requestId === walletPanelRequestRef.current) setWalletPanelData((current) => ({ ...current, activity }));
       }
     } catch (error) {
@@ -7678,18 +8099,22 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     pointerDAppRef.current = null;
   };
 
-  const openDAppMarket = () => {
-    switchProductMode('chat');
-    setActiveChatSurface('dapp-market');
-    setActiveWalletTab(null);
+  const showAppsTab = (tabId: string) => {
+    if (miniAppLoadingTimerRef.current) {
+      window.clearTimeout(miniAppLoadingTimerRef.current);
+      miniAppLoadingTimerRef.current = null;
+    }
+    setActiveMiniAppTabId(tabId);
     setActiveMiniApp(null);
     setMiniAppUrl('');
     setMiniAppNavigation(initialMiniAppNavigation);
     setMiniAppLoading(false);
-    setDappMarketOpen((current) => !current);
+    switchProductMode('chat');
+    setActiveChatSurface('dapp-market');
+    setActiveWalletTab(null);
   };
 
-  const openDApp = (app: DAppMarketItem, path?: string) => {
+  const activateMiniApp = (app: DAppMarketItem, tabId: string, path?: string) => {
     const manifest = getMiniAppManifest(app.id);
     if (manifest) {
       try {
@@ -7698,7 +8123,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         parsedUrl.searchParams.delete('injpass_miniapp');
         parsedUrl.searchParams.delete('injpass_host_origin');
         const initialPath = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}` || '/';
-        setMiniAppTabs((current) => current.some((tab) => tab.id === app.id) ? current : [...current, app]);
+        setActiveMiniAppTabId(tabId);
         setActiveMiniApp(app);
         setMiniAppUrl(url);
         setMiniAppNavigation({
@@ -7726,30 +8151,79 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     attachDAppToComposer(app);
   };
 
-  const openNewMiniAppTab = () => {
-    if (miniAppLoadingTimerRef.current) {
-      window.clearTimeout(miniAppLoadingTimerRef.current);
-      miniAppLoadingTimerRef.current = null;
-    }
-    setActiveMiniApp(null);
-    setMiniAppUrl('');
-    setMiniAppNavigation(initialMiniAppNavigation);
-    setMiniAppLoading(false);
-    switchProductMode('chat');
-    setActiveChatSurface('dapp-market');
-    setActiveWalletTab(null);
-  };
-
-  const closeMiniAppTab = (appId: string) => {
-    const remaining = miniAppTabs.filter((tab) => tab.id !== appId);
-    setMiniAppTabs(remaining);
-    if (activeMiniApp?.id !== appId) return;
-    const nextTab = remaining.at(-1);
-    if (nextTab) {
-      openDApp(nextTab);
+  const selectMiniAppTab = (tab: MiniAppBrowserTab) => {
+    if (tab.app) {
+      activateMiniApp(tab.app, tab.id);
       return;
     }
-    openNewMiniAppTab();
+    showAppsTab(tab.id);
+  };
+
+  const openDAppMarket = () => {
+    const existingAppsTab = [...miniAppTabs].reverse().find((tab) => tab.app === null);
+    if (existingAppsTab) {
+      showAppsTab(existingAppsTab.id);
+    } else {
+      const tab: MiniAppBrowserTab = { id: uid('apps-tab'), app: null };
+      setMiniAppTabs((current) => [...current, tab]);
+      showAppsTab(tab.id);
+    }
+    setDappMarketOpen((current) => !current);
+  };
+
+  const openDApp = (app: DAppMarketItem, path?: string) => {
+    if (!getMiniAppManifest(app.id)) {
+      if (app.url) {
+        window.open(app.url, '_blank', 'noopener,noreferrer');
+      } else {
+        attachDAppToComposer(app);
+      }
+      return;
+    }
+
+    const existingTab = miniAppTabs.find((tab) => tab.app?.id === app.id);
+    if (existingTab) {
+      activateMiniApp(app, existingTab.id, path);
+      return;
+    }
+
+    const tab: MiniAppBrowserTab = { id: uid('app-tab'), app };
+    setMiniAppTabs((current) => [...current, tab]);
+    activateMiniApp(app, tab.id, path);
+  };
+
+  const openDAppFromMarket = (app: DAppMarketItem) => {
+    const activeTab = miniAppTabs.find((tab) => tab.id === activeMiniAppTabId);
+    if (!activeTab || activeTab.app || !getMiniAppManifest(app.id)) {
+      openDApp(app);
+      return;
+    }
+
+    setMiniAppTabs((current) => current.map((tab) => (
+      tab.id === activeTab.id ? { ...tab, app } : tab
+    )));
+    activateMiniApp(app, activeTab.id);
+  };
+
+  const openNewMiniAppTab = () => {
+    const tab: MiniAppBrowserTab = { id: uid('apps-tab'), app: null };
+    setMiniAppTabs((current) => [...current, tab]);
+    showAppsTab(tab.id);
+  };
+
+  const closeMiniAppTab = (tabId: string) => {
+    const closingIndex = miniAppTabs.findIndex((tab) => tab.id === tabId);
+    const remaining = miniAppTabs.filter((tab) => tab.id !== tabId);
+    setMiniAppTabs(remaining);
+    if (activeMiniAppTabId !== tabId) return;
+    const nextTab = remaining[Math.min(Math.max(closingIndex, 0), remaining.length - 1)];
+    if (nextTab) {
+      selectMiniAppTab(nextTab);
+      return;
+    }
+    const freshTab: MiniAppBrowserTab = { id: uid('apps-tab'), app: null };
+    setMiniAppTabs([freshTab]);
+    showAppsTab(freshTab.id);
   };
 
   const navigateMiniApp = (action: MiniAppNavigationAction) => {
@@ -7771,7 +8245,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setMiniAppLoading(false);
       miniAppLoadingTimerRef.current = null;
     }, 4_000);
-    miniAppIframeRef.current?.contentWindow?.postMessage({
+    (miniAppWindowRef.current || miniAppIframeRef.current?.contentWindow)?.postMessage({
       channel: 'injpass-miniapp-v1',
       type: 'navigation-command',
       action,
@@ -7868,15 +8342,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const joinCampaign = () => {
-    const injGift = dappMarketItems.find((app) => app.id === 'inj-gift') || dappMarketApps.find((app) => app.id === 'inj-gift');
-    if (injGift) {
-      attachDAppToComposer({
-        ...injGift,
-        prompt: selectedLanguageCode.startsWith('zh')
-          ? '帮我参加“让马斯克倾家荡产”活动，并检查领取 INJ Gift 所需的 Injective 步骤。'
-          : 'Help me join the Make Elon Musk Go Broke campaign and prepare the INJ Gift claim steps.',
-      });
-    }
+    const campaign = dappMarketItems.find((app) => app.id === 'bankrupt-elon-musk')
+      || dappMarketApps.find((app) => app.id === 'bankrupt-elon-musk');
+    if (campaign) openDApp(campaign);
   };
 
   const startCreativeFromShortcut = (text: string) => {
@@ -8216,13 +8684,13 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }
     if (!isAllowedMiniAppOrigin(manifest, miniAppOrigin, activeMiniApp.url)) return;
 
-    const postToMiniApp = (payload: Record<string, unknown>) => {
-      miniAppIframeRef.current?.contentWindow?.postMessage({
+    const postToMiniApp = (payload: Record<string, unknown>, target?: WindowProxy | null) => {
+      (target || miniAppWindowRef.current || miniAppIframeRef.current?.contentWindow)?.postMessage({
         channel: 'injpass-miniapp-v1',
         ...payload,
       }, miniAppOrigin);
     };
-    const sendSession = () => postToMiniApp({
+    const sendSession = (target?: WindowProxy | null) => postToMiniApp({
       type: 'session',
       session: {
         authenticated: isAuthenticated,
@@ -8231,15 +8699,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         chainId: manifest.chainId,
         language: selectedLanguageCode,
       },
-    });
+    }, target);
 
     const handleMiniAppMessage = (event: MessageEvent) => {
-      if (
-        event.origin !== miniAppOrigin
-        || event.source !== miniAppIframeRef.current?.contentWindow
-      ) return;
+      if (event.origin !== miniAppOrigin || !event.source) return;
       const message = event.data as Record<string, unknown> | null;
       if (!message || message.channel !== 'injpass-miniapp-v1') return;
+      const source = event.source as WindowProxy;
+      miniAppWindowRef.current = source;
       if (message.type === 'navigation' && typeof message.path === 'string') {
         const nextPath = message.path.startsWith('/') ? message.path.slice(0, 2_048) : '/';
         setMiniAppNavigation({
@@ -8256,7 +8723,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         return;
       }
       if (message.type === 'ready') {
-        sendSession();
+        sendSession(source);
         return;
       }
       if (
@@ -8270,7 +8737,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           type: 'rpc-response',
           id: message.id,
           ...(error ? { error } : { result }),
-        });
+        }, source);
       };
 
       if (message.method === 'injpass_requestLogin') {
@@ -8343,8 +8810,145 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
     window.addEventListener('message', handleMiniAppMessage);
     sendSession();
-    return () => window.removeEventListener('message', handleMiniAppMessage);
+    return () => {
+      window.removeEventListener('message', handleMiniAppMessage);
+      miniAppWindowRef.current = null;
+    };
   }, [activeMiniApp, address, isAuthenticated, keystore?.walletName, logout, miniAppUrl, resetTxAuth, selectedLanguageCode]);
+
+  useEffect(() => {
+    if (!miniAppAgentRun) return;
+
+    let miniAppOrigin: string;
+    try {
+      miniAppOrigin = new URL(miniAppAgentRun.src).origin;
+    } catch {
+      return;
+    }
+    if (!isAllowedMiniAppOrigin(miniAppAgentRun.manifest, miniAppOrigin)) return;
+
+    let commandSent = false;
+    const postToAgentApp = (payload: Record<string, unknown>, target?: WindowProxy | null) => {
+      (target || miniAppAgentWindowRef.current || miniAppAgentIframeRef.current?.contentWindow)?.postMessage({
+        channel: 'injpass-miniapp-v1',
+        ...payload,
+      }, miniAppOrigin);
+    };
+    const sendSession = (target?: WindowProxy | null) => postToAgentApp({
+      type: 'session',
+      session: {
+        authenticated: isAuthenticated,
+        address: address || null,
+        walletName: keystore?.walletName,
+        chainId: miniAppAgentRun.manifest.chainId,
+        language: selectedLanguageCode,
+      },
+    }, target);
+    const sendCommand = (target?: WindowProxy | null) => {
+      if (commandSent) return;
+      commandSent = true;
+      postToAgentApp({
+        type: 'agent-command',
+        id: miniAppAgentRun.id,
+        command: miniAppAgentRun.command,
+      }, target);
+    };
+    const respond = (
+      id: string,
+      result?: unknown,
+      error?: { code: number; message: string; data?: unknown },
+      target?: WindowProxy | null,
+    ) => postToAgentApp({
+      type: 'rpc-response',
+      id,
+      ...(error ? { error } : { result }),
+    }, target);
+
+    const handleAgentAppMessage = (event: MessageEvent) => {
+      if (event.origin !== miniAppOrigin || !event.source) return;
+      const message = event.data as Record<string, unknown> | null;
+      if (!message || message.channel !== 'injpass-miniapp-v1') return;
+      const source = event.source as WindowProxy;
+      miniAppAgentWindowRef.current = source;
+
+      if (message.type === 'ready') {
+        sendSession(source);
+        sendCommand(source);
+        return;
+      }
+
+      if (
+        message.type === 'agent-command-result'
+        && message.id === miniAppAgentRun.id
+      ) {
+        const pending = miniAppAgentResolverRef.current;
+        if (!pending) return;
+        window.clearTimeout(pending.timer);
+        pending.cleanupAbort?.();
+        miniAppAgentResolverRef.current = null;
+        setMiniAppAgentRun((current) => current?.id === miniAppAgentRun.id ? null : current);
+        const result = message.result && typeof message.result === 'object'
+          ? message.result as MiniAppAgentCommandResult
+          : { ok: false, key: 'unknown_error' };
+        pending.resolve(result);
+        return;
+      }
+
+      if (
+        message.type !== 'rpc-request'
+        || typeof message.id !== 'string'
+        || typeof message.method !== 'string'
+      ) return;
+      const requestId = message.id;
+      const requestMethod = message.method;
+
+      if (requestMethod === 'injpass_requestLogin') {
+        setAuthError('');
+        setOrphanWalletAddress(null);
+        setLocalWallets(loadWallets());
+        void detectPrfSupport().then(setPrfDetection).catch(() => undefined);
+        authMenuPinnedRef.current = true;
+        setAuthMethod('mnemonic');
+        setAuthMenuOpen(true);
+        respond(requestId, true, undefined, source);
+        return;
+      }
+
+      if (requestMethod === 'injpass_requestLogout') {
+        void logout()
+          .then(() => respond(requestId, true, undefined, source))
+          .catch((error) => respond(requestId, undefined, {
+            code: -32603,
+            message: error instanceof Error ? error.message : 'Unable to sign out.',
+          }, source));
+        return;
+      }
+
+      void handleMiniAppRpc(
+        requestMethod,
+        Array.isArray(message.params) ? message.params : [],
+        {
+          manifest: miniAppAgentRun.manifest,
+          address: address ? address as Address : null,
+          getPrivateKey: () => requireWalletPrivateKeyRef.current(),
+        },
+      ).then((result) => respond(requestId, result, undefined, source)).catch((error) => {
+        const bridgeError = error instanceof MiniAppHostError ? error : null;
+        respond(requestId, undefined, {
+          code: bridgeError?.code ?? -32603,
+          message: error instanceof Error ? error.message : 'INJ Pass mini app request failed.',
+          data: bridgeError?.data,
+        }, source);
+      });
+    };
+
+    window.addEventListener('message', handleAgentAppMessage);
+    sendSession();
+    return () => {
+      window.removeEventListener('message', handleAgentAppMessage);
+      miniAppAgentWindowRef.current = null;
+    };
+  }, [address, isAuthenticated, keystore?.walletName, logout, miniAppAgentRun, selectedLanguageCode]);
 
   const refreshAccountDeletionStatus = async () => {
     if (!isAuthenticated || accountActionState === 'deleted') {
@@ -8440,6 +9044,44 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileOpen, profilePanel, preferenceSection, isAuthenticated]);
 
+  const updateWalletInviteCode = (value: string) => {
+    walletInviteValidationRequestRef.current += 1;
+    setWalletInviteCode(normalizeWalletInviteCode(value));
+    setWalletInviteValidation('idle');
+    setWalletInviteValidationMessage('');
+    setAuthError('');
+  };
+
+  const prepareWalletInviteCode = (includeInvite: boolean) => {
+    walletInviteValidationRequestRef.current += 1;
+    setWalletInviteCode(includeInvite ? readInviteCodeFromLocation() : '');
+    setWalletInviteValidation('idle');
+    setWalletInviteValidationMessage('');
+  };
+
+  const handleValidateWalletInvite = async () => {
+    const code = normalizeWalletInviteCode(walletInviteCode);
+    if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) {
+      setWalletInviteValidation('invalid');
+      setWalletInviteValidationMessage('Enter a valid 8-character INJ Pass invite code.');
+      return;
+    }
+
+    const requestId = ++walletInviteValidationRequestRef.current;
+    setWalletInviteValidation('checking');
+    setWalletInviteValidationMessage('Checking this invite code...');
+    const result = await validateInviteCode(code);
+    if (requestId !== walletInviteValidationRequestRef.current) return;
+
+    if (result.valid) {
+      setWalletInviteValidation('valid');
+      setWalletInviteValidationMessage('Invite code applied. Referral rewards will be added after registration.');
+    } else {
+      setWalletInviteValidation('invalid');
+      setWalletInviteValidationMessage('This invite code is not valid. Check it or skip this step.');
+    }
+  };
+
   const openTraditionalWalletWizard = (mode: TraditionalWalletWizardMode) => {
     setWalletSetupMethod('traditional');
     setTraditionalWalletWizardMode(mode);
@@ -8448,6 +9090,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setNewWalletPassword('');
     setNewWalletPasswordConfirm('');
     setRecoveryMnemonic('');
+    setPreparedMnemonicWallet(mode === 'create' ? prepareLocalWalletSetup() : null);
+    prepareWalletInviteCode(mode === 'create');
     setAuthError('');
     setOrphanWalletAddress(null);
     setAuthMenuOpen(false);
@@ -8462,6 +9106,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setNewWalletPassword('');
     setNewWalletPasswordConfirm('');
     setRecoveryMnemonic('');
+    setPreparedMnemonicWallet(null);
+    prepareWalletInviteCode(true);
     setAuthError('');
     setOrphanWalletAddress(null);
     setAuthMenuOpen(false);
@@ -8477,6 +9123,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setNewWalletPassword('');
     setNewWalletPasswordConfirm('');
     setRecoveryMnemonic('');
+    setPreparedMnemonicWallet(null);
+    prepareWalletInviteCode(false);
     setAuthError('');
   };
 
@@ -8488,8 +9136,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
     try {
       const walletName = newWalletName.trim() || 'My INJ Pass';
+      const preparedMnemonic = preparedMnemonicWallet?.mnemonic;
       if (newWalletPassword !== newWalletPasswordConfirm) {
         throw new Error('The two wallet passwords do not match.');
+      }
+      if (traditionalWalletWizardMode === 'create' && !preparedMnemonic) {
+        throw new Error('The wallet address preview expired. Close this window and start again.');
       }
       const result = traditionalWalletWizardMode === 'recover'
         ? await importMnemonicWallet({
@@ -8497,7 +9149,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           password: newWalletPassword,
           walletName,
         })
-        : await completeLocalWalletSetup({ password: newWalletPassword, walletName });
+        : await completeLocalWalletSetup({
+          password: newWalletPassword,
+          walletName,
+          mnemonic: preparedMnemonic,
+        });
       const createdWallet = loadWallet();
       if (!createdWallet) {
         throw new Error('The encrypted wallet was saved, but its local metadata could not be loaded.');
@@ -8506,6 +9162,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         privateKey: result.privateKey,
         walletAddress: result.address,
         walletName,
+        inviteCode: traditionalWalletWizardMode === 'create' && walletInviteValidation === 'valid'
+          ? walletInviteCode
+          : undefined,
       });
       unlockWithWalletKey(result.privateKey, createdWallet);
       setMnemonicWords(result.mnemonicForBackup.split(/\s+/));
@@ -8518,6 +9177,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setNewWalletPassword('');
       setNewWalletPasswordConfirm('');
       setRecoveryMnemonic('');
+      setPreparedMnemonicWallet(null);
+      prepareWalletInviteCode(false);
       setTraditionalWalletWizardStep(0);
       setLocalWallets(loadWallets());
     } catch (error) {
@@ -8539,7 +9200,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setPrfDetection(detection);
       // Detection is advisory only. The authenticator selected in the actual
       // WebAuthn ceremony is the source of truth for PRF support.
-      const result = await createPrfWallet(walletName);
+      const result = await createPrfWallet(
+        walletName,
+        walletInviteValidation === 'valid' ? walletInviteCode : undefined,
+      );
       const createdWallet = loadWallet();
       if (!createdWallet) {
         throw new Error('The Passkey wallet was created but its local metadata could not be loaded.');
@@ -8550,6 +9214,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setTraditionalWalletWizardOpen(false);
       setAuthMenuOpen(false);
       setNewWalletName('');
+      prepareWalletInviteCode(false);
       setLocalWallets(loadWallets());
     } catch (error) {
       if (error instanceof PrfUnsupportedError) {
@@ -8561,6 +9226,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         setTraditionalWalletWizardStep(0);
         setNewWalletPassword('');
         setNewWalletPasswordConfirm('');
+        setPreparedMnemonicWallet(prepareLocalWalletSetup());
         setAuthError(
           'This authenticator does not support secure Passkey PRF. Continue with the Traditional wallet option to create a recoverable 24-word wallet protected by a local password.',
         );
@@ -8585,32 +9251,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setAuthMenuOpen(false);
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Failed to enter this wallet.');
-    } finally {
-      setAuthPendingAction(null);
-    }
-  };
-
-  const handleEnterPasskey = async () => {
-    if (authPendingAction) return;
-    setAuthPendingAction('enter');
-    setAuthError('');
-
-    try {
-      // A single discoverable ceremony auto-detects PRF wallets and only falls
-      // back to legacy sha256 derivation for an existing matching wallet.
-      const recovered = await recoverWallet();
-      const recoveredWallet = loadWallet();
-      if (!recoveredWallet) {
-        throw new Error('The Passkey was verified but the wallet could not be recovered.');
-      }
-      unlockWithWalletKey(recovered.privateKey, {
-        ...recoveredWallet,
-        credentialId: recovered.credentialId,
-      });
-      setAuthMenuOpen(false);
-    } catch (error) {
-      setAuthMenuOpen(true);
-      setAuthError(error instanceof Error ? error.message : 'Failed to enter INJ Pass.');
     } finally {
       setAuthPendingAction(null);
     }
@@ -9288,7 +9928,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                                         : isLight ? 'border-black/8 hover:bg-black/5' : 'border-white/8 hover:bg-white/8'
                                     )}
                                   >
-                                    {plan.lam} LAM
+                                    <span className="block">{plan.lam} LAM</span>
+                                    <span className={cx('mt-0.5 block text-[10px] font-semibold', selectedLamPlanId === plan.planId ? 'opacity-70' : isLight ? 'text-black/42' : 'text-white/42')}>
+                                      {plan.inj} INJ
+                                    </span>
                                   </button>
                                 ))}
                               </div>
@@ -9937,21 +10580,24 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         ))}
                       </div>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => void handleEnterPasskey()}
-                      disabled={authPendingAction !== null}
-                      className={cx(
-                        'flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition disabled:opacity-55',
-                        isLight ? 'hover:bg-black/5' : 'hover:bg-white/8'
-                      )}
-                    >
-                      <span>
-                        <span className="block text-sm font-bold">Use another Passkey</span>
-                        <span className={cx('mt-0.5 block text-xs', isLight ? 'text-black/46' : 'text-white/46')}>Recover a wallet from a system Passkey</span>
-                      </span>
-                      <span className="text-xs font-semibold">{authPendingAction === 'enter' ? 'Opening...' : 'Enter'}</span>
-                    </button>
+                    {isAuthenticated && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          authMenuPinnedRef.current = false;
+                          setAuthMenuOpen(false);
+                          void logout();
+                        }}
+                        className={cx(
+                          'mt-1 flex w-full items-center justify-between rounded-xl border-t px-3 py-3 text-left text-sm font-bold transition',
+                          isLight
+                            ? 'border-black/8 text-rose-700 hover:bg-rose-50'
+                            : 'border-white/8 text-rose-300 hover:bg-rose-300/10',
+                        )}
+                      >
+                        <span>Disconnect</span>
+                      </button>
+                    )}
                     {authError && (
                       <p className={cx('mx-2 mt-2 px-1 pb-1 text-xs leading-5', isLight ? 'text-rose-700' : 'text-rose-200')}>
                         {authError}
@@ -9966,7 +10612,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           <div className="flex flex-1 flex-col px-4 pb-5 pt-32 sm:px-6 sm:pt-16">
             <div
               className={cx(
-                'relative isolate mx-auto flex w-full max-w-[1280px] flex-1 flex-col',
+                'relative isolate mx-auto flex w-full flex-1 flex-col',
+                activeChatSurface === 'mini-app' || activeChatSurface === 'dapp-market'
+                  ? 'max-w-[1440px]'
+                  : 'max-w-[1280px]',
                 hasActiveSession
                   ? cx(
                     'min-h-0 justify-start pt-4 sm:pt-7',
@@ -10042,6 +10691,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                             onSend={() => setAssetWalletView('send')}
                             onReceive={() => setAssetWalletView('receive')}
                             isLight={isLight}
+                            languageCode={selectedLanguageCode}
                             copy={copy}
                           />
                         )
@@ -10068,7 +10718,29 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                                         : isLight ? 'text-black' : 'text-white'
                                 )}
                               >
-                                {message.role === 'user' ? message.body : <MarkdownMessage body={message.body} isLight={isLight} />}
+                                {message.role === 'user' ? message.body : (
+                                  <>
+                                    <MarkdownMessage body={message.body} isLight={isLight} />
+                                    {!isAuthenticated && (
+                                      message.action === 'login'
+                                      || responseRequiresWalletLogin(message.body)
+                                    ) && (
+                                      <button
+                                        type="button"
+                                        onClick={handleLoginEntry}
+                                        className={cx(
+                                          'mt-4 inline-flex h-9 items-center gap-2 rounded-full border px-4 text-xs font-bold transition hover:-translate-y-0.5',
+                                          isLight
+                                            ? 'border-black/12 bg-white text-black hover:border-black/22 hover:bg-black/[0.025]'
+                                            : 'border-white/14 bg-white/[0.06] text-white hover:border-white/28 hover:bg-white/[0.1]',
+                                        )}
+                                      >
+                                        {copy.logIn}
+                                        <OpenAppIcon className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -10125,8 +10797,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                     <DAppMarketPanel
                       apps={dappMarketItems}
                       tabs={miniAppTabs}
-                      onOpenApp={openDApp}
-                      onCloseApp={closeMiniAppTab}
+                      activeTabId={activeMiniAppTabId}
+                      onOpenApp={openDAppFromMarket}
+                      onSelectTab={selectMiniAppTab}
+                      onCloseTab={closeMiniAppTab}
                       onAddApp={openNewMiniAppTab}
                       onDragStart={handleDAppDragStart}
                       onPointerDown={handleDAppPointerDown}
@@ -10154,6 +10828,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                     <MiniAppPanel
                       app={activeMiniApp}
                       tabs={miniAppTabs}
+                      activeTabId={activeMiniAppTabId}
                       manifest={activeMiniAppManifest}
                       src={miniAppUrl}
                       iframeKey={`${activeMiniApp.id}-${address || 'guest'}-${miniAppFrameNonce}`}
@@ -10163,8 +10838,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                       address={address}
                       walletName={keystore?.walletName}
                       isLight={isLight}
-                      onSelectApp={openDApp}
-                      onCloseApp={closeMiniAppTab}
+                      onSelectTab={selectMiniAppTab}
+                      onCloseTab={closeMiniAppTab}
                       onAddApp={openNewMiniAppTab}
                       onNavigate={navigateMiniApp}
                       onOpenWallet={() => {
@@ -10439,7 +11114,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                     role="listbox"
                     aria-label={composerTrigger.symbol === '@' ? 'Application suggestions' : composerTrigger.symbol === '#' ? 'Skill suggestions' : 'Asset suggestions'}
                     className={cx(
-                      'inj-liquid-menu absolute left-10 top-[calc(100%+12px)] z-[80] max-h-[360px] w-[min(390px,calc(100vw-3rem))] overflow-y-auto rounded-2xl border p-1.5 shadow-2xl',
+                      'inj-liquid-menu absolute left-10 z-[80] max-h-[360px] w-[min(390px,calc(100vw-3rem))] overflow-y-auto rounded-2xl border p-1.5 shadow-2xl',
+                      isCreativeBuildSession || hasActiveSession
+                        ? 'bottom-[calc(100%+12px)]'
+                        : 'top-[calc(100%+12px)]',
                       isLight ? 'border-black/10 bg-white text-black shadow-black/16' : 'border-white/12 bg-[#19191c] text-white shadow-black/55'
                     )}
                   >
@@ -10690,11 +11368,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 </div>
               )}
               {!hasActiveSession && (activeMode === 'creative' || activeChatSurface === 'default') && (
-                <div className={cx('mx-auto mt-4 w-full max-w-3xl gap-2', activeMode === 'chat' ? 'grid grid-cols-5' : 'flex flex-wrap justify-center')}>
+                <div className="mx-auto mt-4 grid w-full max-w-3xl grid-cols-5 gap-2">
                   {(activeMode === 'chat' ? visibleChatShortcuts : creativeShortcutsByLanguage[selectedLanguageCode]).map((shortcut) => (
                     <button
                       key={shortcut}
                       type="button"
+                      title={shortcut}
                       onClick={() => {
                         if (activeMode === 'creative') {
                           startCreativeFromShortcut(shortcut);
@@ -10708,7 +11387,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                       }}
                       className={cx(
                         'inline-flex min-h-9 items-center rounded-full border text-xs font-semibold transition',
-                        activeMode === 'chat' ? 'min-w-0 justify-center overflow-hidden px-2' : 'shrink-0 whitespace-nowrap px-3',
+                        'min-w-0 justify-center overflow-hidden px-2',
                         activeMode === 'chat' && shortcut === newUserGuideLabelByLanguage[selectedLanguageCode]
                           ? isLight
                             ? 'border-violet-300 bg-violet-50 text-violet-700 hover:border-violet-400'
@@ -10718,7 +11397,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                             : 'border-white/10 bg-white/[0.04] text-white/62 hover:text-white'
                       )}
                     >
-                      <span className={cx(activeMode === 'chat' && 'min-w-0 truncate')}>{shortcut}</span>
+                      <span className="min-w-0 truncate">{shortcut}</span>
                     </button>
                   ))}
                 </div>
@@ -10743,6 +11422,18 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           </div>
         </section>
       </div>
+      {miniAppAgentRun && (
+        <iframe
+          key={miniAppAgentRun.id}
+          ref={miniAppAgentIframeRef}
+          src={miniAppAgentRun.src}
+          title={`${miniAppAgentRun.manifest.name} AgentOS command runner`}
+          allow="clipboard-read; clipboard-write; publickey-credentials-get; publickey-credentials-create"
+          aria-hidden="true"
+          tabIndex={-1}
+          className="pointer-events-none fixed -left-[10000px] top-0 h-px w-px border-0 opacity-0"
+        />
+      )}
       <WalletSetupWizard
         open={traditionalWalletWizardOpen}
         method={walletSetupMethod}
@@ -10752,6 +11443,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         password={newWalletPassword}
         passwordConfirm={newWalletPasswordConfirm}
         recoveryMnemonic={recoveryMnemonic}
+        preparedWalletAddress={preparedMnemonicWallet?.address || null}
+        inviteCode={walletInviteCode}
+        inviteValidation={walletInviteValidation}
+        inviteValidationMessage={walletInviteValidationMessage}
         busy={authPendingAction === 'create'}
         error={authError}
         prfDetection={prfDetection}
@@ -10761,6 +11456,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         onPassword={setNewWalletPassword}
         onPasswordConfirm={setNewWalletPasswordConfirm}
         onRecoveryMnemonic={setRecoveryMnemonic}
+        onInviteCode={updateWalletInviteCode}
+        onValidateInvite={() => void handleValidateWalletInvite()}
         onClearError={() => setAuthError('')}
         onClose={closeTraditionalWalletWizard}
         onSubmit={() => void (
@@ -10797,6 +11494,18 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         onPasswordChange={setLocalUnlockPassword}
         onSubmit={() => void submitLocalWalletUnlock()}
         onClose={() => closeLocalWalletUnlock()}
+        onRecoverOrphan={() => {
+          const walletToRecover = localUnlockWallet;
+          if (!walletToRecover) return;
+          localUnlockResolverRef.current?.reject(new Error(''));
+          localUnlockResolverRef.current = null;
+          setLocalUnlockWallet(null);
+          setLocalUnlockPassword('');
+          setLocalUnlockError('');
+          setLocalUnlockBusy(false);
+          openTraditionalWalletWizard('recover');
+          setNewWalletName(walletToRecover.walletName || 'My INJ Pass');
+        }}
         onRemoveOrphan={() => {
           if (!orphanWalletAddress) return;
           deleteWalletByAddress(orphanWalletAddress);

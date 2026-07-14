@@ -60,6 +60,28 @@ export const MINI_APP_MANIFESTS: readonly MiniAppManifest[] = [
     permissions: ['accounts', 'read', 'sign', 'transactions'],
     allowedContracts: [INJ_GIFT_CONTRACT],
   },
+  {
+    appId: 'bankrupt-elon-musk',
+    slug: 'bankrupt-elon-musk',
+    name: 'Bankrupt Elon Musk',
+    developmentUrl: process.env.NEXT_PUBLIC_BANKRUPT_ELON_APP_URL || 'http://localhost:3003',
+    productionUrl: process.env.NEXT_PUBLIC_BANKRUPT_ELON_APP_URL || 'https://bankrupt-elon-musk.vercel.app',
+    networkName: NETWORK_CONFIG.mainnet.name,
+    chainId: NETWORK_CONFIG.mainnet.chainId,
+    rpcUrl: NETWORK_CONFIG.mainnet.rpcUrl,
+    permissions: ['accounts', 'read', 'sign'],
+  },
+  {
+    appId: 'omisper',
+    slug: 'omisper',
+    name: 'Omisper',
+    developmentUrl: process.env.NEXT_PUBLIC_OMISPER_APP_URL || 'http://localhost:5173',
+    productionUrl: process.env.NEXT_PUBLIC_OMISPER_APP_URL || 'https://omisper.vercel.app',
+    networkName: NETWORK_CONFIG.mainnet.name,
+    chainId: NETWORK_CONFIG.mainnet.chainId,
+    rpcUrl: NETWORK_CONFIG.mainnet.rpcUrl,
+    permissions: ['accounts', 'read', 'sign'],
+  },
 ];
 
 export function getMiniAppManifest(appId: string): MiniAppManifest | null {
@@ -77,15 +99,17 @@ function isValidHttpUrl(value: string | null | undefined): value is string {
 }
 
 /**
- * The base URL used to embed the mini app. A valid `baseOverride` (e.g. the
- * dApp directory record's `url` coming from the backend/database) wins so the
- * embed follows the deployed domain; otherwise we fall back to the manifest.
+ * The base URL used to embed the mini app. Registered apps use their local
+ * development origin while INJ Pass is running in development, so connector
+ * changes can be tested end to end. Production follows the dApp directory URL
+ * when present and otherwise uses the manifest fallback.
  */
 export function resolveMiniAppBase(manifest: MiniAppManifest, baseOverride?: string): string {
+  if (process.env.NODE_ENV === 'development' && manifest.developmentUrl) {
+    return manifest.developmentUrl;
+  }
   if (isValidHttpUrl(baseOverride)) return baseOverride;
-  return process.env.NODE_ENV === 'development' && manifest.developmentUrl
-    ? manifest.developmentUrl
-    : manifest.productionUrl;
+  return manifest.productionUrl;
 }
 
 export function resolveMiniAppUrl(manifest: MiniAppManifest, path?: string, baseOverride?: string): string {

@@ -21,6 +21,12 @@ export interface LocalKeystore {
   createdAt: number; // Unix timestamp
   walletName?: string; // Display name for the wallet
   encryptedMnemonic?: string; // Present only until a new wallet completes backup verification
+  /**
+   * Password-encrypted local mnemonic vault serialized as JSON. This mirrors
+   * the IndexedDB copy so a browser storage migration cannot orphan the
+   * wallet list entry from its encrypted key material.
+   */
+  encryptedMnemonicVault?: string;
   mnemonicBackedUpAt?: number;
   mnemonicBackupConfirmed?: boolean;
 }

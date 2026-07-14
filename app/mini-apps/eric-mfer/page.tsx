@@ -135,8 +135,8 @@ function shortAddress(value: string) {
 
 function friendlyError(error: unknown) {
   const message = error instanceof Error ? error.message : 'Mint failed. Please try again.';
-  if (/insufficient mint credits/i.test(message)) {
-    return 'This wallet has used its complimentary mint and has no remaining mint credits.';
+  if (/insufficient mint credits|complimentary mint|already.*mint|only one eric mfer/i.test(message)) {
+    return 'This INJ Pass account has already minted its eric mfer.';
   }
   if (/unlock|locked/i.test(message)) {
     return 'Unlock this INJ Pass wallet to approve the mint.';

@@ -531,7 +531,7 @@ async function mintCatNFTWithVoucherEndpoint(
     body: JSON.stringify({
       tokenId: tokenId.toString(),
       txHash: hash,
-      ownerAddress: account.address,
+      ownerAddress: voucherPayload.voucher.to,
       source: endpoint === 'sponsored-mint-voucher' ? 'eric-mfer' : 'frontend',
     }),
   });

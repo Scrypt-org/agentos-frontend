@@ -8,6 +8,7 @@ export interface MiniAppManifest {
   appId: string;
   slug: string;
   name: string;
+  sameOrigin?: boolean;
   developmentUrl?: string;
   productionUrl: string;
   entryPath?: string;
@@ -37,6 +38,7 @@ export const MINI_APP_MANIFESTS: readonly MiniAppManifest[] = [
     appId: 'eric-mfer',
     slug: 'eric-mfer',
     name: 'eric mfer',
+    sameOrigin: true,
     developmentUrl: process.env.NEXT_PUBLIC_INJ_PASS_APP_URL || 'http://localhost:3000',
     productionUrl: 'https://injpass.com',
     entryPath: '/mini-apps/eric-mfer',
@@ -98,6 +100,10 @@ function isValidHttpUrl(value: string | null | undefined): value is string {
   }
 }
 
+function getBrowserOrigin(): string | undefined {
+  return typeof window !== 'undefined' ? window.location.origin : undefined;
+}
+
 /**
  * The base URL used to embed the mini app. Registered apps use their local
  * development origin while INJ Pass is running in development, so connector
@@ -105,6 +111,10 @@ function isValidHttpUrl(value: string | null | undefined): value is string {
  * when present and otherwise uses the manifest fallback.
  */
 export function resolveMiniAppBase(manifest: MiniAppManifest, baseOverride?: string): string {
+  const browserOrigin = getBrowserOrigin();
+  if (manifest.sameOrigin && browserOrigin) {
+    return browserOrigin;
+  }
   if (process.env.NODE_ENV === 'development' && manifest.developmentUrl) {
     return manifest.developmentUrl;
   }
@@ -127,7 +137,9 @@ export function isAllowedMiniAppOrigin(
   origin: string,
   baseOverride?: string,
 ): boolean {
+  const browserOrigin = getBrowserOrigin();
   const allowed = [
+    manifest.sameOrigin ? browserOrigin : undefined,
     isValidHttpUrl(baseOverride) ? baseOverride : undefined,
     manifest.productionUrl,
     manifest.developmentUrl,

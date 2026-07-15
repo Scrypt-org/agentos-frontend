@@ -79,6 +79,16 @@ export interface CatMintCredits {
   walletAddress: string | null;
 }
 
+export async function waitForCatNftSponsorship(
+  hash: Hash,
+  waitForReceipt: (request: { hash: Hash }) => Promise<{ status: string }>,
+): Promise<void> {
+  const receipt = await waitForReceipt({ hash });
+  if (receipt.status !== 'success') {
+    throw new Error('CatNFT gas sponsorship transaction reverted. The mint was not submitted.');
+  }
+}
+
 const CATNFT_ABI = [
   {
     inputs: [],
@@ -556,6 +566,15 @@ async function mintCatNFTWithVoucherEndpoint(
     sponsoredWei?: string;
     sponsorshipTxHash?: Hash;
   };
+
+  if (voucherPayload.sponsorshipTxHash) {
+    await waitForCatNftSponsorship(
+      voucherPayload.sponsorshipTxHash,
+      ({ hash: sponsorshipHash }) => client.waitForTransactionReceipt({
+        hash: sponsorshipHash,
+      }),
+    );
+  }
 
   const hash = await walletClient.writeContract({
     address: contractAddress,

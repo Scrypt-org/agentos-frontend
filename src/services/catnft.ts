@@ -100,6 +100,7 @@ interface IndexedCatNFTOwnership {
 interface IndexedCatNFTOptions {
   fetchImpl?: typeof fetch;
   loadDetails?: (tokenId: bigint) => Promise<CatNFT | null>;
+  onIndexed?: (items: CatNFT[]) => void;
 }
 
 export async function waitForCatNftSponsorship(
@@ -494,6 +495,8 @@ export async function getIndexedCatNFTsForOwner(
             : {}),
         };
       });
+
+    options.onIndexed?.(indexedItems);
 
     const enriched = await Promise.all(indexedItems.map(async (indexed) => {
       try {

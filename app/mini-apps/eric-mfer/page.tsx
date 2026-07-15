@@ -9,6 +9,7 @@ import {
   getCatCollectionInfo,
   getCatNFTDetails,
   getCatNFTsForOwner,
+  getIndexedCatNFTsForOwner,
   type CatCollectionInfo,
   type CatNFT,
 } from '@/services/catnft';
@@ -16,6 +17,7 @@ import {
   getInitialEricMferLanguage,
   waitForMintedCatNFT,
 } from '@/services/eric-mfer-mint';
+import { resolveSelectedTokenId } from '@/services/eric-mfer-gallery';
 import {
   InjPassMiniAppConnector,
   type InjPassMiniAppSession,
@@ -171,9 +173,11 @@ export default function EricMferMiniAppPage() {
   const { theme } = useTheme();
   const isLight = theme === 'light';
   const connectorRef = useRef<InjPassMiniAppConnector | null>(null);
+  const ownershipRequestRef = useRef(0);
   const [session, setSession] = useState<InjPassMiniAppSession | null>(null);
   const [collection, setCollection] = useState<CatCollectionInfo | null>(null);
   const [ownedNFTs, setOwnedNFTs] = useState<CatNFT[]>([]);
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [isEmbedded, setIsEmbedded] = useState(false);
   const [loadingCollection, setLoadingCollection] = useState(true);
   const [mintPhase, setMintPhase] = useState<MintPhase>('idle');
@@ -184,22 +188,68 @@ export default function EricMferMiniAppPage() {
   const minting = mintPhase === 'submitting' || mintPhase === 'discovering';
 
   const refreshCollection = useCallback(async (owner?: string | null) => {
+    const requestId = ++ownershipRequestRef.current;
     setLoadingCollection(true);
+
+    const collectionPromise = getCatCollectionInfo()
+      .then((nextCollection) => {
+        if (ownershipRequestRef.current === requestId) {
+          setCollection(nextCollection);
+        }
+        return nextCollection;
+      })
+      .catch((error) => {
+        if (ownershipRequestRef.current === requestId) {
+          setNotice(friendlyError(error));
+        }
+        return null;
+      })
+      .finally(() => {
+        if (ownershipRequestRef.current === requestId) {
+          setLoadingCollection(false);
+        }
+      });
+
+    if (!owner) {
+      setOwnedNFTs([]);
+      const nextCollection = await collectionPromise;
+      return { collection: nextCollection, ownedNFTs: [] };
+    }
+
     try {
-      const [nextCollection, nextOwned] = await Promise.all([
-        getCatCollectionInfo(),
-        owner ? getCatNFTsForOwner(owner as Address) : Promise.resolve([]),
-      ]);
-      setCollection(nextCollection);
-      setOwnedNFTs(nextOwned);
-      return { collection: nextCollection, ownedNFTs: nextOwned };
+      const address = owner as Address;
+      const indexedOwned = await getIndexedCatNFTsForOwner(address, {
+        onIndexed: (items) => {
+          if (ownershipRequestRef.current === requestId) {
+            setOwnedNFTs(items);
+          }
+        },
+      });
+      if (ownershipRequestRef.current !== requestId) return null;
+      if (indexedOwned.length > 0) setOwnedNFTs(indexedOwned);
+
+      const chainOwned = await getCatNFTsForOwner(address);
+      if (ownershipRequestRef.current !== requestId) return null;
+      if (chainOwned.length > 0 || indexedOwned.length === 0) {
+        setOwnedNFTs(chainOwned);
+      }
+
+      const nextCollection = await collectionPromise;
+      return {
+        collection: nextCollection,
+        ownedNFTs: chainOwned.length > 0 ? chainOwned : indexedOwned,
+      };
     } catch (error) {
-      setNotice(friendlyError(error));
+      if (ownershipRequestRef.current === requestId) {
+        setNotice(friendlyError(error));
+      }
       return null;
-    } finally {
-      setLoadingCollection(false);
     }
   }, []);
+
+  useEffect(() => {
+    setSelectedTokenId((current) => resolveSelectedTokenId(ownedNFTs, current));
+  }, [ownedNFTs]);
 
   useEffect(() => {
     setLocalLanguage(readBrowserLanguage());
@@ -282,7 +332,7 @@ export default function EricMferMiniAppPage() {
     }
   };
 
-  const previewNFT = ownedNFTs[0];
+  const previewNFT = ownedNFTs.find((nft) => nft.tokenId === selectedTokenId) ?? ownedNFTs[0];
   const language = normalizeLanguage(session?.language || localLanguage);
   const statusCopy = collectionStatusCopy[language];
   const supply = collection
@@ -312,7 +362,47 @@ export default function EricMferMiniAppPage() {
             sizes="(max-width: 1024px) 100vw, 46vw"
             className="object-cover"
           />
-          <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/70 to-transparent" />
+          {ownedNFTs.length > 0 && (
+            <div className="absolute left-5 top-5 z-20 rounded-full border border-white/18 bg-black/52 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-md">
+              Owned · {ownedNFTs.length}
+            </div>
+          )}
+          <div className={ownedNFTs.length > 1
+            ? 'absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/88 via-black/42 to-transparent'
+            : 'absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/70 to-transparent'} />
+          {ownedNFTs.length > 1 && (
+            <div className="absolute inset-x-0 bottom-[76px] z-20 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex w-max snap-x snap-mandatory gap-2.5">
+                {ownedNFTs.map((nft) => {
+                  const selected = nft.tokenId === previewNFT?.tokenId;
+                  return (
+                    <button
+                      key={`${nft.contractAddress}:${nft.tokenId}`}
+                      type="button"
+                      onClick={() => setSelectedTokenId(nft.tokenId)}
+                      aria-label={`View ${nft.name}`}
+                      aria-pressed={selected}
+                      className={selected
+                        ? 'group relative h-[72px] w-[72px] shrink-0 snap-start overflow-hidden rounded-lg border-2 border-violet-300 bg-[#ded4f3] shadow-[0_0_0_2px_rgba(139,92,246,0.32),0_10px_30px_rgba(0,0,0,0.34)] transition'
+                        : 'group relative h-[72px] w-[72px] shrink-0 snap-start overflow-hidden rounded-lg border border-white/24 bg-[#ded4f3] opacity-72 transition hover:opacity-100'}
+                    >
+                      <Image
+                        src={nft.image || '/eric-mfer.png'}
+                        alt=""
+                        fill
+                        unoptimized={Boolean(nft.image)}
+                        sizes="72px"
+                        className="object-cover transition duration-300 group-hover:scale-[1.04]"
+                      />
+                      <span className="absolute bottom-1 right-1 rounded bg-black/72 px-1.5 py-0.5 font-mono text-[9px] font-bold text-white backdrop-blur-sm">
+                        #{nft.tokenId.padStart(3, '0')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4 text-white">
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/62">CC0 tribute collection</div>

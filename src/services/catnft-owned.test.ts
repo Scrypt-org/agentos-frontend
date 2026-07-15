@@ -29,6 +29,32 @@ function detail(tokenId: string, detailOwner = owner): CatNFT {
 }
 
 describe('getIndexedCatNFTsForOwner', () => {
+  it('publishes database cards before chain detail enrichment completes', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(indexedResponse([
+      { tokenId: '8', ownerAddress: owner, txHash: `0x${'8'.repeat(64)}`, name: 'Indexed #008' },
+    ]));
+    let releaseDetails!: (value: CatNFT) => void;
+    const loadDetails = vi.fn(() => new Promise<CatNFT>((resolve) => {
+      releaseDetails = resolve;
+    }));
+    const onIndexed = vi.fn();
+
+    const resultPromise = getIndexedCatNFTsForOwner(owner, {
+      fetchImpl,
+      loadDetails,
+      onIndexed,
+    });
+    await vi.waitFor(() => expect(onIndexed).toHaveBeenCalledTimes(1));
+    expect(onIndexed.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ tokenId: '8', name: 'Indexed #008' }),
+    ]);
+
+    releaseDetails(detail('8'));
+    await expect(resultPromise).resolves.toEqual([
+      expect.objectContaining({ tokenId: '8', name: 'Chain mfer #008' }),
+    ]);
+  });
+
   it('enriches indexed token IDs in parallel and preserves backend ordering', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(indexedResponse([
       { tokenId: '8', ownerAddress: owner, txHash: `0x${'8'.repeat(64)}`, name: 'Indexed #008' },

@@ -52,6 +52,26 @@ export interface CatMintResult {
   gasSponsored?: boolean;
   sponsoredWei?: string;
   sponsorshipTxHash?: Hash;
+  recordSynced: boolean;
+  recordSyncWarning?: string;
+}
+
+export interface CatMintRecordPayload {
+  tokenId: string;
+  txHash: Hash;
+  ownerAddress: Address;
+  source: string;
+}
+
+interface CatMintRecordSyncOptions {
+  attempts?: number;
+  delay?: (milliseconds: number) => Promise<void>;
+  fetchImpl?: typeof fetch;
+}
+
+export interface CatMintRecordSyncResult {
+  recordSynced: boolean;
+  recordSyncWarning?: string;
 }
 
 export interface CatMintCredits {
@@ -189,6 +209,47 @@ function getAuthHeaders(): HeadersInit {
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+const wait = (milliseconds: number) => new Promise<void>((resolve) => {
+  setTimeout(resolve, milliseconds);
+});
+
+export async function syncCatMintRecord(
+  payload: CatMintRecordPayload,
+  options: CatMintRecordSyncOptions = {},
+): Promise<CatMintRecordSyncResult> {
+  const attempts = Math.max(1, options.attempts ?? 3);
+  const delay = options.delay ?? wait;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  let lastError = 'Unable to persist the mint record.';
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(`${API_BASE_URL}/catnft/mint-record`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) return { recordSynced: true };
+
+      const responsePayload = await response.json().catch(() => ({})) as { message?: unknown };
+      lastError = typeof responsePayload.message === 'string'
+        ? responsePayload.message
+        : `Failed to persist mint record (${response.status})`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : lastError;
+    }
+
+    if (attempt < attempts - 1) {
+      await delay(Math.min(750 * (attempt + 1), 2_000));
+    }
+  }
+
+  return {
+    recordSynced: false,
+    recordSyncWarning: `The NFT was minted on-chain, but its INJ Pass record is still syncing: ${lastError}`,
   };
 }
 
@@ -525,26 +586,12 @@ async function mintCatNFTWithVoucherEndpoint(
     throw new Error('Mint transaction succeeded but no CatNFT Minted event was found. Check the contract address and network.');
   }
 
-  const recordResponse = await fetch(`${API_BASE_URL}/catnft/mint-record`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({
-      tokenId: tokenId.toString(),
-      txHash: hash,
-      ownerAddress: voucherPayload.voucher.to,
-      source: endpoint === 'sponsored-mint-voucher' ? 'eric-mfer' : 'frontend',
-    }),
+  const recordSync = await syncCatMintRecord({
+    tokenId: tokenId.toString(),
+    txHash: hash,
+    ownerAddress: voucherPayload.voucher.to,
+    source: endpoint === 'sponsored-mint-voucher' ? 'eric-mfer' : 'frontend',
   });
-
-  if (!recordResponse.ok) {
-    const payload = await recordResponse.json().catch(() => ({}));
-    const message = typeof payload?.message === 'string'
-      ? payload.message
-      : `Failed to persist mint record (${recordResponse.status})`;
-    throw new Error(
-      `Mint transaction succeeded (${hash}), but backend record failed: ${message}`,
-    );
-  }
 
   return {
     hash,
@@ -552,6 +599,7 @@ async function mintCatNFTWithVoucherEndpoint(
     gasSponsored: voucherPayload.gasSponsored,
     sponsoredWei: voucherPayload.sponsoredWei,
     sponsorshipTxHash: voucherPayload.sponsorshipTxHash,
+    ...recordSync,
   };
 }
 

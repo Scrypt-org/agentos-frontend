@@ -7,10 +7,15 @@ import { formatEther, type Address, type Hash } from 'viem';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   getCatCollectionInfo,
+  getCatNFTDetails,
   getCatNFTsForOwner,
   type CatCollectionInfo,
   type CatNFT,
 } from '@/services/catnft';
+import {
+  getInitialEricMferLanguage,
+  waitForMintedCatNFT,
+} from '@/services/eric-mfer-mint';
 import {
   InjPassMiniAppConnector,
   type InjPassMiniAppSession,
@@ -22,12 +27,17 @@ interface MintResponse {
   gasSponsored?: boolean;
   sponsoredWei?: string;
   sponsorshipTxHash?: Hash;
+  recordSynced?: boolean;
+  recordSyncWarning?: string;
 }
 
 interface MintCelebration {
   result: MintResponse;
   nft: CatNFT | null;
+  timedOut: boolean;
 }
+
+type MintPhase = 'idle' | 'submitting' | 'discovering' | 'complete' | 'partial' | 'failed';
 
 type EricMferLanguage = 'en' | 'de' | 'fr' | 'ko' | 'ja' | 'zh-Hans' | 'zh-Hant';
 
@@ -122,8 +132,7 @@ function normalizeLanguage(value?: string | null): EricMferLanguage {
   return 'en';
 }
 
-function readInitialLanguage(): EricMferLanguage {
-  if (typeof window === 'undefined') return 'en';
+function readBrowserLanguage(): EricMferLanguage {
   const stored = window.localStorage.getItem('injpass_language');
   if (stored) return normalizeLanguage(stored);
   return normalizeLanguage(window.navigator.language);
@@ -167,11 +176,12 @@ export default function EricMferMiniAppPage() {
   const [ownedNFTs, setOwnedNFTs] = useState<CatNFT[]>([]);
   const [isEmbedded, setIsEmbedded] = useState(false);
   const [loadingCollection, setLoadingCollection] = useState(true);
-  const [minting, setMinting] = useState(false);
+  const [mintPhase, setMintPhase] = useState<MintPhase>('idle');
   const [mintResult, setMintResult] = useState<MintResponse | null>(null);
   const [mintCelebration, setMintCelebration] = useState<MintCelebration | null>(null);
   const [notice, setNotice] = useState('');
-  const [initialLanguage] = useState<EricMferLanguage>(readInitialLanguage);
+  const [localLanguage, setLocalLanguage] = useState<EricMferLanguage>(getInitialEricMferLanguage);
+  const minting = mintPhase === 'submitting' || mintPhase === 'discovering';
 
   const refreshCollection = useCallback(async (owner?: string | null) => {
     setLoadingCollection(true);
@@ -189,6 +199,10 @@ export default function EricMferMiniAppPage() {
     } finally {
       setLoadingCollection(false);
     }
+  }, []);
+
+  useEffect(() => {
+    setLocalLanguage(readBrowserLanguage());
   }, []);
 
   useEffect(() => {
@@ -227,32 +241,49 @@ export default function EricMferMiniAppPage() {
       return;
     }
 
-    setMinting(true);
+    setMintPhase('submitting');
     setNotice('INJ Pass is sponsoring gas and preparing your mint.');
     setMintResult(null);
+    setMintCelebration(null);
     try {
       const result = await connector.getEthereumProvider().request({
         method: 'injpass_mintCatNft',
         params: [],
       }) as MintResponse;
       setMintResult(result);
-      setNotice(result.gasSponsored
-        ? 'Mint complete. INJ Pass sponsored the network fee.'
-        : 'Mint complete.');
-      const snapshot = await refreshCollection(session.address);
-      const mintedNFT = result.tokenId
-        ? snapshot?.ownedNFTs.find((nft) => nft.tokenId === result.tokenId) || null
-        : null;
-      setMintCelebration({ result, nft: mintedNFT });
+      setMintPhase('discovering');
+      setNotice('Transaction confirmed. Waiting for your NFT artwork and ownership record.');
+
+      const discovery = result.tokenId
+        ? await waitForMintedCatNFT({
+            tokenId: result.tokenId,
+            owner: session.address as Address,
+            loadDetails: getCatNFTDetails,
+            loadOwned: getCatNFTsForOwner,
+          })
+        : { nft: null, ownedNFTs: [], timedOut: true };
+
+      setOwnedNFTs(discovery.ownedNFTs);
+      const nextCollection = await getCatCollectionInfo().catch(() => null);
+      if (nextCollection) setCollection(nextCollection);
+
+      const syncWarning = result.recordSyncWarning ? ` ${result.recordSyncWarning}` : '';
+      if (discovery.timedOut) {
+        setMintPhase('partial');
+        setNotice(`Mint confirmed. The NFT artwork is still synchronizing; use the transaction link as proof.${syncWarning}`);
+      } else {
+        setMintPhase('complete');
+        setNotice(`${result.gasSponsored ? 'Mint complete. INJ Pass sponsored the network fee.' : 'Mint complete.'}${syncWarning}`);
+      }
+      setMintCelebration({ result, nft: discovery.nft, timedOut: discovery.timedOut });
     } catch (error) {
+      setMintPhase('failed');
       setNotice(friendlyError(error));
-    } finally {
-      setMinting(false);
     }
   };
 
   const previewNFT = ownedNFTs[0];
-  const language = normalizeLanguage(session?.language || initialLanguage);
+  const language = normalizeLanguage(session?.language || localLanguage);
   const statusCopy = collectionStatusCopy[language];
   const supply = collection
     ? `${collection.totalMinted} / ${collection.maxSupply}`
@@ -370,11 +401,13 @@ export default function EricMferMiniAppPage() {
               : 'relative z-10 w-full max-w-lg rounded-lg border border-white/12 bg-[#151219] p-6 text-center shadow-[0_28px_90px_rgba(0,0,0,0.62)] motion-safe:animate-[injFadeUp_420ms_cubic-bezier(0.22,1,0.36,1)_both] sm:p-8'}
           >
             <div className={isLight ? 'text-[10px] font-bold uppercase tracking-[0.22em] text-violet-700' : 'text-[10px] font-bold uppercase tracking-[0.22em] text-violet-300'}>
-              Mint complete
+              {mintCelebration.timedOut ? 'Mint confirmed' : 'Mint complete'}
             </div>
             <h2 id="mint-congratulations-title" className="mt-3 text-3xl font-semibold">Congratulations</h2>
             <p className={isLight ? 'mt-2 text-sm text-black/52' : 'mt-2 text-sm text-white/52'}>
-              This eric mfer now belongs to your INJ Pass wallet.
+              {mintCelebration.timedOut
+                ? 'Ownership is confirmed on-chain. The NFT artwork is still synchronizing.'
+                : 'This eric mfer now belongs to your INJ Pass wallet.'}
             </p>
 
             <div className={isLight ? 'mx-auto mt-6 w-full max-w-[280px] rounded-lg border border-black/8 bg-white p-3' : 'mx-auto mt-6 w-full max-w-[280px] rounded-lg border border-white/10 bg-white/[0.035] p-3'}>
@@ -407,6 +440,11 @@ export default function EricMferMiniAppPage() {
             >
               Transaction {shortAddress(mintCelebration.result.hash)}
             </a>
+            {mintCelebration.result.recordSyncWarning && (
+              <p className={isLight ? 'mt-3 text-xs leading-5 text-amber-700' : 'mt-3 text-xs leading-5 text-amber-300'}>
+                {mintCelebration.result.recordSyncWarning}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setMintCelebration(null)}

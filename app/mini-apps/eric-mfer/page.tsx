@@ -17,7 +17,10 @@ import {
   getInitialEricMferLanguage,
   waitForMintedCatNFT,
 } from '@/services/eric-mfer-mint';
-import { resolveSelectedTokenId } from '@/services/eric-mfer-gallery';
+import {
+  isEricMferMintCreditUsedNotice,
+  resolveSelectedTokenId,
+} from '@/services/eric-mfer-gallery';
 import {
   InjPassMiniAppConnector,
   type InjPassMiniAppSession,
@@ -341,13 +344,16 @@ export default function EricMferMiniAppPage() {
   const remainingSupply = collection
     ? `${Math.max(0, collection.maxSupply - collection.totalMinted)}/${collection.maxSupply}`
     : loadingCollection ? statusCopy.readingChain : statusCopy.unavailable;
-  const mintButtonLabel = minting
-    ? 'Minting...'
-    : !session?.authenticated
-      ? 'Connect INJ Pass'
-      : ownedNFTs.length > 0
-        ? 'Mint another'
-        : 'Mint with sponsored gas';
+  const mintCreditUsed = isEricMferMintCreditUsedNotice(notice);
+  const mintButtonLabel = mintCreditUsed
+    ? 'Mint credit used'
+    : minting
+      ? 'Minting...'
+      : !session?.authenticated
+        ? 'Connect INJ Pass'
+        : ownedNFTs.length > 0
+          ? 'Mint another'
+          : 'Mint with sponsored gas';
 
   return (
     <main className={isLight ? 'min-h-screen bg-[#f5f2fb] text-[#161319]' : 'min-h-screen bg-[#0d0b10] text-white'}>
@@ -440,11 +446,36 @@ export default function EricMferMiniAppPage() {
           </div>
 
           <div className="pt-10">
-            {notice && (
+            {mintCreditUsed ? (
+              <div
+                role="status"
+                className={isLight
+                  ? 'mb-5 border border-amber-300/80 bg-amber-50 px-4 py-4 text-amber-950'
+                  : 'mb-5 border border-amber-300/24 bg-amber-300/[0.075] px-4 py-4 text-amber-100'}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_0_5px_rgba(251,191,36,0.12)]" />
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-500">
+                      Collection status
+                    </div>
+                    <div className="mt-1 text-base font-bold">
+                      Complimentary mint already used
+                    </div>
+                    <p className={isLight
+                      ? 'mt-1.5 text-sm leading-6 text-amber-950/68'
+                      : 'mt-1.5 text-sm leading-6 text-amber-100/64'}
+                    >
+                      This wallet has no mint credits remaining. Your existing eric mfer is safe and shown in the gallery.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : notice ? (
               <div className={isLight ? 'mb-4 text-sm leading-6 text-black/62' : 'mb-4 text-sm leading-6 text-white/62'}>
                 {notice}
               </div>
-            )}
+            ) : null}
             {mintResult?.hash && (
               <a
                 href={`https://blockscout.injective.network/tx/${mintResult.hash}`}
@@ -458,7 +489,7 @@ export default function EricMferMiniAppPage() {
             <button
               type="button"
               onClick={() => void handleMint()}
-              disabled={minting || !isEmbedded}
+              disabled={minting || !isEmbedded || mintCreditUsed}
               className={isLight
                 ? 'h-12 w-full bg-[#17131b] px-5 text-sm font-semibold text-white transition hover:bg-[#30263b] disabled:cursor-not-allowed disabled:opacity-45'
                 : 'h-12 w-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-45'}

@@ -12,3 +12,9 @@ export function resolveSelectedTokenId(
   }
   return items[0]?.tokenId ?? null;
 }
+
+export function isEricMferMintCreditUsedNotice(notice: string): boolean {
+  return /already minted its eric mfer|complimentary mint already used|no mint credits remaining/i.test(
+    notice,
+  );
+}

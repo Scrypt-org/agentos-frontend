@@ -97,6 +97,10 @@ export async function handleMiniAppRpc(
     if (!context.address) throw new MiniAppHostError(4100, 'Log in to INJ Pass first.');
     const tx = params[0] as Record<string, unknown> | undefined;
     if (!tx?.to) throw new MiniAppHostError(-32602, 'A transaction recipient is required.');
+    const requestedFrom = String(tx.from || '');
+    if (requestedFrom && requestedFrom.toLowerCase() !== context.address.toLowerCase()) {
+      throw new MiniAppHostError(4100, 'The transaction sender is not the authenticated INJ Pass wallet.');
+    }
     const to = String(tx.to) as Address;
     if (
       manifest.allowedContracts?.length
@@ -124,6 +128,10 @@ export async function handleMiniAppRpc(
   if (method === 'personal_sign' || method === 'eth_sign') {
     requirePermission(manifest, 'sign');
     if (!context.address) throw new MiniAppHostError(4100, 'Log in to INJ Pass first.');
+    const requestedAddress = String(method === 'personal_sign' ? params[1] || '' : params[0] || '');
+    if (requestedAddress && requestedAddress.toLowerCase() !== context.address.toLowerCase()) {
+      throw new MiniAppHostError(4100, 'The requested signing account is not the authenticated INJ Pass wallet.');
+    }
     const privateKey = await context.getPrivateKey();
     const account = privateKeyToAccount(privateKeyHex(privateKey));
     const raw = String(method === 'personal_sign' ? params[0] : params[1] || params[0]) as Hex;

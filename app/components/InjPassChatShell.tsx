@@ -95,6 +95,7 @@ import {
 } from '@/services/mini-app-commands';
 import { handleMiniAppRpc, MiniAppHostError } from '@/services/mini-app-host';
 import { getMiniAppFrameKey, getMiniAppSessionAddress } from '@/services/mini-app-session';
+import { enterExistingPasskey } from '@/services/passkey-entry';
 import { estimateGas, getBalance as getNativeBalance, getGasPrice, sendTransaction, waitForTransaction } from '@/wallet/chain';
 import {
   completeLocalWalletSetup,
@@ -103,6 +104,7 @@ import {
   importMnemonicWallet,
   markMnemonicBackedUp,
   prepareLocalWalletSetup,
+  recoverWallet,
   revealWalletMnemonic,
   unlockWalletKey,
   PrfUnsupportedError,
@@ -115,6 +117,7 @@ import { privateKeyToHex } from '@/utils/wallet';
 import { INJECTIVE_MAINNET, type GasEstimate } from '@/types/chain';
 import { QRCodeSVG } from 'qrcode.react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
+import PasskeyWalletActions from './PasskeyWalletActions';
 
 type ShellEntry = 'home' | 'welcome' | 'dashboard';
 type ProductMode = 'chat' | 'creative';
@@ -9241,6 +9244,28 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }
   };
 
+  const handleEnterPasskey = async () => {
+    if (authPendingAction) return;
+    setAuthPendingAction('enter');
+    setAuthError('');
+    setOrphanWalletAddress(null);
+
+    try {
+      await enterExistingPasskey({
+        recover: recoverWallet,
+        loadRecoveredWallet: loadWallet,
+        unlock: unlockWithWalletKey,
+      });
+      setLocalWallets(loadWallets());
+      setAuthMenuOpen(false);
+    } catch (error) {
+      setAuthMenuOpen(true);
+      setAuthError(error instanceof Error ? error.message : 'Failed to enter INJ Pass.');
+    } finally {
+      setAuthPendingAction(null);
+    }
+  };
+
   const handleEnterLocalWallet = async (wallet: LocalKeystore) => {
     if (authPendingAction) return;
     setAuthPendingAction('enter');
@@ -10544,25 +10569,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         </button>
                       </div>
                     ) : (
-                      <div className="px-1 pb-1">
-                        <button
-                          type="button"
-                          onClick={openPasskeyWalletWizard}
-                          disabled={authPendingAction !== null}
-                          className={cx(
-                            'flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition duration-300 disabled:opacity-55',
-                            isLight
-                              ? 'border-white bg-black/[0.025] shadow-[0_0_0_1px_rgba(0,0,0,0.07)] hover:bg-black/5'
-                              : 'border-white/35 bg-white/[0.035] shadow-[0_0_0_1px_rgba(255,255,255,0.04)] hover:border-white/55 hover:bg-white/8',
-                          )}
-                        >
-                          <span>
-                            <span className="block text-sm font-bold">Create New Wallet</span>
-                            <span className={cx('mt-0.5 block text-xs', isLight ? 'text-black/46' : 'text-white/46')}>Guided setup with this device&apos;s system Passkey</span>
-                          </span>
-                          <span className="text-xs font-semibold">Create</span>
-                        </button>
-                      </div>
+                      <PasskeyWalletActions
+                        isLight={isLight}
+                        pendingAction={authPendingAction}
+                        onCreate={openPasskeyWalletWizard}
+                        onEnterExisting={() => void handleEnterPasskey()}
+                      />
                     )}
                     {localWallets.length > 0 && (
                       <div className={cx('my-1 border-y py-1', isLight ? 'border-black/7' : 'border-white/8')}>

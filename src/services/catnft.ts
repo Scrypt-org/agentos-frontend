@@ -79,6 +79,29 @@ export interface CatMintCredits {
   walletAddress: string | null;
 }
 
+interface IndexedCatNFTItem {
+  tokenId: string;
+  ownerAddress: string;
+  txHash: string;
+  mintedAt: string | null;
+  name: string;
+  description: string | null;
+  image: string | null;
+  attributes: CatNFTMetadata['attributes'];
+  metadata: CatNFTMetadata | null;
+}
+
+interface IndexedCatNFTOwnership {
+  ownerAddress: string;
+  contractAddress: string;
+  items: IndexedCatNFTItem[];
+}
+
+interface IndexedCatNFTOptions {
+  fetchImpl?: typeof fetch;
+  loadDetails?: (tokenId: bigint) => Promise<CatNFT | null>;
+}
+
 export async function waitForCatNftSponsorship(
   hash: Hash,
   waitForReceipt: (request: { hash: Hash }) => Promise<{ status: string }>,
@@ -319,6 +342,13 @@ async function fetchMetadata(tokenURI: string): Promise<CatNFTMetadata | null> {
   }
 }
 
+function resolveCatNftUri(uri?: string | null): string | undefined {
+  if (!uri) return undefined;
+  return uri.startsWith('ipfs://')
+    ? uri.replace('ipfs://', NETWORK_CONFIG.ipfsGateway)
+    : uri;
+}
+
 export async function getCatCollectionInfo(): Promise<CatCollectionInfo> {
   const contractAddress = getCatNFTContractAddress();
   const client = createClient();
@@ -410,6 +440,76 @@ export async function getCatNFTDetails(tokenId: bigint): Promise<CatNFT | null> 
   } catch (error) {
     console.error(`[CatNFT] Failed to load token ${tokenId.toString()}:`, error);
     return null;
+  }
+}
+
+export async function getIndexedCatNFTsForOwner(
+  ownerAddress: Address,
+  options: IndexedCatNFTOptions = {},
+): Promise<CatNFT[]> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const loadDetails = options.loadDetails ?? getCatNFTDetails;
+
+  try {
+    const response = await fetchImpl(`${API_BASE_URL}/catnft/owned`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) return [];
+
+    const payload = await response.json() as IndexedCatNFTOwnership;
+    if (
+      payload.ownerAddress?.toLowerCase() !== ownerAddress.toLowerCase()
+      || !/^0x[a-fA-F0-9]{40}$/.test(payload.contractAddress || '')
+      || !Array.isArray(payload.items)
+    ) {
+      return [];
+    }
+
+    const contractAddress = payload.contractAddress as Address;
+    const indexedItems = payload.items
+      .filter((item) => /^\d+$/.test(item.tokenId) && BigInt(item.tokenId) > 0n)
+      .map((item): CatNFT => {
+        const metadata = item.metadata ?? {
+          name: item.name,
+          ...(item.description ? { description: item.description } : {}),
+          ...(item.image ? { image: resolveCatNftUri(item.image) } : {}),
+          ...(item.attributes?.length ? { attributes: item.attributes } : {}),
+        };
+        const image = resolveCatNftUri(item.image ?? metadata.image);
+        if (metadata.image) metadata.image = resolveCatNftUri(metadata.image);
+
+        return {
+          contractAddress,
+          tokenId: item.tokenId,
+          name: item.name || `eric mfer #${item.tokenId.padStart(3, '0')}`,
+          ...(item.description ? { description: item.description } : {}),
+          ...(image ? { image } : {}),
+          metadata,
+          collection: 'eric mfer',
+          owner: ownerAddress,
+          tokenURI: '',
+          ...(/^0x[a-fA-F0-9]{64}$/.test(item.txHash)
+            ? { mintTxHash: item.txHash as Hash }
+            : {}),
+        };
+      });
+
+    const enriched = await Promise.all(indexedItems.map(async (indexed) => {
+      try {
+        const detail = await loadDetails(BigInt(indexed.tokenId));
+        if (!detail) return indexed;
+        if (detail.owner.toLowerCase() !== ownerAddress.toLowerCase()) return null;
+        return detail;
+      } catch {
+        return indexed;
+      }
+    }));
+
+    return enriched.filter((item): item is CatNFT => item !== null);
+  } catch (error) {
+    console.warn('[CatNFT] Failed to load indexed owner NFTs:', error);
+    return [];
   }
 }
 

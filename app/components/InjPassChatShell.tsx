@@ -94,6 +94,7 @@ import {
   type MiniAppAgentCommandResult,
 } from '@/services/mini-app-commands';
 import { handleMiniAppRpc, MiniAppHostError } from '@/services/mini-app-host';
+import { getMiniAppFrameKey, getMiniAppSessionAddress } from '@/services/mini-app-session';
 import { estimateGas, getBalance as getNativeBalance, getGasPrice, sendTransaction, waitForTransaction } from '@/wallet/chain';
 import {
   completeLocalWalletSetup,
@@ -8667,6 +8668,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     return nextPrivateKey;
   };
 
+  const miniAppSessionAddress = getMiniAppSessionAddress(isAuthenticated, address);
+
   useEffect(() => {
     requireWalletPrivateKeyRef.current = requireWalletPrivateKey;
   });
@@ -8694,7 +8697,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       type: 'session',
       session: {
         authenticated: isAuthenticated,
-        address: address || null,
+        address: miniAppSessionAddress,
         walletName: keystore?.walletName,
         chainId: manifest.chainId,
         language: selectedLanguageCode,
@@ -8771,7 +8774,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           respond(undefined, { code: 4100, message: 'This app cannot request a CatNFT mint.' });
           return;
         }
-        if (!isAuthenticated || !address) {
+        if (!miniAppSessionAddress) {
           respond(undefined, { code: 4100, message: 'Log in to INJ Pass before minting.' });
           return;
         }
@@ -8795,7 +8798,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         Array.isArray(message.params) ? message.params : [],
         {
           manifest,
-          address: address ? address as Address : null,
+          address: miniAppSessionAddress as Address | null,
           getPrivateKey: () => requireWalletPrivateKeyRef.current(),
         },
       ).then((result) => respond(result)).catch((error) => {
@@ -8814,7 +8817,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       window.removeEventListener('message', handleMiniAppMessage);
       miniAppWindowRef.current = null;
     };
-  }, [activeMiniApp, address, isAuthenticated, keystore?.walletName, logout, miniAppUrl, resetTxAuth, selectedLanguageCode]);
+  }, [activeMiniApp, isAuthenticated, keystore?.walletName, logout, miniAppSessionAddress, miniAppUrl, resetTxAuth, selectedLanguageCode]);
 
   useEffect(() => {
     if (!miniAppAgentRun) return;
@@ -10831,11 +10834,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                       activeTabId={activeMiniAppTabId}
                       manifest={activeMiniAppManifest}
                       src={miniAppUrl}
-                      iframeKey={`${activeMiniApp.id}-${address || 'guest'}-${miniAppFrameNonce}`}
+                      iframeKey={getMiniAppFrameKey(activeMiniApp.id, miniAppFrameNonce)}
                       iframeRef={miniAppIframeRef}
                       navigation={miniAppNavigation}
                       isLoading={miniAppLoading}
-                      address={address}
+                      address={miniAppSessionAddress}
                       walletName={keystore?.walletName}
                       isLight={isLight}
                       onSelectTab={selectMiniAppTab}

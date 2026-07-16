@@ -9420,7 +9420,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   }
 
   return (
-    <main className={cx('inj-shell-font relative min-h-screen overflow-hidden transition-colors', isCreativeBuildSession && 'inj-creative-build-active', surfaceTone)} data-inj-entry={entry}>
+    <main className={cx('inj-shell-font relative h-screen overflow-hidden transition-colors', isCreativeBuildSession && 'inj-creative-build-active', surfaceTone)} data-inj-entry={entry}>
       <ShellMotionStyles />
       <SandboxIntroModal
         open={sandboxIntroOpen}
@@ -9466,7 +9466,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           void openStoredConversation(conversationId);
         }}
       />
-      <div className="flex min-h-screen">
+      <div className="flex h-full min-h-0">
         <aside
           className={cx(
             'inj-glass-surface hidden shrink-0 border-r py-3 transition-[width,padding] duration-300 lg:flex lg:flex-col',
@@ -9828,7 +9828,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 <span className="mt-2 block text-xs font-bold">{copy.backUpNow}</span>
               </button>
             )}
-            <div className={cx('relative', !profileOpen && !sidebarCollapsed ? 'pt-7' : 'pt-0')}>
+            {isAuthenticated && <div className={cx('relative', !profileOpen && !sidebarCollapsed ? 'pt-7' : 'pt-0')}>
               {!profileOpen && !sidebarCollapsed && <div className="absolute left-3 top-px z-10 flex h-7 items-end gap-1 text-[10px] font-bold">
                 <span className={cx('inline-flex h-7 items-center rounded-t-lg border border-b-0 px-2', isLight ? 'border-black/9 bg-[#f5f5f3] text-black/48' : 'border-white/8 bg-[#141416] text-white/48')}>
                   INJ · {formatAmount(sidebarWalletSummary.inj)}
@@ -10506,11 +10506,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   </div>
                 </div>}
               </button>
-            </div>
+            </div>}
           </div>
         </aside>
 
-        <section className="relative flex min-w-0 flex-1 flex-col">
+        <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header className={cx('pointer-events-none fixed inset-x-0 top-0 z-20 px-4 py-4 transition-[left] duration-300 sm:px-6', sidebarCollapsed ? 'lg:left-[76px]' : 'lg:left-[286px]')}>
             <div className="relative flex items-center justify-between">
               <div className="pointer-events-auto flex items-center gap-2 lg:hidden">
@@ -10680,7 +10680,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             </div>
           </header>
 
-          <div className="flex flex-1 flex-col px-4 pb-5 pt-32 sm:px-6 sm:pt-16">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-5 pt-32 sm:px-6 sm:pt-16">
             <div
               className={cx(
                 'relative isolate mx-auto flex w-full flex-1 flex-col',

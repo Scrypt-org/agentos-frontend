@@ -25,6 +25,7 @@ import type { DApp } from '@/config/dapps';
 import {
   getMiniAppManifest,
   isAllowedMiniAppOrigin,
+  resolveMiniAppAgentUrl,
   resolveMiniAppUrl,
   type MiniAppManifest,
 } from '@/config/mini-apps';
@@ -194,6 +195,7 @@ interface MiniAppAgentRun {
   command: MiniAppAgentCommand;
   manifest: MiniAppManifest;
   src: string;
+  baseOverride?: string;
 }
 
 interface MiniAppAgentResolver {
@@ -7297,8 +7299,8 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }
 
     const id = uid('miniapp-agent');
-    const src = resolveMiniAppUrl(manifest);
-    setMiniAppAgentRun({ id, command, manifest, src });
+    const { src, baseOverride } = resolveMiniAppAgentUrl(manifest, dappMarketItems);
+    setMiniAppAgentRun({ id, command, manifest, src, baseOverride });
 
     return new Promise((resolve, reject) => {
       const onAbort = () => {
@@ -8887,7 +8889,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     } catch {
       return;
     }
-    if (!isAllowedMiniAppOrigin(miniAppAgentRun.manifest, miniAppOrigin)) return;
+    if (!isAllowedMiniAppOrigin(
+      miniAppAgentRun.manifest,
+      miniAppOrigin,
+      miniAppAgentRun.baseOverride,
+    )) return;
 
     let commandSent = false;
     const postToAgentApp = (payload: Record<string, unknown>, target?: WindowProxy | null) => {

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getMiniAppManifest,
   isAllowedMiniAppOrigin,
+  resolveMiniAppAgentUrl,
   resolveMiniAppUrl,
   type MiniAppManifest,
 } from '@/config/mini-apps';
@@ -70,5 +71,19 @@ describe('mini app URL resolution', () => {
 
     expect(new URL(resolveMiniAppUrl(external, '/', 'not-a-url')).origin)
       .toBe('https://fallback.example');
+  });
+
+  it('uses the registered Omisper URL for AI Chat commands', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubGlobal('window', { location: { origin: 'https://injpass.com' } });
+    const manifest = getMiniAppManifest('omisper');
+    expect(manifest).not.toBeNull();
+
+    const resolved = resolveMiniAppAgentUrl(manifest!, [
+      { id: 'omisper', url: 'https://omisper-front.pages.dev' },
+    ]);
+
+    expect(new URL(resolved.src).origin).toBe('https://omisper-front.pages.dev');
+    expect(resolved.baseOverride).toBe('https://omisper-front.pages.dev');
   });
 });

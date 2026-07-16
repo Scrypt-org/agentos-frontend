@@ -132,6 +132,18 @@ export function resolveMiniAppUrl(manifest: MiniAppManifest, path?: string, base
   return url.toString();
 }
 
+export function resolveMiniAppAgentUrl(
+  manifest: MiniAppManifest,
+  registeredApps: Array<{ id: string; url?: string | null }>,
+): { src: string; baseOverride?: string } {
+  const registeredUrl = registeredApps.find((app) => app.id === manifest.appId)?.url;
+  const baseOverride = isValidHttpUrl(registeredUrl) ? registeredUrl : undefined;
+  return {
+    src: resolveMiniAppUrl(manifest, undefined, baseOverride),
+    baseOverride,
+  };
+}
+
 export function isAllowedMiniAppOrigin(
   manifest: MiniAppManifest,
   origin: string,

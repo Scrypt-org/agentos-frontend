@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  isCampaignVisible,
+  campaignAvailability,
   visibleComposerDApps,
+  visibleMarketDApps,
   visibleSidebarDApps,
 } from './dapp-visibility';
 
@@ -27,7 +28,14 @@ describe('dApp shell visibility', () => {
     ]);
   });
 
-  it('hides the Elon Musk campaign entry', () => {
-    expect(isCampaignVisible('bankrupt-elon-musk')).toBe(false);
+  it('hides Bankrupt Elon Musk from the Apps market', () => {
+    expect(visibleMarketDApps(dapps).map((app) => app.id)).toEqual([
+      'inj-gift',
+      'omisper',
+    ]);
+  });
+
+  it('keeps Campaign visible as coming soon', () => {
+    expect(campaignAvailability).toBe('coming-soon');
   });
 });

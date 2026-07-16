@@ -10,5 +10,7 @@ export const visibleSidebarDApps = <T extends DAppIdentity>(apps: T[]): T[] =>
 export const visibleComposerDApps = <T extends DAppIdentity>(apps: T[]): T[] =>
   apps.filter(isVisibleInShell);
 
-export const isCampaignVisible = (appId: string): boolean =>
-  !HIDDEN_SHELL_DAPP_IDS.has(appId);
+export const visibleMarketDApps = <T extends DAppIdentity>(apps: T[]): T[] =>
+  apps.filter(isVisibleInShell);
+
+export const campaignAvailability = 'coming-soon' as const;

@@ -74,6 +74,11 @@ import {
 import { executeSwap, getTokenBalances } from '@/services/dex-swap';
 import { fetchDapps } from '@/services/dapps';
 import { getDAppIconUrl } from '@/services/dapp-icons';
+import {
+  isCampaignVisible,
+  visibleComposerDApps,
+  visibleSidebarDApps,
+} from '@/services/dapp-visibility';
 import { claimDailyCheckIn, getNinjaStatus, getTransactions, type NinjaStatusResponse, type PointsTransaction } from '@/services/points';
 import { getUserProfile, type UserProfileResponse } from '@/services/user';
 import { authenticateWalletSession } from '@/services/wallet-auth';
@@ -6216,7 +6221,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     if (!composerTrigger) return [];
     const query = composerTrigger.query.toLocaleLowerCase();
     if (composerTrigger.symbol === '@') {
-      return dappMarketItems
+      return visibleComposerDApps(dappMarketItems)
         .filter((app) => app.name.toLocaleLowerCase().includes(query))
         .slice(0, 7)
         .map((app) => ({
@@ -6261,7 +6266,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     composerSuggestionRefs.current[composerSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
   }, [composerSuggestionIndex]);
   const pinnedDApps = useMemo(
-    () => dappMarketItems.filter((app) => app.aiDriven),
+    () => visibleSidebarDApps(dappMarketItems).filter((app) => app.aiDriven),
     [dappMarketItems]
   );
   const activeMiniAppManifest = useMemo(
@@ -9665,7 +9670,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             </div>
           )}
 
-          <button
+          {isCampaignVisible('bankrupt-elon-musk') && <button
             type="button"
             onClick={openCampaign}
             aria-expanded={campaignOpen}
@@ -9682,9 +9687,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               {!sidebarCollapsed && copy.campaign}
             </span>
             {!sidebarCollapsed && <ChevronDownIcon className={cx('h-4 w-4 transition-transform duration-300', campaignOpen && 'rotate-180', isLight ? 'text-black/42' : 'text-white/42')} />}
-          </button>
+          </button>}
 
-          {campaignOpen && !sidebarCollapsed && (
+          {isCampaignVisible('bankrupt-elon-musk') && campaignOpen && !sidebarCollapsed && (
             <div className="inj-liquid-menu mt-1 pl-2">
               <button
                 type="button"
@@ -10880,7 +10885,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                       copy={copy}
                     />
                   )}
-                  {activeChatSurface === 'campaign' && (
+                  {isCampaignVisible('bankrupt-elon-musk') && activeChatSurface === 'campaign' && (
                     <CampaignPanel isLight={isLight} copy={copy} onJoin={joinCampaign} />
                   )}
                   {activeChatSurface === 'skills' && (

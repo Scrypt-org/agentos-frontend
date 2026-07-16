@@ -1634,3 +1634,166 @@ html[data-theme="light"] [class*="shadow-"] {
     box-shadow: 0 0 18px 2px rgba(34, 211, 238, 0.35);
   }
 }
+.inj-recovery-print-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 210mm;
+    min-height: 297mm;
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .inj-recovery-print-sheet,
+  .inj-recovery-print-sheet * {
+    visibility: visible !important;
+  }
+
+  .inj-recovery-print-sheet {
+    position: fixed;
+    inset: 0;
+    display: flex !important;
+    box-sizing: border-box;
+    width: 210mm;
+    min-height: 297mm;
+    flex-direction: column;
+    padding: 18mm;
+    overflow: hidden;
+    background: #fff !important;
+    color: #111 !important;
+    font-family: Arial, Helvetica, sans-serif;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .inj-recovery-print-header {
+    padding-bottom: 10mm;
+    border-bottom: 0.35mm solid #151515;
+  }
+
+  .inj-recovery-print-brand {
+    margin: 0 0 4mm;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+  }
+
+  .inj-recovery-print-header h1 {
+    margin: 0;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 28pt;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .inj-recovery-print-header > p:last-child {
+    margin: 3mm 0 0;
+    color: #5a5a5a !important;
+    font-size: 10pt;
+  }
+
+  .inj-recovery-print-code {
+    margin-top: 10mm;
+    padding: 7mm;
+    border: 0.35mm solid #b9b9b9;
+    background: #f4f4f2 !important;
+    break-inside: avoid;
+  }
+
+  .inj-recovery-print-code p {
+    margin: 0 0 3mm;
+    color: #5a5a5a !important;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .inj-recovery-print-code strong {
+    font-family: 'Courier New', monospace;
+    font-size: 20pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .inj-recovery-print-words {
+    margin-top: 11mm;
+  }
+
+  .inj-recovery-print-words > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8mm;
+  }
+
+  .inj-recovery-print-words h2 {
+    margin: 0;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 17pt;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .inj-recovery-print-words > div p {
+    margin: 0;
+    color: #666 !important;
+    font-size: 9pt;
+  }
+
+  .inj-recovery-print-words ol {
+    display: grid;
+    margin: 6mm 0 0;
+    padding: 0;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3mm;
+    list-style: none;
+  }
+
+  .inj-recovery-print-words li {
+    display: flex;
+    min-height: 12mm;
+    box-sizing: border-box;
+    align-items: center;
+    gap: 3mm;
+    padding: 3mm;
+    border: 0.25mm solid #d4d4d4;
+    break-inside: avoid;
+  }
+
+  .inj-recovery-print-words li span {
+    width: 5mm;
+    flex: none;
+    color: #777 !important;
+    font-family: 'Courier New', monospace;
+    font-size: 8pt;
+    text-align: right;
+  }
+
+  .inj-recovery-print-words li strong {
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    font-size: 10pt;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .inj-recovery-print-sheet footer {
+    margin-top: auto;
+    padding-top: 7mm;
+    border-top: 0.25mm solid #d4d4d4;
+    color: #555 !important;
+    font-size: 9pt;
+    line-height: 1.5;
+  }
+}

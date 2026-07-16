@@ -12,6 +12,8 @@ interface SettingsPageProps {
   embeddedOverride?: boolean;
 }
 
+type SettingsSection = 'security' | 'agent' | 'private-key' | 'session';
+
 export default function SettingsPage({ embeddedOverride }: SettingsPageProps = {}) {
   const router = useRouter();
   const { isUnlocked, address, privateKey, keystore, lock, isCheckingSession } = useWallet();
@@ -52,6 +54,7 @@ export default function SettingsPage({ embeddedOverride }: SettingsPageProps = {
   const [pinError, setPinError] = useState('');
   const [resettingPin, setResettingPin] = useState(false);
   const [pinResetSuccess, setPinResetSuccess] = useState(false);
+  const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>('security');
 
   const navigateApp = (path: string) => {
     if (typeof window !== 'undefined' && embedded && window.top) {
@@ -295,6 +298,25 @@ export default function SettingsPage({ embeddedOverride }: SettingsPageProps = {
 
       {/* Main Content */}
       <div className={embedded ? 'h-full overflow-y-auto px-0 py-0' : 'max-w-7xl mx-auto px-4 py-6'}>
+        <div className="grid gap-5 md:grid-cols-[190px_minmax(0,1fr)]">
+          <nav className="self-start rounded-2xl border border-white/10 bg-white/[0.035] p-2 md:sticky md:top-4" aria-label="Settings sections">
+            {([
+              { id: 'security', label: 'PIN Security' },
+              { id: 'agent', label: 'AI Agent' },
+              { id: 'private-key', label: 'Private Key' },
+              { id: 'session', label: 'Wallet Actions' },
+            ] as const).map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSettingsSection(section.id)}
+                className={`block w-full rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${activeSettingsSection === section.id ? 'bg-white text-black' : 'text-gray-400 hover:bg-white/8 hover:text-white'}`}
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+          <div className="min-w-0">
         {/* PIN Reset Success Message */}
         {pinResetSuccess && (
           <div className="mb-6 p-4 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400 flex items-center gap-3 animate-fade-in">
@@ -311,6 +333,7 @@ export default function SettingsPage({ embeddedOverride }: SettingsPageProps = {
         )}
 
         {/* PIN Management Section */}
+        {activeSettingsSection === 'security' && (
         <div className={sectionWrapperClass}>
           <h2 className={sectionTitleClass}>PIN Security</h2>
           
@@ -485,8 +508,10 @@ export default function SettingsPage({ embeddedOverride }: SettingsPageProps = {
             )}
           </div>
         </div>
+        )}
 
         {/* Agent Sandbox Section */}
+        {activeSettingsSection === 'agent' && (
         <div className={sectionWrapperClass}>
           <h2 className={sectionTitleClass}>AI Agent</h2>
           <div className={`rounded-2xl border border-white/10 bg-white/5 ${settingsItemPaddingClass}`}>
@@ -535,8 +560,10 @@ export default function SettingsPage({ embeddedOverride }: SettingsPageProps = {
             </div>
           </div>
         </div>
+        )}
 
         {/* Security Section */}
+        {activeSettingsSection === 'private-key' && (
         <div className={sectionWrapperClass}>
           <div className="mb-3 flex items-center justify-between">
             <h2 className={embedded ? 'text-[11px] font-bold uppercase tracking-[0.22em] text-gray-400' : 'text-sm font-bold uppercase tracking-wider text-gray-400'}>Private Key</h2>
@@ -627,8 +654,10 @@ export default function SettingsPage({ embeddedOverride }: SettingsPageProps = {
           </div>
         )}
         </div>
+        )}
 
         {/* Wallet Actions */}
+        {activeSettingsSection === 'session' && (
         <div className={sectionWrapperClass}>
           <h2 className={sectionTitleClass}>Wallet Actions</h2>
           
@@ -642,6 +671,9 @@ export default function SettingsPage({ embeddedOverride }: SettingsPageProps = {
             </svg>
             Lock Wallet
           </button>
+        </div>
+        )}
+          </div>
         </div>
       </div>
 

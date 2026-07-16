@@ -35,6 +35,7 @@ export interface CatNFT {
   collection: string;
   owner: Address;
   tokenURI: string;
+  mintTxHash?: Hash;
 }
 
 export interface CatCollectionInfo {
@@ -48,11 +49,68 @@ export interface CatCollectionInfo {
 export interface CatMintResult {
   hash: Hash;
   tokenId: string | null;
+  gasSponsored?: boolean;
+  sponsoredWei?: string;
+  sponsorshipTxHash?: Hash;
+  recordSynced: boolean;
+  recordSyncWarning?: string;
+}
+
+export interface CatMintRecordPayload {
+  tokenId: string;
+  txHash: Hash;
+  ownerAddress: Address;
+  source: string;
+}
+
+interface CatMintRecordSyncOptions {
+  attempts?: number;
+  delay?: (milliseconds: number) => Promise<void>;
+  fetchImpl?: typeof fetch;
+}
+
+export interface CatMintRecordSyncResult {
+  recordSynced: boolean;
+  recordSyncWarning?: string;
 }
 
 export interface CatMintCredits {
   mintCreditsRemaining: number;
   walletAddress: string | null;
+}
+
+interface IndexedCatNFTItem {
+  tokenId: string;
+  ownerAddress: string;
+  txHash: string;
+  mintedAt: string | null;
+  name: string;
+  description: string | null;
+  image: string | null;
+  attributes: CatNFTMetadata['attributes'];
+  metadata: CatNFTMetadata | null;
+}
+
+interface IndexedCatNFTOwnership {
+  ownerAddress: string;
+  contractAddress: string;
+  items: IndexedCatNFTItem[];
+}
+
+interface IndexedCatNFTOptions {
+  fetchImpl?: typeof fetch;
+  loadDetails?: (tokenId: bigint) => Promise<CatNFT | null>;
+  onIndexed?: (items: CatNFT[]) => void;
+}
+
+export async function waitForCatNftSponsorship(
+  hash: Hash,
+  waitForReceipt: (request: { hash: Hash }) => Promise<{ status: string }>,
+): Promise<void> {
+  const receipt = await waitForReceipt({ hash });
+  if (receipt.status !== 'success') {
+    throw new Error('CatNFT gas sponsorship transaction reverted. The mint was not submitted.');
+  }
 }
 
 const CATNFT_ABI = [
@@ -188,6 +246,47 @@ function getAuthHeaders(): HeadersInit {
   };
 }
 
+const wait = (milliseconds: number) => new Promise<void>((resolve) => {
+  setTimeout(resolve, milliseconds);
+});
+
+export async function syncCatMintRecord(
+  payload: CatMintRecordPayload,
+  options: CatMintRecordSyncOptions = {},
+): Promise<CatMintRecordSyncResult> {
+  const attempts = Math.max(1, options.attempts ?? 3);
+  const delay = options.delay ?? wait;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  let lastError = 'Unable to persist the mint record.';
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(`${API_BASE_URL}/catnft/mint-record`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) return { recordSynced: true };
+
+      const responsePayload = await response.json().catch(() => ({})) as { message?: unknown };
+      lastError = typeof responsePayload.message === 'string'
+        ? responsePayload.message
+        : `Failed to persist mint record (${response.status})`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : lastError;
+    }
+
+    if (attempt < attempts - 1) {
+      await delay(Math.min(750 * (attempt + 1), 2_000));
+    }
+  }
+
+  return {
+    recordSynced: false,
+    recordSyncWarning: `The NFT was minted on-chain, but its INJ Pass record is still syncing: ${lastError}`,
+  };
+}
+
 function createClient() {
   return createPublicClient({
     chain: getChain(),
@@ -242,6 +341,13 @@ async function fetchMetadata(tokenURI: string): Promise<CatNFTMetadata | null> {
     console.error('[CatNFT] Failed to fetch metadata:', error);
     return null;
   }
+}
+
+function resolveCatNftUri(uri?: string | null): string | undefined {
+  if (!uri) return undefined;
+  return uri.startsWith('ipfs://')
+    ? uri.replace('ipfs://', NETWORK_CONFIG.ipfsGateway)
+    : uri;
 }
 
 export async function getCatCollectionInfo(): Promise<CatCollectionInfo> {
@@ -338,6 +444,78 @@ export async function getCatNFTDetails(tokenId: bigint): Promise<CatNFT | null> 
   }
 }
 
+export async function getIndexedCatNFTsForOwner(
+  ownerAddress: Address,
+  options: IndexedCatNFTOptions = {},
+): Promise<CatNFT[]> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const loadDetails = options.loadDetails ?? getCatNFTDetails;
+
+  try {
+    const response = await fetchImpl(`${API_BASE_URL}/catnft/owned`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) return [];
+
+    const payload = await response.json() as IndexedCatNFTOwnership;
+    if (
+      payload.ownerAddress?.toLowerCase() !== ownerAddress.toLowerCase()
+      || !/^0x[a-fA-F0-9]{40}$/.test(payload.contractAddress || '')
+      || !Array.isArray(payload.items)
+    ) {
+      return [];
+    }
+
+    const contractAddress = payload.contractAddress as Address;
+    const indexedItems = payload.items
+      .filter((item) => /^\d+$/.test(item.tokenId) && BigInt(item.tokenId) > 0n)
+      .map((item): CatNFT => {
+        const metadata = item.metadata ?? {
+          name: item.name,
+          ...(item.description ? { description: item.description } : {}),
+          ...(item.image ? { image: resolveCatNftUri(item.image) } : {}),
+          ...(item.attributes?.length ? { attributes: item.attributes } : {}),
+        };
+        const image = resolveCatNftUri(item.image ?? metadata.image);
+        if (metadata.image) metadata.image = resolveCatNftUri(metadata.image);
+
+        return {
+          contractAddress,
+          tokenId: item.tokenId,
+          name: item.name || `eric mfer #${item.tokenId.padStart(3, '0')}`,
+          ...(item.description ? { description: item.description } : {}),
+          ...(image ? { image } : {}),
+          metadata,
+          collection: 'eric mfer',
+          owner: ownerAddress,
+          tokenURI: '',
+          ...(/^0x[a-fA-F0-9]{64}$/.test(item.txHash)
+            ? { mintTxHash: item.txHash as Hash }
+            : {}),
+        };
+      });
+
+    options.onIndexed?.(indexedItems);
+
+    const enriched = await Promise.all(indexedItems.map(async (indexed) => {
+      try {
+        const detail = await loadDetails(BigInt(indexed.tokenId));
+        if (!detail) return indexed;
+        if (detail.owner.toLowerCase() !== ownerAddress.toLowerCase()) return null;
+        return detail;
+      } catch {
+        return indexed;
+      }
+    }));
+
+    return enriched.filter((item): item is CatNFT => item !== null);
+  } catch (error) {
+    console.warn('[CatNFT] Failed to load indexed owner NFTs:', error);
+    return [];
+  }
+}
+
 async function getCatNFTsForOwnerByScanning(ownerAddress: Address): Promise<CatNFT[]> {
   const collectionInfo = await getCatCollectionInfo();
   const totalMinted = Math.min(collectionInfo.totalMinted, collectionInfo.maxSupply);
@@ -389,6 +567,14 @@ export async function getCatNFTsForOwner(ownerAddress: Address): Promise<CatNFT[
         }),
       ]);
 
+      const mintTxHashes = new Map<string, Hash>();
+      for (const log of mintLogs) {
+        const tokenId = log.args?.tokenId;
+        if (typeof tokenId === 'bigint' && log.transactionHash) {
+          mintTxHashes.set(tokenId.toString(), log.transactionHash);
+        }
+      }
+
       const tokenIds = [...mintLogs, ...transferLogs]
         .sort((a, b) => {
           if (a.blockNumber === b.blockNumber) {
@@ -408,7 +594,10 @@ export async function getCatNFTsForOwner(ownerAddress: Address): Promise<CatNFT[
 
         const nft = await getCatNFTDetails(tokenId);
         if (nft?.owner.toLowerCase() === ownerAddress.toLowerCase()) {
-          nfts.push(nft);
+          nfts.push({
+            ...nft,
+            mintTxHash: mintTxHashes.get(key),
+          });
           if (nfts.length >= Number(balance)) {
             return nfts;
           }
@@ -434,7 +623,10 @@ export async function getCatNFTForOwner(ownerAddress: Address): Promise<CatNFT |
   return nfts[0] ?? null;
 }
 
-export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult> {
+async function mintCatNFTWithVoucherEndpoint(
+  privateKey: Uint8Array,
+  endpoint: 'mint-voucher' | 'sponsored-mint-voucher',
+): Promise<CatMintResult> {
   const contractAddress = getCatNFTContractAddress();
   const client = createClient();
 
@@ -450,7 +642,7 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
     transport: http(),
   });
 
-  const voucherResponse = await fetch(`${API_BASE_URL}/catnft/mint-voucher`, {
+  const voucherResponse = await fetch(`${API_BASE_URL}/catnft/${endpoint}`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ quantity: 1 }),
@@ -472,7 +664,20 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
       quantity: number;
     };
     signature: `0x${string}`;
+    gasLimit?: string;
+    gasSponsored?: boolean;
+    sponsoredWei?: string;
+    sponsorshipTxHash?: Hash;
   };
+
+  if (voucherPayload.sponsorshipTxHash) {
+    await waitForCatNftSponsorship(
+      voucherPayload.sponsorshipTxHash,
+      ({ hash: sponsorshipHash }) => client.waitForTransactionReceipt({
+        hash: sponsorshipHash,
+      }),
+    );
+  }
 
   const hash = await walletClient.writeContract({
     address: contractAddress,
@@ -487,6 +692,7 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
       },
       voucherPayload.signature,
     ],
+    gas: voucherPayload.gasLimit ? BigInt(voucherPayload.gasLimit) : undefined,
   });
 
   const receipt = await client.waitForTransactionReceipt({ hash });
@@ -502,31 +708,29 @@ export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult>
     throw new Error('Mint transaction succeeded but no CatNFT Minted event was found. Check the contract address and network.');
   }
 
-  const recordResponse = await fetch(`${API_BASE_URL}/catnft/mint-record`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({
-      tokenId: tokenId.toString(),
-      txHash: hash,
-      ownerAddress: account.address,
-      source: 'frontend',
-    }),
+  const recordSync = await syncCatMintRecord({
+    tokenId: tokenId.toString(),
+    txHash: hash,
+    ownerAddress: voucherPayload.voucher.to,
+    source: endpoint === 'sponsored-mint-voucher' ? 'eric-mfer' : 'frontend',
   });
-
-  if (!recordResponse.ok) {
-    const payload = await recordResponse.json().catch(() => ({}));
-    const message = typeof payload?.message === 'string'
-      ? payload.message
-      : `Failed to persist mint record (${recordResponse.status})`;
-    throw new Error(
-      `Mint transaction succeeded (${hash}), but backend record failed: ${message}`,
-    );
-  }
 
   return {
     hash,
     tokenId: typeof tokenId === 'bigint' ? tokenId.toString() : null,
+    gasSponsored: voucherPayload.gasSponsored,
+    sponsoredWei: voucherPayload.sponsoredWei,
+    sponsorshipTxHash: voucherPayload.sponsorshipTxHash,
+    ...recordSync,
   };
+}
+
+export async function mintCatNFT(privateKey: Uint8Array): Promise<CatMintResult> {
+  return mintCatNFTWithVoucherEndpoint(privateKey, 'mint-voucher');
+}
+
+export async function mintSponsoredCatNFT(privateKey: Uint8Array): Promise<CatMintResult> {
+  return mintCatNFTWithVoucherEndpoint(privateKey, 'sponsored-mint-voucher');
 }
 
 export async function getCatMintCredits(): Promise<CatMintCredits> {

@@ -44,6 +44,16 @@ export interface AdjustNinjaResponse {
   error?: string;
 }
 
+export interface DailyCheckInResponse {
+  success: boolean;
+  claimed?: boolean;
+  reward?: number;
+  balance?: number;
+  nextAvailableAt?: number;
+  transactionId?: number;
+  error?: string;
+}
+
 export interface NinjaMinerState {
   ninjaBalance: number;
   tapCooldownEndsAt: number;
@@ -76,6 +86,23 @@ function getAuthHeader(): HeadersInit {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   };
+}
+
+export async function claimDailyCheckIn(): Promise<DailyCheckInResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/points/daily-check-in`, {
+      method: 'POST',
+      headers: getAuthHeader(),
+    });
+    const payload = await response.json().catch(() => ({})) as DailyCheckInResponse;
+    if (!response.ok || !payload.success) {
+      return { success: false, error: payload.error || 'Daily check-in failed' };
+    }
+    return payload;
+  } catch (error) {
+    console.error('[Points] Daily check-in failed:', error);
+    return { success: false, error: 'Network error' };
+  }
 }
 
 /**

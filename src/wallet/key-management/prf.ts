@@ -59,7 +59,33 @@ function readPrfFirst(cred: PublicKeyCredential | null): Uint8Array | null {
   if (!first) return null;
   return first instanceof ArrayBuffer
     ? new Uint8Array(first)
-    : new Uint8Array((first as ArrayBufferView).buffer);
+    : new Uint8Array(
+        (first as ArrayBufferView).buffer,
+        (first as ArrayBufferView).byteOffset,
+        (first as ArrayBufferView).byteLength,
+      );
+}
+
+function addressesMatch(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
+/**
+ * Older clients hashed the credential-id string exactly as serialized at the
+ * time. Try every historical base64/base64url representation and let the
+ * immutable backend wallet address select the valid legacy key.
+ */
+function legacyCredentialIdCandidates(rawId: ArrayBuffer, assertedId: string): string[] {
+  const bytes = new Uint8Array(rawId);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+
+  const standardPadded = btoa(binary);
+  const standardUnpadded = standardPadded.replace(/=+$/g, '');
+  const urlPadded = standardPadded.replace(/\+/g, '-').replace(/\//g, '_');
+  const urlUnpadded = urlPadded.replace(/=+$/g, '');
+
+  return [...new Set([assertedId, urlUnpadded, urlPadded, standardUnpadded, standardPadded])];
 }
 
 /**
@@ -346,7 +372,7 @@ export async function recoverWallet(): Promise<RecoverWalletResult> {
   const prfOutput = readPrfFirst(assertion);
   if (prfOutput) {
     const { privateKey, address } = hkdfToSecp256k1(prfOutput);
-    if (address === walletAddress) {
+    if (addressesMatch(address, walletAddress)) {
       saveWallet({
         address,
         encryptedPrivateKey: '',
@@ -368,9 +394,11 @@ export async function recoverWallet(): Promise<RecoverWalletResult> {
 
   // 2) Legacy migration fallback: key = sha256(credentialId). Insecure — kept
   //    working only so existing users can open the original wallet and migrate.
-  const legacyEntropy = sha256(new TextEncoder().encode(credentialId));
-  const { privateKey, address } = deriveSecp256k1(legacyEntropy);
-  if (address === walletAddress) {
+  for (const legacyCredentialId of legacyCredentialIdCandidates(assertion.rawId, credentialId)) {
+    const legacyEntropy = sha256(new TextEncoder().encode(legacyCredentialId));
+    const { privateKey, address } = deriveSecp256k1(legacyEntropy);
+    if (!addressesMatch(address, walletAddress)) continue;
+
     const encryptedPrivateKey = await encryptKey(privateKey, legacyEntropy);
     saveWallet({
       address,
@@ -378,6 +406,7 @@ export async function recoverWallet(): Promise<RecoverWalletResult> {
       source: 'passkey',
       keyScheme: 'legacy-sha256',
       credentialId,
+      legacyKeyCredentialId: legacyCredentialId,
       createdAt: Date.now(),
       walletName: verifyResult.walletName,
     });

@@ -11,7 +11,7 @@ The Web NFC API requires HTTPS to work (except on localhost). Vercel provides fr
 Make sure all changes are committed:
 
 ```bash
-cd /Users/dongfang/Desktop/injpass-nfc
+cd ~/projects/inj-pass-frontend
 git add .
 git commit -m "Add NFC card features"
 ```

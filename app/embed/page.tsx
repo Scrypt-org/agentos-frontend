@@ -16,14 +16,19 @@ const CARD_H = 314;
 const CONNECT_W = 392;
 const CONNECT_H = 620;
 
-function requestResize(width: number, height: number) {
-  window.parent.postMessage(
+function postToParent(message: Record<string, unknown>, targetOrigin: string) {
+  if (!targetOrigin) return;
+  window.parent.postMessage(message, targetOrigin);
+}
+
+function requestResize(width: number, height: number, targetOrigin: string) {
+  postToParent(
     {
       type: 'INJPASS_RESIZE',
       width,
       height,
     },
-    '*'
+    targetOrigin
   );
 }
 
@@ -130,10 +135,47 @@ function OpenIcon({ className = 'h-4 w-4' }: { className?: string }) {
 export default function EmbedPage() {
   const { theme } = useTheme();
   const isLightMode = theme === 'light';
+  const [{ embeddingOrigin, embeddingOriginError }] = useState(() => {
+    if (typeof window === 'undefined') {
+      return { embeddingOrigin: '', embeddingOriginError: '' };
+    }
+
+    const explicitOrigin = new URLSearchParams(window.location.search).get('appOrigin');
+    let referrerOrigin = '';
+    try {
+      referrerOrigin = document.referrer ? new URL(document.referrer).origin : '';
+    } catch {
+      return {
+        embeddingOrigin: '',
+        embeddingOriginError: 'Unable to verify the parent app origin.',
+      };
+    }
+
+    const isEmbedded = window.parent !== window;
+    if (isEmbedded && !referrerOrigin) {
+      return {
+        embeddingOrigin: '',
+        embeddingOriginError: 'The parent app disabled origin information, so INJ Pass cannot connect safely.',
+      };
+    }
+
+    if (explicitOrigin && referrerOrigin && explicitOrigin !== referrerOrigin) {
+      return {
+        embeddingOrigin: '',
+        embeddingOriginError: 'The requested app origin does not match the page embedding INJ Pass.',
+      };
+    }
+
+    return {
+      embeddingOrigin: referrerOrigin || explicitOrigin || window.location.origin,
+      embeddingOriginError: '',
+    };
+  });
 
   const [connected, setConnected] = useState(false);
   const [address, setAddress] = useState('');
   const [walletName, setWalletName] = useState('');
+  const [walletType, setWalletType] = useState<'passkey' | 'traditional' | null>(null);
   const [loading, setLoading] = useState(false);
   const [authPopup, setAuthPopup] = useState<Window | null>(null);
   const authPopupRef = useRef<Window | null>(null);
@@ -145,13 +187,13 @@ export default function EmbedPage() {
 
   useEffect(() => {
     if (!connected) {
-      requestResize(CONNECT_W, CONNECT_H);
+      requestResize(CONNECT_W, CONNECT_H, embeddingOrigin);
     } else if (minimized) {
-      requestResize(BALL_SIZE, BALL_SIZE);
+      requestResize(BALL_SIZE, BALL_SIZE, embeddingOrigin);
     } else {
-      requestResize(CARD_W, CARD_H);
+      requestResize(CARD_W, CARD_H, embeddingOrigin);
     }
-  }, [connected, minimized]);
+  }, [connected, embeddingOrigin, minimized]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || minimized) {
@@ -183,7 +225,7 @@ export default function EmbedPage() {
         width: nextWidth,
         height: nextHeight,
       };
-      requestResize(nextWidth, nextHeight);
+      requestResize(nextWidth, nextHeight, embeddingOrigin);
     };
 
     updateSize();
@@ -198,7 +240,7 @@ export default function EmbedPage() {
       observer.disconnect();
       window.removeEventListener('resize', updateSize);
     };
-  }, [connected, minimized, hasPendingSign, loading, errorToast, walletName, address]);
+  }, [address, connected, embeddingOrigin, errorToast, hasPendingSign, loading, minimized, walletName]);
 
   useEffect(() => {
     if (hasPendingSign && minimized) {
@@ -238,16 +280,25 @@ export default function EmbedPage() {
     authPopupRef.current = null;
     setAddress('');
     setWalletName('');
+    setWalletType(null);
     setConnected(false);
     setMinimized(false);
     setHasPendingSign(false);
-    window.parent.postMessage({ type: 'INJPASS_DISCONNECTED' }, '*');
-  }, [authPopup]);
+    postToParent({ type: 'INJPASS_DISCONNECTED' }, embeddingOrigin);
+  }, [authPopup, embeddingOrigin]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (!isValidOrigin(event.origin)) return;
+      if (!event.data || typeof event.data !== 'object') return;
       const { type } = event.data;
+      const isPopupResponse = type === 'SIGN_RESPONSE' || type === 'TX_RESPONSE';
+      const isFromParent = event.source === window.parent && event.origin === embeddingOrigin;
+      const isFromAuthPopup = (
+        event.source === authPopupRef.current
+        && event.origin === window.location.origin
+      );
+      if (isPopupResponse ? !isFromAuthPopup : !isFromParent) return;
+
       // Auth popup sends flat: { type, requestId, ... }
       // SDK sends nested: { type, data: { id, ... } }
       // Normalize: prefer event.data.data (SDK), fallback to event.data (popup)
@@ -404,7 +455,7 @@ export default function EmbedPage() {
 
       if (type === 'SIGN_RESPONSE') {
         setHasPendingSign(false);
-        window.parent.postMessage(
+        postToParent(
           {
             type: 'INJPASS_SIGN_RESPONSE',
             requestId: data.requestId,
@@ -412,7 +463,7 @@ export default function EmbedPage() {
             address: data.address,
             error: data.error,
           },
-          '*'
+          embeddingOrigin
         );
       }
 
@@ -424,14 +475,14 @@ export default function EmbedPage() {
           rawData: event.data,
         });
         setHasPendingSign(false);
-        window.parent.postMessage(
+        postToParent(
           {
             type: 'INJPASS_TX_RESPONSE',
             requestId: data.requestId,
             txHash: data.txHash,
             error: data.error,
           },
-          '*'
+          embeddingOrigin
         );
         console.log('[INJ Pass /embed] INJPASS_TX_RESPONSE forwarded to parent (dApp)');
       }
@@ -443,18 +494,25 @@ export default function EmbedPage() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [connected, handleDisconnect]);
+  }, [connected, embeddingOrigin, handleDisconnect]);
 
   const handleConnect = async () => {
     setLoading(true);
     dismissErrorToast(true);
 
     try {
-      const { address: walletAddress, walletName: nextWalletName, popup } =
-        await triggerWalletConnect();
+      if (embeddingOriginError) {
+        throw new Error(embeddingOriginError);
+      }
+      if (!embeddingOrigin || !isValidOrigin(embeddingOrigin)) {
+        throw new Error('This app origin is not authorized to connect to INJ Pass.');
+      }
+      const { address: walletAddress, walletName: nextWalletName, walletType: nextWalletType, popup } =
+        await triggerWalletConnect(embeddingOrigin);
 
       setAddress(walletAddress);
       setWalletName(nextWalletName);
+      setWalletType(nextWalletType || null);
       setConnected(true);
 
       if (popup && !popup.closed) {
@@ -462,18 +520,19 @@ export default function EmbedPage() {
         setAuthPopup(popup);
       }
 
-      window.parent.postMessage(
+      postToParent(
         {
           type: 'INJPASS_CONNECTED',
           address: walletAddress,
           walletName: nextWalletName,
+          walletType: nextWalletType,
         },
-        '*'
+        embeddingOrigin
       );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Connection failed';
       showErrorToast(errorMsg);
-      window.parent.postMessage({ type: 'INJPASS_ERROR', error: errorMsg }, '*');
+      postToParent({ type: 'INJPASS_ERROR', error: errorMsg }, embeddingOrigin);
     } finally {
       setLoading(false);
     }
@@ -593,7 +652,7 @@ export default function EmbedPage() {
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <TrustPillBadge label="Passkey Security" icon="passkey" isLightMode={isLightMode} showActivation activationIndex={0} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.14em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
+            <TrustPillBadge label={walletType === 'traditional' ? 'Local Encryption' : 'Passkey Security'} icon="passkey" isLightMode={isLightMode} showActivation activationIndex={0} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.14em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
             <TrustPillBadge label="Sovereign Custody" icon="custody" isLightMode={isLightMode} showActivation activationIndex={1} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.14em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
             <TrustPillBadge label="Agent Session" icon="lock" isLightMode={isLightMode} showActivation activationIndex={2} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.14em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
           </div>
@@ -690,8 +749,8 @@ export default function EmbedPage() {
               Connect to INJ Pass
             </h2>
             <p className={`mt-2 max-w-[21rem] text-sm leading-6 ${brandTextTone}`}>
-              Open a passkey-secured wallet session that matches the same design
-              language as your INJ Pass dashboard.
+              Choose one of your INJ Pass wallets and keep every signature inside
+              a secure authorization window.
             </p>
           </div>
 
@@ -701,7 +760,7 @@ export default function EmbedPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <TrustPillBadge label="Passkey Security" icon="passkey" isLightMode={isLightMode} showActivation activationIndex={0} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.14em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
+          <TrustPillBadge label="Wallet Choice" icon="passkey" isLightMode={isLightMode} showActivation activationIndex={0} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.14em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
           <TrustPillBadge label="Sovereign Custody" icon="custody" isLightMode={isLightMode} showActivation activationIndex={1} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.14em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
           <TrustPillBadge label="Agent Session" icon="lock" isLightMode={isLightMode} showActivation activationIndex={2} className="!gap-1.5 !px-2.5 !py-1 !text-[10px] !font-medium !tracking-[0.14em] !uppercase sm:!px-2.5 sm:!py-1 sm:!text-[10px]" />
         </div>
@@ -739,11 +798,11 @@ export default function EmbedPage() {
             </div>
             <div>
               <p className="text-sm font-semibold tracking-[-0.01em]">
-                Continue with your paired passkey
+                Choose your INJ Pass wallet
               </p>
               <p className={`mt-1 text-xs leading-5 ${brandTextTone}`}>
-                Your wallet opens in a secure INJ Pass window and stays under
-                your control throughout the session.
+                Select a Passkey or traditional wallet. INJ Gift receives only
+                the address and approved results.
               </p>
             </div>
           </div>
@@ -785,7 +844,7 @@ export default function EmbedPage() {
           ) : (
             <>
               <FingerprintIcon className="h-[18px] w-[18px]" />
-              Continue with Passkey
+              Choose wallet
             </>
           )}
         </button>

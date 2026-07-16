@@ -106,47 +106,13 @@ function CloseIcon() {
   );
 }
 
-function SupportHeadsetIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 12a8 8 0 0 1 16 0"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-      />
-      <path
-        d="M6 12.5v3.25A2.25 2.25 0 0 0 8.25 18H9.5v-6H8.25A2.25 2.25 0 0 0 6 14.25"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M18 12.5v3.25A2.25 2.25 0 0 1 15.75 18H14.5v-6h1.25A2.25 2.25 0 0 1 18 14.25"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M14.5 18a2.5 2.5 0 0 1-2.5 2.5H10.5"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function SupportAvatar({ isLight }: { isLight: boolean }) {
   return (
     <div
       className={`relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border shadow-sm ${
         isLight
-          ? 'border-violet-200 bg-violet-100'
-          : 'border-violet-400/30 bg-violet-950'
+          ? 'border-black/10 bg-white'
+          : 'border-white/12 bg-white/[0.06]'
       }`}
       aria-hidden="true"
     >
@@ -167,8 +133,8 @@ function SupportHeaderAvatar({ isLight }: { isLight: boolean }) {
     <div
       className={`relative mr-3 h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border shadow-sm ${
         isLight
-          ? 'border-violet-200 bg-violet-100'
-          : 'border-violet-400/30 bg-violet-950'
+          ? 'border-black/10 bg-white'
+          : 'border-white/12 bg-white/[0.06]'
       }`}
       aria-hidden="true"
     >
@@ -232,6 +198,7 @@ export default function SupportChat() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const usesSidebarLauncher = pathname === '/' || pathname === '/welcome' || pathname === '/dashboard';
 
   useEffect(() => {
     setMessages(readStoredMessages());
@@ -275,6 +242,19 @@ export default function SupportChat() {
         window.clearTimeout(closeTimerRef.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const handleOpenFromSidebar = () => {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+      setIsClosing(false);
+      setIsOpen(true);
+    };
+    window.addEventListener('injpass:open-support', handleOpenFromSidebar);
+    return () => window.removeEventListener('injpass:open-support', handleOpenFromSidebar);
   }, []);
 
   if (hideForEmbeddedSurface) {
@@ -422,20 +402,20 @@ export default function SupportChat() {
   };
 
   const panelClass = isLight
-    ? 'border-slate-200/90 bg-white/95 text-slate-950 shadow-[0_24px_80px_rgba(15,23,42,0.18)]'
-    : 'border-white/10 bg-[#090b10]/95 text-white shadow-[0_24px_80px_rgba(0,0,0,0.42)]';
+    ? 'border-black/8 bg-white/94 text-[#1d1d1f] shadow-[0_24px_90px_rgba(0,0,0,0.14)]'
+    : 'border-white/10 bg-[#111113]/94 text-white shadow-[0_24px_90px_rgba(0,0,0,0.5)]';
 
   const headerClass = isLight
-    ? 'border-slate-200/90 bg-white/90'
-    : 'border-white/10 bg-white/[0.03]';
+    ? 'border-black/8 bg-white/86'
+    : 'border-white/10 bg-white/[0.04]';
 
-  const mutedTextClass = isLight ? 'text-slate-500' : 'text-gray-400';
+  const mutedTextClass = isLight ? 'text-black/48' : 'text-white/48';
 
   return (
     <>
       {isOpen ? (
         <section
-          className={`fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] left-3 right-3 z-[70] flex h-[min(36rem,calc(100vh-7rem))] origin-bottom-right flex-col overflow-hidden rounded-lg border backdrop-blur-xl transition-[opacity,transform,filter] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:left-auto sm:right-4 sm:w-96 ${
+          className={`fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] left-3 right-3 z-[70] flex h-[min(36rem,calc(100vh-7rem))] origin-bottom-right flex-col overflow-hidden rounded-[1.35rem] border backdrop-blur-xl transition-[opacity,transform,filter] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] sm:left-auto sm:right-5 sm:w-[25rem] ${
             isClosing
               ? 'pointer-events-none translate-y-3 scale-[0.985] opacity-0 blur-[2px]'
               : 'translate-y-0 scale-100 opacity-100 blur-0'
@@ -455,8 +435,8 @@ export default function SupportChat() {
               <button
                 type="button"
                 onClick={resetChat}
-                className={`rounded-lg p-2 transition-colors ${
-                  isLight ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-900' : 'text-gray-400 hover:bg-white/10 hover:text-white'
+                className={`rounded-full p-2 transition-colors ${
+                  isLight ? 'text-black/46 hover:bg-black/5 hover:text-black' : 'text-white/46 hover:bg-white/10 hover:text-white'
                 }`}
                 aria-label="Start a new support chat"
                 title="New chat"
@@ -466,8 +446,8 @@ export default function SupportChat() {
               <button
                 type="button"
                 onClick={closeChat}
-                className={`rounded-lg p-2 transition-colors ${
-                  isLight ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-900' : 'text-gray-400 hover:bg-white/10 hover:text-white'
+                className={`rounded-full p-2 transition-colors ${
+                  isLight ? 'text-black/46 hover:bg-black/5 hover:text-black' : 'text-white/46 hover:bg-white/10 hover:text-white'
                 }`}
                 aria-label="Close support chat"
                 title="Close"
@@ -483,15 +463,15 @@ export default function SupportChat() {
               const isPendingAssistant = message.role === 'assistant' && !message.content && !message.isError;
               const bubbleClass = isUser
                 ? isLight
-                  ? 'ml-auto border border-slate-200 bg-slate-50 text-slate-900'
-                  : 'ml-auto border border-black bg-[linear-gradient(180deg,#17191f,#050607)] text-white shadow-[0_8px_18px_rgba(0,0,0,0.16)]'
+                  ? 'ml-auto bg-black text-white'
+                  : 'ml-auto bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.16)]'
                 : message.isError
                   ? isLight
                     ? 'mr-auto border border-red-200 bg-red-50 text-red-700'
                     : 'mr-auto border border-red-400/25 bg-red-500/10 text-red-200'
                   : isLight
-                    ? 'mr-auto border border-slate-200 bg-slate-50 text-slate-900'
-                    : 'mr-auto border border-white/10 bg-white/[0.06] text-gray-100';
+                    ? 'mr-auto border border-black/8 bg-[#f6f6f2] text-black'
+                    : 'mr-auto border border-white/10 bg-white/[0.06] text-white';
 
               return (
                 <div
@@ -500,7 +480,7 @@ export default function SupportChat() {
                 >
                   {!isUser ? <SupportAvatar isLight={isLight} /> : null}
                   <div
-                    className={`max-w-[86%] rounded-lg px-3 py-2 text-sm leading-6 ${bubbleClass}`}
+                    className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm leading-6 ${bubbleClass}`}
                   >
                     {isPendingAssistant ? (
                       <TypingDots />
@@ -520,10 +500,10 @@ export default function SupportChat() {
                     type="button"
                     onClick={() => void sendMessage(shortcut)}
                     disabled={isSending}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 ${
-                      isLight
-                        ? 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                        : 'border-white/10 bg-white/[0.04] text-gray-200 hover:border-white/20 hover:bg-white/[0.08]'
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isLight
+                        ? 'border-black/10 bg-white text-black/62 hover:bg-black/5 hover:text-black'
+                        : 'border-white/10 bg-white/[0.04] text-white/62 hover:border-white/20 hover:bg-white/[0.08] hover:text-white'
                     }`}
                   >
                     {shortcut}
@@ -536,16 +516,16 @@ export default function SupportChat() {
           </div>
 
           <form
-            className={`border-t p-3 ${isLight ? 'border-slate-200/90 bg-white/85' : 'border-white/10 bg-black/20'}`}
+            className={`border-t p-3 ${isLight ? 'border-black/8 bg-white/86' : 'border-white/10 bg-black/20'}`}
             onSubmit={(event) => {
               event.preventDefault();
               void sendMessage();
             }}
           >
             <div
-              className={`flex items-end gap-2 rounded-lg border px-2 py-2 ${
+              className={`flex items-end gap-2 rounded-2xl border px-2 py-2 ${
                 isLight
-                  ? 'border-slate-200 bg-white'
+                  ? 'border-black/8 bg-white'
                   : 'border-white/10 bg-white/[0.04]'
               }`}
             >
@@ -562,42 +542,41 @@ export default function SupportChat() {
                 rows={1}
                 placeholder="Ask Eric..."
                 className={`max-h-28 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 outline-none ${
-                  isLight ? 'text-slate-950 placeholder:text-slate-400' : 'text-white placeholder:text-gray-500'
+                  isLight ? 'text-black placeholder:text-black/38' : 'text-white placeholder:text-white/38'
                 }`}
                 disabled={isSending}
               />
               <button
                 type="submit"
                 disabled={!draft.trim() || isSending}
-                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border text-white shadow-[0_10px_22px_rgba(0,0,0,0.22)] transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border shadow-[0_10px_22px_rgba(0,0,0,0.16)] transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
                   isLight
-                    ? 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                    : 'border-white/10 bg-[linear-gradient(180deg,#242832,#050608)] hover:border-white/20 hover:bg-[#16191f]'
+                    ? 'border-black bg-black text-white hover:bg-black/82'
+                    : 'border-white bg-white text-black hover:bg-white/86'
                 }`}
                 aria-label="Send support message"
                 title="Send"
               >
-                <SendIcon className={isLight ? 'text-slate-950' : 'text-white'} />
+                <SendIcon className={isLight ? 'text-white' : 'text-black'} />
               </button>
             </div>
           </form>
         </section>
       ) : null}
 
-      <button
+      {!usesSidebarLauncher && <button
         type="button"
         onClick={isOpen ? closeChat : openChat}
-        className={`fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-[80] inline-flex h-12 origin-bottom-right items-center justify-center gap-2 rounded-full border px-5 text-sm font-semibold shadow-2xl transition-[opacity,transform,border-color,background-color,box-shadow] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] ${
+        className={`fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-5 z-[80] inline-flex h-12 origin-bottom-right items-center justify-center rounded-full border px-5 text-sm font-semibold shadow-2xl transition-[opacity,transform,border-color,background-color,box-shadow] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] ${
           isLight
-            ? 'border-violet-300 bg-[linear-gradient(135deg,#8b5cf6,#7c3aed)] text-white shadow-[0_18px_46px_rgba(124,58,237,0.32)] hover:border-violet-200 hover:bg-[linear-gradient(135deg,#9d72ff,#8b5cf6)] hover:shadow-[0_22px_54px_rgba(124,58,237,0.4)]'
-            : 'border-violet-400/35 bg-[linear-gradient(135deg,#6d28d9,#4c1d95)] text-white shadow-[0_18px_46px_rgba(76,29,149,0.46)] hover:border-violet-300/55 hover:bg-[linear-gradient(135deg,#7c3aed,#5b21b6)] hover:shadow-[0_22px_54px_rgba(91,33,182,0.54)]'
+            ? 'border-black bg-black text-white shadow-[0_18px_46px_rgba(0,0,0,0.18)] hover:bg-black/82 hover:shadow-[0_22px_54px_rgba(0,0,0,0.24)]'
+            : 'border-white/14 bg-white text-black shadow-[0_18px_46px_rgba(0,0,0,0.48)] hover:bg-white/88 hover:shadow-[0_22px_54px_rgba(0,0,0,0.58)]'
         }`}
         aria-label={isOpen ? 'Close Eric support' : 'Open Eric support'}
         title={isOpen ? 'Close support' : 'Open support'}
       >
-        <SupportHeadsetIcon />
         <span>Support</span>
-      </button>
+      </button>}
     </>
   );
 }

@@ -14,7 +14,9 @@ function normalizeIcon(icon: string) {
   if (icon.startsWith('/')) return icon;
 
   const looksLikeImage = /\.(png|jpe?g|webp|gif|svg|avif)(\?.*)?$/i.test(icon);
-  if (looksLikeImage) return icon;
+  if (looksLikeImage) {
+    return /^https?:\/\//i.test(icon) ? icon : `/${icon}`;
+  }
 
   try {
     const parsed = icon.startsWith('http') ? new URL(icon) : new URL(`https://${icon}`);

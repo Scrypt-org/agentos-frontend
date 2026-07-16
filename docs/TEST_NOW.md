@@ -317,7 +317,7 @@ https://blockscout.injective.network/tx/你的交易哈希
 
 ```bash
 # 1. 进入项目
-cd /Users/dongfang/Desktop/injpass-nfc/frontend
+cd ~/projects/inj-pass-frontend
 
 # 2. 安装依赖
 pnpm install

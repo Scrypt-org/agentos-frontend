@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePin } from '@/contexts/PinContext';
 import { useWallet } from '@/contexts/WalletContext';
+import { authenticateWalletSession } from '@/services/wallet-auth';
 
 interface TransactionAuthModalProps {
   isOpen: boolean;
@@ -22,21 +23,24 @@ export default function TransactionAuthModal({
   const { defaultAuthMethod, verifyPin, resetActivity } = usePin();
   const { keystore, privateKey, unlock } = useWallet();
   const [pin, setPin] = useState('');
+  const [walletPassword, setWalletPassword] = useState('');
   const [error, setError] = useState('');
   const [verifying, setVerifying] = useState(false);
   const pinInputRef = useRef<HTMLInputElement>(null);
   const primaryActionRef = useRef<HTMLButtonElement>(null);
-  const requiresPasskeyUnlock = !privateKey;
+  const requiresWalletUnlock = !privateKey;
+  const requiresLocalPassword = requiresWalletUnlock && keystore?.keyScheme === 'local-mnemonic-v1';
 
   useEffect(() => {
     if (!isOpen) {
       setPin('');
+      setWalletPassword('');
       setError('');
       setVerifying(false);
       return;
     }
 
-    if (!requiresPasskeyUnlock && defaultAuthMethod === 'pin') {
+    if (!requiresWalletUnlock && defaultAuthMethod === 'pin') {
       window.requestAnimationFrame(() => {
         pinInputRef.current?.focus();
       });
@@ -46,7 +50,7 @@ export default function TransactionAuthModal({
     window.requestAnimationFrame(() => {
       primaryActionRef.current?.focus();
     });
-  }, [defaultAuthMethod, isOpen, requiresPasskeyUnlock]);
+  }, [defaultAuthMethod, isOpen, requiresWalletUnlock]);
 
   useEffect(() => {
     if (!isOpen || variant !== 'modal') return undefined;
@@ -93,11 +97,21 @@ export default function TransactionAuthModal({
     try {
       const { unlockWalletKey } = await import('@/wallet/key-management');
 
-      if (!keystore?.credentialId) {
-        throw new Error('No passkey found');
+      if (!keystore) throw new Error('No local wallet found.');
+      if (keystore.keyScheme !== 'local-mnemonic-v1' && !keystore.credentialId) {
+        throw new Error('No Passkey found.');
       }
-
-      const decryptedPrivateKey = await unlockWalletKey(keystore);
+      const decryptedPrivateKey = await unlockWalletKey(
+        keystore,
+        requiresLocalPassword ? { password: walletPassword } : undefined,
+      );
+      if (requiresLocalPassword) {
+        await authenticateWalletSession({
+          privateKey: decryptedPrivateKey,
+          walletAddress: keystore.address,
+          walletName: keystore.walletName,
+        });
+      }
       unlock(decryptedPrivateKey, keystore);
       resetActivity();
       onSuccess();
@@ -109,7 +123,7 @@ export default function TransactionAuthModal({
   };
 
   const handleVerify = () => {
-    if (!requiresPasskeyUnlock && defaultAuthMethod === 'pin') {
+    if (!requiresWalletUnlock && defaultAuthMethod === 'pin') {
       handlePinVerify();
     } else {
       handlePasskeyVerify();
@@ -138,8 +152,10 @@ export default function TransactionAuthModal({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="text-xs text-blue-400">
-              {requiresPasskeyUnlock
-                ? 'Your signing key needs to be re-unlocked with Passkey before this transaction can proceed'
+              {requiresWalletUnlock
+                ? requiresLocalPassword
+                  ? 'Enter the local wallet password to unlock the signing key for this transaction'
+                  : 'Your signing key needs to be re-unlocked with Passkey before this transaction can proceed'
                 : defaultAuthMethod === 'pin' 
                   ? 'Enter your 6-digit PIN to authorize this transaction'
                   : 'Use your biometric authentication to authorize this transaction'
@@ -147,7 +163,7 @@ export default function TransactionAuthModal({
             </p>
           </div>
 
-          {defaultAuthMethod === 'pin' && !requiresPasskeyUnlock && (
+          {defaultAuthMethod === 'pin' && !requiresWalletUnlock && (
             <div>
               <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
                 Enter PIN
@@ -171,6 +187,20 @@ export default function TransactionAuthModal({
             </div>
           )}
 
+          {requiresLocalPassword && (
+            <input
+              type="password"
+              value={walletPassword}
+              onChange={(event) => setWalletPassword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && walletPassword) handleVerify();
+              }}
+              placeholder="Local wallet password"
+              autoComplete="current-password"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-white/30"
+            />
+          )}
+
           {error && (
             <div className="text-red-400 text-sm text-center">{error}</div>
           )}
@@ -186,7 +216,7 @@ export default function TransactionAuthModal({
             <button
               ref={primaryActionRef}
               onClick={handleVerify}
-              disabled={verifying || (defaultAuthMethod === 'pin' && !requiresPasskeyUnlock && pin.length !== 6)}
+              disabled={verifying || (defaultAuthMethod === 'pin' && !requiresWalletUnlock && pin.length !== 6) || (requiresLocalPassword && !walletPassword)}
               className="flex-1 py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-gray-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {verifying ? (
@@ -197,7 +227,9 @@ export default function TransactionAuthModal({
                   Verifying...
                 </>
               ) : (
-                requiresPasskeyUnlock ? 'Unlock with Passkey' : 'Verify'
+                requiresWalletUnlock
+                  ? requiresLocalPassword ? 'Unlock wallet' : 'Unlock with Passkey'
+                  : 'Verify'
               )}
             </button>
           </div>

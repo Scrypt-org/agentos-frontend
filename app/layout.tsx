@@ -12,11 +12,11 @@ export const metadata: Metadata = {
   description: "Passkey-powered wallet for Injective",
   icons: {
     icon: [
-      { url: "/lambda.png" },
-      { url: "/lambda.png", sizes: "32x32", type: "image/png" },
-      { url: "/lambda.png", sizes: "16x16", type: "image/png" },
+      { url: "/inj-pass-favicon.png" },
+      { url: "/inj-pass-favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/inj-pass-favicon.png", sizes: "16x16", type: "image/png" },
     ],
-    apple: "/lambda.png",
+    apple: "/inj-pass-favicon.png",
   },
   appleWebApp: {
     capable: true,
@@ -71,7 +71,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className="antialiased">
+      <body className="antialiased" suppressHydrationWarning>
         <ThemeProvider>
           {/* Sidebar Overlay */}
           <SidebarOverlay />

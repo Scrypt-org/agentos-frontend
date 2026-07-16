@@ -9,13 +9,12 @@
 npm i -g vercel
 
 # Navigate to project root
-cd /Users/dongfang/Desktop/injpass-nfc
+cd ~/projects/inj-pass-frontend
 
 # Login to Vercel
 vercel login
 
 # Deploy frontend
-cd frontend
 vercel --prod
 
 # You'll get a URL like: https://your-app.vercel.app

@@ -57,6 +57,7 @@ export interface WalletConnectRequest {
   type: 'WALLET_CONNECT';
   requestId: string;
   origin: string;
+  appOrigin?: string;
 }
 
 export interface WalletConnectResponse {
@@ -64,6 +65,7 @@ export interface WalletConnectResponse {
   requestId: string;
   address?: string;
   walletName?: string;
+  walletType?: 'passkey' | 'traditional';
   error?: string;
 }
 
@@ -172,14 +174,25 @@ export function triggerPasskeySign(message: string): Promise<{ signature: Uint8A
 }
 
 // ===== 4. 弹窗授权函数 - 连接钱包 =====
-export function triggerWalletConnect(): Promise<{ address: string; walletName: string; popup: Window }> {
+export function triggerWalletConnect(appOrigin?: string): Promise<{
+  address: string;
+  walletName: string;
+  walletType?: 'passkey' | 'traditional';
+  popup: Window;
+}> {
   return new Promise((resolve, reject) => {
     const requestId = crypto.randomUUID();
     const authUrl = getAuthPopupUrl();
     
     // 打开授权窗口
+    const query = new URLSearchParams({
+      requestId,
+      origin: window.location.origin,
+      action: 'connect',
+    });
+    if (appOrigin) query.set('appOrigin', appOrigin);
     const popup = window.open(
-      `${authUrl}?requestId=${requestId}&origin=${encodeURIComponent(window.location.origin)}&action=connect`,
+      `${authUrl}?${query.toString()}`,
       'injpass_connect',
       getPopupFeatures()
     );
@@ -199,7 +212,7 @@ export function triggerWalletConnect(): Promise<{ address: string; walletName: s
         }
       }
 
-      const { type, requestId: respId, address, walletName, error } = event.data;
+      const { type, requestId: respId, address, walletName, walletType, error } = event.data;
 
       // 处理窗口准备就绪消息
       if (type === 'AUTH_WINDOW_READY' && respId === requestId) {
@@ -227,7 +240,7 @@ export function triggerWalletConnect(): Promise<{ address: string; walletName: s
           reject(new Error(error));
         } else if (address && walletName) {
           // 成功时返回弹窗引用
-          resolve({ address, walletName, popup });
+          resolve({ address, walletName, walletType, popup });
         } else {
           if (!popup.closed) {
             popup.close();
@@ -259,7 +272,8 @@ export function triggerWalletConnect(): Promise<{ address: string; walletName: s
         const request: WalletConnectRequest = {
           type: 'WALLET_CONNECT',
           requestId,
-          origin: window.location.origin
+          origin: window.location.origin,
+          appOrigin,
         };
         popup.postMessage(request, authUrl.startsWith('http') ? new URL(authUrl).origin : window.location.origin);
       }

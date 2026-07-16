@@ -43,14 +43,11 @@ async function deriveKey(entropy: Uint8Array, salt: Uint8Array): Promise<CryptoK
  * @param entropy - Entropy from Passkey/NFC/password (32 bytes minimum)
  * @returns Encrypted string in format "salt:iv:tag:encrypted" (all hex)
  */
-export async function encryptKey(
-  privateKey: Uint8Array,
+async function encryptBytes(
+  value: Uint8Array,
   entropy: Uint8Array
 ): Promise<string> {
   try {
-    if (privateKey.length !== 32) {
-      throw new Error('Private key must be 32 bytes');
-    }
     if (entropy.length < 32) {
       throw new Error('Entropy must be at least 32 bytes');
     }
@@ -66,7 +63,7 @@ export async function encryptKey(
     const encrypted = await crypto.subtle.encrypt(
       { name: ALGORITHM, iv: iv as BufferSource },
       key,
-      privateKey as BufferSource
+      value as BufferSource
     );
 
     // Extract tag (last 16 bytes of GCM output)
@@ -86,6 +83,20 @@ export async function encryptKey(
   }
 }
 
+export async function encryptKey(
+  privateKey: Uint8Array,
+  entropy: Uint8Array
+): Promise<string> {
+  if (privateKey.length !== 32) {
+    throw new Error('Private key must be 32 bytes');
+  }
+  return encryptBytes(privateKey, entropy);
+}
+
+export async function encryptText(value: string, entropy: Uint8Array): Promise<string> {
+  return encryptBytes(new TextEncoder().encode(value), entropy);
+}
+
 /**
  * Decrypt private key using AES-256-GCM
  * 
@@ -93,7 +104,7 @@ export async function encryptKey(
  * @param entropy - Same entropy used for encryption
  * @returns Decrypted private key (32 bytes)
  */
-export async function decryptKey(
+async function decryptBytes(
   encryptedData: string,
   entropy: Uint8Array
 ): Promise<Uint8Array> {
@@ -130,6 +141,21 @@ export async function decryptKey(
   } catch (error) {
     throw new Error(`Decryption failed: ${error instanceof Error ? error.message : 'Invalid key or corrupted data'}`);
   }
+}
+
+export async function decryptKey(
+  encryptedData: string,
+  entropy: Uint8Array
+): Promise<Uint8Array> {
+  const value = await decryptBytes(encryptedData, entropy);
+  if (value.length !== 32) {
+    throw new Error('Decrypted private key must be 32 bytes');
+  }
+  return value;
+}
+
+export async function decryptText(encryptedData: string, entropy: Uint8Array): Promise<string> {
+  return new TextDecoder().decode(await decryptBytes(encryptedData, entropy));
 }
 
 // Utility functions

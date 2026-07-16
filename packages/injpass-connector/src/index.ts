@@ -89,6 +89,7 @@ export interface InjPassConfig {
 export interface ConnectedWallet {
   address: string;
   walletName?: string;
+  walletType?: 'passkey' | 'traditional';
   signer: InjPassSigner;
 }
 
@@ -159,8 +160,8 @@ export class InjPassConnector {
    * ⚡ How it works (New Architecture):
    * 1. SDK creates an iframe with INJ Pass embed page
    * 2. User clicks "Connect" in the iframe
-   * 3. A popup window opens for Passkey authentication
-   * 4. User authenticates with biometrics in the popup
+   * 3. A popup window opens with the user's INJ Pass wallets
+   * 4. User selects and unlocks a Passkey or traditional wallet
    * 5. Popup closes and sends wallet info back to iframe
    * 6. Iframe forwards the info to your dApp
    * 
@@ -198,7 +199,7 @@ export class InjPassConnector {
         reject(
           new Error(
             embedLoaded
-              ? 'Connection timeout: no response from the INJ Pass approval popup. Please retry and complete the passkey prompt.'
+              ? 'Connection timeout: no response from the INJ Pass approval popup. Please retry and choose a wallet.'
               : `Connection timeout: the INJ Pass widget never loaded (${this.config.embedUrl}).`,
           ),
         );
@@ -210,7 +211,7 @@ export class InjPassConnector {
           return; // Ignore messages from other origins
         }
 
-        const { type, address, walletName, error } = event.data;
+        const { type, address, walletName, walletType, error } = event.data;
 
         if (type === 'INJPASS_CONNECTED') {
           clearTimeout(loadTimeout);
@@ -223,6 +224,7 @@ export class InjPassConnector {
           const wallet: ConnectedWallet = {
             address,
             walletName,
+            walletType,
             signer,
           };
           this.connectedWallet = wallet;
@@ -502,7 +504,9 @@ export class InjPassConnector {
 
   private createIframe(onError?: () => void): void {
     this.iframe = document.createElement('iframe');
-    this.iframe.src = this.config.embedUrl;
+    const embedUrl = new URL(this.config.embedUrl);
+    embedUrl.searchParams.set('appOrigin', window.location.origin);
+    this.iframe.src = embedUrl.toString();
     if (onError) {
       // Fires when the browser cannot load the iframe document (network error,
       // blocked host). Note: for a cross-origin document that DOES load, only
@@ -586,7 +590,7 @@ class InjPassSigner {
    * ⚡ How it works (New Architecture):
    * 1. SDK sends sign request to iframe
    * 2. Iframe opens a popup window for authentication
-   * 3. User authenticates with Passkey in the popup
+   * 3. User approves in the secure wallet popup
    * 4. Popup signs the message and sends result back
    * 5. Result is forwarded to your dApp
    * 
@@ -753,3 +757,11 @@ class InjPassSigner {
 }
 
 export type { InjPassSigner };
+export {
+  INJPASS_MINIAPP_CHANNEL,
+  InjPassMiniAppConnector,
+  type ConnectedMiniAppWallet,
+  type InjPassMiniAppConfig,
+  type InjPassMiniAppNavigationAction,
+  type InjPassMiniAppSession,
+} from './miniapp';

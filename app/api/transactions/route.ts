@@ -25,11 +25,18 @@ export async function GET(request: NextRequest) {
     
     console.log(`[API] Fetching transactions from: ${apiUrl}`);
     
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    const [response, latestBlockResponse] = await Promise.all([
+      fetch(apiUrl, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      }),
+      fetch(activeChain.rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }),
+      }).catch(() => null),
+    ]);
 
     console.log(`[API] Response status: ${response.status}`);
 
@@ -61,8 +68,20 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    
-    return NextResponse.json(data);
+    let currentBlock: number | null = null;
+    if (latestBlockResponse?.ok) {
+      try {
+        const latestBlockPayload = await latestBlockResponse.json() as { result?: unknown };
+        if (typeof latestBlockPayload.result === 'string') {
+          const parsedBlock = Number.parseInt(latestBlockPayload.result, 16);
+          if (Number.isSafeInteger(parsedBlock)) currentBlock = parsedBlock;
+        }
+      } catch {
+        currentBlock = null;
+      }
+    }
+
+    return NextResponse.json({ ...data, current_block: currentBlock });
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return NextResponse.json(

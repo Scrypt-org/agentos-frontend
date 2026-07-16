@@ -86,4 +86,14 @@ describe('mini app URL resolution', () => {
     expect(new URL(resolved.src).origin).toBe('https://omisper-front.pages.dev');
     expect(resolved.baseOverride).toBe('https://omisper-front.pages.dev');
   });
+
+  it('falls back to the deployed Omisper Pages origin', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubGlobal('window', { location: { origin: 'https://www.injpass.com' } });
+    const manifest = getMiniAppManifest('omisper');
+
+    const resolved = resolveMiniAppAgentUrl(manifest!, []);
+
+    expect(new URL(resolved.src).origin).toBe('https://omisper-front.pages.dev');
+  });
 });

@@ -78,7 +78,7 @@ export const MINI_APP_MANIFESTS: readonly MiniAppManifest[] = [
     slug: 'omisper',
     name: 'Omisper',
     developmentUrl: process.env.NEXT_PUBLIC_OMISPER_APP_URL || 'http://localhost:5173',
-    productionUrl: process.env.NEXT_PUBLIC_OMISPER_APP_URL || 'https://omisper.vercel.app',
+    productionUrl: process.env.NEXT_PUBLIC_OMISPER_APP_URL || 'https://omisper-front.pages.dev',
     networkName: NETWORK_CONFIG.mainnet.name,
     chainId: NETWORK_CONFIG.mainnet.chainId,
     rpcUrl: NETWORK_CONFIG.mainnet.rpcUrl,

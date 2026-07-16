@@ -75,6 +75,11 @@ import {
 import { executeSwap, getTokenBalances } from '@/services/dex-swap';
 import { fetchDapps } from '@/services/dapps';
 import { getDAppIconUrl } from '@/services/dapp-icons';
+import {
+  visibleComposerDApps,
+  visibleMarketDApps,
+  visibleSidebarDApps,
+} from '@/services/dapp-visibility';
 import { claimDailyCheckIn, getNinjaStatus, getTransactions, type NinjaStatusResponse, type PointsTransaction } from '@/services/points';
 import { getUserProfile, type UserProfileResponse } from '@/services/user';
 import { authenticateWalletSession } from '@/services/wallet-auth';
@@ -4084,37 +4089,19 @@ function MiniAppPanel({
 function CampaignPanel({
   isLight,
   copy,
-  onJoin,
 }: {
   isLight: boolean;
   copy: ShellCopy;
-  onJoin: () => void;
 }) {
   return (
-    <section className="mx-auto mt-8 w-full max-w-4xl py-6">
+    <section className="mx-auto mt-8 flex min-h-[55vh] w-full max-w-4xl flex-col py-6">
       <div className={cx('text-xs font-bold uppercase tracking-[0.16em]', isLight ? 'text-black/42' : 'text-white/42')}>
         {copy.campaign}
       </div>
-      <div className={cx('mt-5 grid gap-6 border-y py-7 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center', isLight ? 'border-black/8' : 'border-white/10')}>
-        <div>
-          <div className="flex items-center gap-3">
-            <div className={cx('relative h-11 w-11 overflow-hidden rounded-xl border', isLight ? 'border-black/10 bg-white' : 'border-white/12 bg-white/6')}>
-              <Image src="/bankrupt-elon-musk.png" alt="Bankrupt Elon Musk" fill sizes="44px" className="object-cover" />
-            </div>
-            <div>
-              <h2 className="inj-display-serif text-3xl leading-tight">{copy.campaignTitle}</h2>
-              <div className={cx('mt-1 text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>Bankrupt Elon Musk · Injective</div>
-            </div>
-          </div>
-          <p className={cx('mt-5 max-w-2xl text-sm leading-6', isLight ? 'text-black/58' : 'text-white/58')}>{copy.campaignBody}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onJoin}
-          className={cx('inline-flex h-10 items-center justify-center rounded-full px-5 text-sm font-bold transition', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}
-        >
-          {copy.joinCampaign}
-        </button>
+      <div className="flex flex-1 items-center justify-center">
+        <h2 className={cx('inj-display-serif text-4xl sm:text-5xl', isLight ? 'text-black/70' : 'text-white/70')}>
+          {copy.comingSoon}
+        </h2>
       </div>
     </section>
   );
@@ -6218,7 +6205,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     if (!composerTrigger) return [];
     const query = composerTrigger.query.toLocaleLowerCase();
     if (composerTrigger.symbol === '@') {
-      return dappMarketItems
+      return visibleComposerDApps(dappMarketItems)
         .filter((app) => app.name.toLocaleLowerCase().includes(query))
         .slice(0, 7)
         .map((app) => ({
@@ -6263,7 +6250,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     composerSuggestionRefs.current[composerSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
   }, [composerSuggestionIndex]);
   const pinnedDApps = useMemo(
-    () => dappMarketItems.filter((app) => app.aiDriven),
+    () => visibleSidebarDApps(dappMarketItems).filter((app) => app.aiDriven),
+    [dappMarketItems]
+  );
+  const marketDApps = useMemo(
+    () => visibleMarketDApps(dappMarketItems),
     [dappMarketItems]
   );
   const activeMiniAppManifest = useMemo(
@@ -8403,12 +8394,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     window.setTimeout(() => composerInputRef.current?.focus(), 60);
   };
 
-  const joinCampaign = () => {
-    const campaign = dappMarketItems.find((app) => app.id === 'bankrupt-elon-musk')
-      || dappMarketApps.find((app) => app.id === 'bankrupt-elon-musk');
-    if (campaign) openDApp(campaign);
-  };
-
   const startCreativeFromShortcut = (text: string) => {
     switchProductMode('creative');
     void requestCreativeProjectPlan(text);
@@ -9701,7 +9686,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 }}
                 className={cx('inj-subtle-line w-full rounded-xl px-3 py-2 text-left text-sm transition', isLight ? 'text-black/70 hover:bg-black/5' : 'text-white/70 hover:bg-white/8')}
               >
-                {copy.campaignTitle}
+                {copy.comingSoon}
               </button>
             </div>
           )}
@@ -10872,7 +10857,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   )}
                   {activeChatSurface === 'dapp-market' && (
                     <DAppMarketPanel
-                      apps={dappMarketItems}
+                      apps={marketDApps}
                       tabs={miniAppTabs}
                       activeTabId={activeMiniAppTabId}
                       onOpenApp={openDAppFromMarket}
@@ -10887,7 +10872,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                     />
                   )}
                   {activeChatSurface === 'campaign' && (
-                    <CampaignPanel isLight={isLight} copy={copy} onJoin={joinCampaign} />
+                    <CampaignPanel isLight={isLight} copy={copy} />
                   )}
                   {activeChatSurface === 'skills' && (
                     <SkillsPanel isLight={isLight} copy={copy} skills={allSkills} canCreate={isAuthenticated} onCreate={addCustomSkill} onUse={useSkill} />

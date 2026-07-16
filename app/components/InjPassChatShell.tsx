@@ -79,6 +79,7 @@ import { getUserProfile, type UserProfileResponse } from '@/services/user';
 import { authenticateWalletSession } from '@/services/wallet-auth';
 import { validateInviteCode } from '@/services/referral';
 import { createMySkill, getMySkills, getPublicSkills } from '@/services/skills';
+import { consumeGuestChatReply, getGuestChatQuota } from '@/services/guest-chat-quota';
 import { getN1NJ4NFTs, getNFTDetails, resolveNFTUri, type NFT } from '@/services/nft';
 import { getCatNFTDetails, getCatNFTsForOwner, mintSponsoredCatNFT } from '@/services/catnft';
 import { getUserStakingInfo, type StakingInfo } from '@/services/staking';
@@ -1993,6 +1994,40 @@ function isWalletInteractionRequest(message: string) {
 
 function shouldOfferWalletLogin(prompt: string, response: string) {
   return responseRequiresWalletLogin(response) || isWalletInteractionRequest(prompt);
+}
+
+function getGuestChatQuotaMessage(languageCode: LanguageCode, remaining: number) {
+  const messages: Record<LanguageCode, { remaining: (count: number) => string; exhausted: string }> = {
+    en: {
+      remaining: (count) => `You have ${count} free guest ${count === 1 ? 'reply' : 'replies'} remaining in this browser.`,
+      exhausted: 'You have used all 3 free guest replies in this browser. Log in to continue chatting.',
+    },
+    de: {
+      remaining: (count) => `In diesem Browser ${count === 1 ? 'ist noch 1 kostenlose Gastantwort' : `sind noch ${count} kostenlose Gastantworten`} verfügbar.`,
+      exhausted: 'Du hast alle 3 kostenlosen Gastantworten in diesem Browser verwendet. Melde dich an, um weiter zu chatten.',
+    },
+    fr: {
+      remaining: (count) => `Il vous reste ${count} réponse${count === 1 ? '' : 's'} gratuite${count === 1 ? '' : 's'} dans ce navigateur.`,
+      exhausted: 'Vous avez utilisé les 3 réponses gratuites de ce navigateur. Connectez-vous pour continuer.',
+    },
+    ko: {
+      remaining: (count) => `이 브라우저에서 무료 게스트 답변이 ${count}회 남았습니다.`,
+      exhausted: '이 브라우저의 무료 게스트 답변 3회를 모두 사용했습니다. 계속하려면 로그인하세요.',
+    },
+    ja: {
+      remaining: (count) => `このブラウザで無料ゲスト回答をあと${count}回利用できます。`,
+      exhausted: 'このブラウザの無料ゲスト回答3回をすべて使用しました。続けるにはログインしてください。',
+    },
+    'zh-Hans': {
+      remaining: (count) => `此浏览器还剩 ${count} 次免费访客对话。`,
+      exhausted: '此浏览器的 3 次免费访客对话已用完，请登录后继续。',
+    },
+    'zh-Hant': {
+      remaining: (count) => `此瀏覽器還剩 ${count} 次免費訪客對話。`,
+      exhausted: '此瀏覽器的 3 次免費訪客對話已用完，請登入後繼續。',
+    },
+  };
+  return remaining > 0 ? messages[languageCode].remaining(remaining) : messages[languageCode].exhausted;
 }
 
 const thinkingFallbacks: Record<LanguageCode, Record<ThinkingMode | 'mint', string[]>> = {
@@ -7536,6 +7571,25 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }
 
     if (!isAuthenticated) {
+      const guestQuota = getGuestChatQuota();
+      if (guestQuota.exhausted) {
+        stopThinkingProgress();
+        setMessages((current) => [
+          ...current,
+          {
+            id: `a-${messageStamp}`,
+            role: 'assistant',
+            body: getGuestChatQuotaMessage(selectedLanguageCode, 0),
+            action: 'login',
+          },
+        ]);
+        setChatWorkStatus('idle');
+        if (chatAbortControllerRef.current === controller) {
+          chatAbortControllerRef.current = null;
+        }
+        return;
+      }
+
       setIsAgentRunning(true);
       try {
         const result = await sendPublicAgentMessage({
@@ -7552,11 +7606,13 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         if (!result.ok || !result.message) {
           throw new Error(result.error || 'AI request failed');
         }
+        const nextGuestQuota = consumeGuestChatReply();
+        const responseBody = `${result.message}\n\n_${getGuestChatQuotaMessage(selectedLanguageCode, nextGuestQuota.remaining)}_`;
         const assistantMessage: ChatMessage = {
           id: `a-${messageStamp}`,
           role: 'assistant',
-          body: result.message || '',
-          action: shouldOfferWalletLogin(trimmedText, result.message || '')
+          body: responseBody,
+          action: nextGuestQuota.exhausted || shouldOfferWalletLogin(trimmedText, result.message || '')
             ? 'login'
             : undefined,
         };

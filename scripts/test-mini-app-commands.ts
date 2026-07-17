@@ -335,4 +335,32 @@ const resultCopy = formatMiniAppAgentResult({
 }, 'zh-Hans');
 assert.match(resultCopy, /7月21日杭州见/);
 
+const giftCreate = parseMiniAppAgentCommand(
+  '@INJ Gift 创建 0.01 INJ 红包，2 份，密码 lucky，1 小时，平均分配',
+  'zh-Hans',
+);
+assert.equal(giftCreate?.appId, 'inj-gift');
+assert.equal(giftCreate?.action, 'create');
+assert.deepEqual(giftCreate?.params, {
+  amount: '0.01',
+  count: 2,
+  password: 'lucky',
+  durationSec: 3600,
+  mode: 'equal',
+});
+
+const packetId = `0x${'ab'.repeat(32)}`;
+const giftClaim = parseMiniAppAgentCommand(`@INJ Gift 领取 ${packetId} 密码 lucky`, 'zh-Hans');
+assert.equal(giftClaim?.appId, 'inj-gift');
+assert.equal(giftClaim?.action, 'claim');
+assert.equal(giftClaim?.params.packetId, packetId);
+
+const giftCreatedCopy = formatMiniAppAgentResult({
+  ok: true,
+  key: 'inj_gift_created',
+  data: { transactionHash: '0xcreate', packetId, password: 'lucky', amount: '0.01', count: 2 },
+}, 'zh-Hans');
+assert.match(giftCreatedCopy, /红包已创建/);
+assert.match(giftCreatedCopy, new RegExp(packetId));
+
 console.log('Mini-app command parsing tests passed.');

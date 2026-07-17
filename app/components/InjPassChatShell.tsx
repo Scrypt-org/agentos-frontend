@@ -7477,13 +7477,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setIsAgentRunning(true);
       try {
         const command = parseInjGiftCommand(trimmedText);
-        const signingKey = command.kind === 'create' || command.kind === 'claim'
-          ? isAuthenticated ? await requireWalletPrivateKey() : undefined
-          : undefined;
+        if (command.kind !== 'help') {
+          throw new Error('INJ Gift mini app command runner is unavailable. Please try again.');
+        }
         if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
         const result = await executeInjGiftCommand(command, {
           languageCode: selectedLanguageCode,
-          privateKey: signingKey,
         });
         if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
 

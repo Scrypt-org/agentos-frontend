@@ -118,7 +118,7 @@ import {
   type PreparedMnemonicWallet,
   type PrfDetection,
 } from '@/wallet/key-management';
-import { deleteWallet, deleteWalletByAddress, loadWallet, loadWallets, setActiveWallet } from '@/wallet/keystore';
+import { deleteWallet, deleteWalletByAddress, loadWallet, loadWallets, reconcileWalletStorage, setActiveWallet } from '@/wallet/keystore';
 import type { LocalKeystore } from '@/types/wallet';
 import { privateKeyToHex } from '@/utils/wallet';
 import { INJECTIVE_MAINNET, type GasEstimate } from '@/types/chain';
@@ -6103,6 +6103,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [accountSweepTarget, setAccountSweepTarget] = useState('');
   const [accountDeleteConfirmation, setAccountDeleteConfirmation] = useState('');
   const [passkeyRemovalSignaled, setPasskeyRemovalSignaled] = useState<boolean | null>(null);
+
   const [sidebarWalletSummary, setSidebarWalletSummary] = useState({
     inj: '0',
     lam: 0,
@@ -6237,6 +6238,16 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         symbol: '$' as const,
       }));
   }, [allSkills, composerAssetBalances, composerTrigger, dappMarketItems, isAuthenticated, sidebarWalletSummary.lam]);
+
+  useEffect(() => {
+    let active = true;
+    void reconcileWalletStorage().then((wallets) => {
+      if (active) setLocalWallets(wallets);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (composerSuggestions.length === 0) {

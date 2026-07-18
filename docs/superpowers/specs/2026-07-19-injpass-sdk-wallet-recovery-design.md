@@ -20,7 +20,7 @@ INJ Gift 通过 Connector SDK 加载 INJ Pass `/embed`，再由 Embed 打开 `/a
 - 自动找回仍存在于 IndexedDB、但已经从钱包列表消失的助记词钱包。
 - 任意连接终态都能贯穿 `/auth → /embed → Connector → INJ Gift`，不再出现悬挂 Promise 或无限 loading。
 - 失败、取消或超时后可以立即重试，不需要刷新页面。
-- Embed 的状态、错误和语言与宿主保持一致。
+- Embed 的新增连接终态和错误提示复用现有语言机制，与宿主保持一致。
 - 不上传助记词、私钥、钱包密码或已解密密钥。
 
 ## 非目标
@@ -110,7 +110,7 @@ Embed 成为协议状态的可视化控制器，而不是自行推测状态：
 - 连接成功后展示选中的钱包名称和缩略地址。
 - iframe 重载或卸载时取消当前本地请求并清理监听器。
 
-语言由宿主通过初始化参数或 Connector options 传入，支持 `zh-CN` 与 `en`。若未传入，则使用 Embed 自身 locale；错误码保持不变，只有显示文本本地化。
+项目已经具备宿主语言传递和中英文展示能力，本次不重做国际化框架。新增的连接错误码接入现有语言机制：优先使用宿主已传入的 language；未传入时沿用 Embed 当前 locale。错误码保持不变，只有新增显示文本进入现有中英文映射。
 
 ### 5. Connector SDK
 
@@ -127,11 +127,11 @@ Connector 维护唯一的连接 attempt：
 
 ### 6. INJ Gift 接入
 
-INJ Gift 只依据 Connector 的状态和结构化事件更新 UI：
+INJ Gift 已经完成 Connector 基础接入、主网配置和现有中英文提示。本次不重写接入层，只对新的结构化连接终态做最小兼容调整：
 
 - `connecting` 仅在当前 attempt 未结束时为真。
 - `USER_CANCELLED` 不显示为系统故障，恢复连接按钮并允许用户重试。
-- 其他错误按当前页面语言显示可行动提示。
+- 新增错误码复用当前页面已有语言状态，显示可行动提示。
 - 页面卸载、路由变化或手动断开时取消当前 attempt。
 - 创建红包与领取红包都从同一个已连接 session 获取账户和签名能力，不再隐式发起第二次连接。
 
@@ -188,5 +188,5 @@ INJ Gift 只依据 Connector 的状态和结构化事件更新 UI：
 - 兼容旧 Passkey 可连接；不可兼容钱包可见且有明确迁移说明。
 - 关闭授权窗口后 1 秒内 Embed 和 INJ Gift 停止 loading，并可立即重试。
 - 所有连接终态都有结构化错误码，且不会遗留 listener、timer 或 pending Promise。
-- Embed 和 INJ Gift 的连接提示支持中英文一致展示。
+- 新增连接错误复用既有中英文机制，现有 INJ Gift 文案和接入行为不回归。
 - 现有 PRF 连接、创建红包和领取红包链路不回归。

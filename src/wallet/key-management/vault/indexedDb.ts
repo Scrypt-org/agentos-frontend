@@ -86,6 +86,10 @@ export async function getVault(address: string): Promise<LocalMnemonicVaultV1 | 
   return vault ?? null;
 }
 
+export async function listVaults(): Promise<LocalMnemonicVaultV1[]> {
+  return transact<LocalMnemonicVaultV1[]>('readonly', (store) => store.getAll());
+}
+
 export async function deleteVault(address: string): Promise<void> {
   await transact('readwrite', (store) => store.delete(address.toLowerCase()));
 }

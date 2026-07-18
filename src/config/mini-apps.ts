@@ -21,7 +21,7 @@ export interface MiniAppManifest {
 
 const INJ_GIFT_CONTRACT = (
   process.env.NEXT_PUBLIC_INJ_GIFT_CONTRACT_ADDRESS
-  || '0xfF2750Ac6f03d4fD4AA19D49a17DC4459cf2d6Ed'
+  || '0x294cDD0Ac5B2ef8b23E2dc3A993E133356Ee72D5'
 ) as Address;
 
 const ERIC_MFER_CONTRACT = (
@@ -56,9 +56,9 @@ export const MINI_APP_MANIFESTS: readonly MiniAppManifest[] = [
     // Fallback only. The embed URL normally follows the dApp record's `url`
     // (see resolveMiniAppUrl's baseOverride); this is used when that is absent.
     productionUrl: 'https://www.inj-gift.fun',
-    networkName: NETWORK_CONFIG.testnet.name,
-    chainId: NETWORK_CONFIG.testnet.chainId,
-    rpcUrl: NETWORK_CONFIG.testnet.rpcUrl,
+    networkName: NETWORK_CONFIG.mainnet.name,
+    chainId: NETWORK_CONFIG.mainnet.chainId,
+    rpcUrl: NETWORK_CONFIG.mainnet.rpcUrl,
     permissions: ['accounts', 'read', 'sign', 'transactions'],
     allowedContracts: [INJ_GIFT_CONTRACT],
   },

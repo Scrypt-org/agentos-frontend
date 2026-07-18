@@ -14,6 +14,19 @@ afterEach(() => {
 });
 
 describe('mini app URL resolution', () => {
+  it('registers INJ Gift on Injective EVM Mainnet', () => {
+    const manifest = getMiniAppManifest('inj-gift');
+    expect(manifest).not.toBeNull();
+    expect(manifest).toMatchObject({
+      chainId: 1776,
+      permissions: ['accounts', 'read', 'sign', 'transactions'],
+    });
+    expect(manifest!.rpcUrl).toContain('evm-rpc.injective.network');
+    expect(manifest!.allowedContracts).toEqual([
+      '0x294cDD0Ac5B2ef8b23E2dc3A993E133356Ee72D5',
+    ]);
+  });
+
   it('keeps eric mfer on the active INJ Pass origin', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubGlobal('window', { location: { origin: 'http://localhost:3001' } });

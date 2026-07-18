@@ -319,10 +319,26 @@ Creates the INJ Pass surface and waits for the user to authenticate with Passkey
 }
 ```
 
-**Throws:**
-- `Error('Already connected')` - If already connected
-- `Error('Connection timeout')` - If user doesn't authenticate within 60s
-- `Error('Connection failed')` - If authentication fails
+Concurrent calls share one in-flight authorization attempt. If the connector is
+already connected, `connect()` returns the current wallet.
+
+**Throws:** `InjPassConnectorError` with a stable `code` and backward-compatible
+human-readable `message`. Codes include `USER_CANCELLED`, `POPUP_BLOCKED`,
+`CONNECTION_TIMEOUT`, `WALLET_NOT_FOUND`, `WALLET_MIGRATION_REQUIRED`,
+`WALLET_UNLOCK_FAILED`, and `PROTOCOL_ERROR`.
+
+```typescript
+try {
+  await connector.connect();
+} catch (error) {
+  if (error instanceof InjPassConnectorError && error.code === 'USER_CANCELLED') {
+    // Restore the connect button; the user can retry immediately.
+  }
+}
+```
+
+Older Embed deployments that only send an `error` string remain supported and
+are normalized to `PROTOCOL_ERROR`.
 
 #### `disconnect(): void`
 Disconnects wallet and removes iframe from DOM.
@@ -429,7 +445,7 @@ The wallet works on:
 1. CSP blocks iframe loading
 2. User doesn't have platform authenticator
 3. Network issues
-4. User closed popup without authenticating
+4. The authorization request remained open without a response
 
 **Solutions:**
 - Check CSP allows the iframe origin

@@ -69,6 +69,35 @@ export interface WalletConnectResponse {
   error?: string;
 }
 
+export type CurrentAuthRequestMessage =
+  | WalletConnectRequest
+  | AuthRequest
+  | { type: 'SIGN_REQUEST'; requestId: string; message: string }
+  | { type: 'TX_REQUEST'; requestId: string; tx: unknown };
+
+/** Return true only for an INJ Pass protocol message belonging to this request. */
+export function isCurrentAuthRequestMessage(
+  data: unknown,
+  requestId: string,
+): data is CurrentAuthRequestMessage {
+  if (!data || typeof data !== 'object') return false;
+  const message = data as Record<string, unknown>;
+  if (message.requestId !== requestId) return false;
+
+  switch (message.type) {
+    case 'WALLET_CONNECT':
+      return typeof message.origin === 'string';
+    case 'PASSKEY_SIGN':
+      return typeof message.origin === 'string' && typeof message.message === 'string';
+    case 'SIGN_REQUEST':
+      return typeof message.message === 'string';
+    case 'TX_REQUEST':
+      return Boolean(message.tx) && typeof message.tx === 'object';
+    default:
+      return false;
+  }
+}
+
 // ===== 3. 弹窗授权函数 - 签名 =====
 export function triggerPasskeySign(message: string): Promise<{ signature: Uint8Array; address: string }> {
   return new Promise((resolve, reject) => {
@@ -89,12 +118,7 @@ export function triggerPasskeySign(message: string): Promise<{ signature: Uint8A
 
     // 监听授权结果
     const handleMessage = (event: MessageEvent<AuthResponse>) => {
-      if (!isTrustedOrigin(event.origin)) {
-        console.warn('⚠️ Message from origin:', event.origin);
-        if (process.env.NODE_ENV === 'production') {
-          return;
-        }
-      }
+      if (event.source !== popup || event.origin !== window.location.origin) return;
 
       const { type, requestId: respId, signature, address, error } = event.data;
 
@@ -205,12 +229,7 @@ export function triggerWalletConnect(appOrigin?: string): Promise<{
 
     // 监听连接结果
     const handleMessage = (event: MessageEvent<WalletConnectResponse>) => {
-      if (!isTrustedOrigin(event.origin)) {
-        console.warn('⚠️ Message from origin:', event.origin);
-        if (process.env.NODE_ENV === 'production') {
-          return;
-        }
-      }
+      if (event.source !== popup || event.origin !== window.location.origin) return;
 
       const { type, requestId: respId, address, walletName, walletType, error } = event.data;
 

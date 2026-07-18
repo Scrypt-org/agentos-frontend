@@ -349,6 +349,13 @@ export async function validateAndRefreshSession(): Promise<boolean> {
   const token = getAuthToken();
   if (!token) return false;
 
+  // The backend intentionally refuses to refresh an already-expired JWT.
+  // Remove it locally so every page load does not retry the same dead session.
+  if (!isTokenLocallyValid(token)) {
+    removeAuthToken();
+    return false;
+  }
+
   const result = await verifyToken(token);
   if (!result.valid) return false;
 

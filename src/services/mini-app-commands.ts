@@ -1,4 +1,6 @@
-export type MiniAppCommandAppId = 'bankrupt-elon-musk' | 'omisper';
+import { isInjGiftMessage, parseInjGiftCommand } from '@/services/inj-gift';
+
+export type MiniAppCommandAppId = 'bankrupt-elon-musk' | 'omisper' | 'inj-gift';
 
 export type MiniAppCommandAction =
   | 'open'
@@ -11,7 +13,10 @@ export type MiniAppCommandAction =
   | 'send'
   | 'broadcast'
   | 'group'
-  | 'history';
+  | 'history'
+  | 'create'
+  | 'claim'
+  | 'query';
 
 export interface MiniAppAgentCommand {
   appId: MiniAppCommandAppId;
@@ -23,6 +28,12 @@ export interface MiniAppAgentCommand {
     message?: string;
     product?: string;
     quantity?: number;
+    amount?: string;
+    count?: number;
+    password?: string;
+    durationSec?: number;
+    mode?: 'random' | 'equal';
+    packetId?: string;
   };
 }
 
@@ -124,6 +135,36 @@ function extractProduct(text: string): string | undefined {
 }
 
 export function parseMiniAppAgentCommand(text: string, language: string): MiniAppAgentCommand | null {
+  if (isInjGiftMessage(text)) {
+    const gift = parseInjGiftCommand(text);
+    if (gift.kind === 'help') return null;
+    if (gift.kind === 'create') {
+      return {
+        appId: 'inj-gift',
+        action: 'create',
+        rawText: text,
+        language,
+        params: {
+          amount: gift.amount,
+          count: gift.count,
+          password: gift.password,
+          durationSec: gift.durationSec,
+          mode: gift.mode,
+        },
+      };
+    }
+    return {
+      appId: 'inj-gift',
+      action: gift.kind,
+      rawText: text,
+      language,
+      params: {
+        packetId: gift.packetId,
+        password: gift.kind === 'claim' ? gift.password : undefined,
+      },
+    };
+  }
+
   if (OMISPER_PATTERN.test(text)) {
     const addresses = text.match(ADDRESS_PATTERN) || [];
     const intentText = text.replace(ADDRESS_PATTERN, '<address>');
@@ -230,6 +271,40 @@ export function formatMiniAppAgentResult(
     'zh-Hans': '应用暂时无法完成这个请求。',
     'zh-Hant': '應用暫時無法完成這個請求。',
   };
+
+  if (result.key === 'inj_gift_created') {
+    const packetId = stringValue(data.packetId);
+    const hash = stringValue(data.transactionHash);
+    const password = stringValue(data.password);
+    const amount = stringValue(data.amount);
+    const count = Number(data.count || 1);
+    return lang === 'zh-Hans' || lang === 'zh-Hant'
+      ? `INJ Gift 红包已创建：${amount} INJ，共 ${count} 份。\n\n- 红包 ID：\`${packetId}\`\n- 密码：\`${password}\`\n- 交易：\`${hash}\``
+      : `INJ Gift created a ${amount} INJ packet with ${count} gifts.\n\n- Packet ID: \`${packetId}\`\n- Password: \`${password}\`\n- Transaction: \`${hash}\``;
+  }
+
+  if (result.key === 'inj_gift_claimed') {
+    const hash = stringValue(data.transactionHash);
+    const claimed = stringValue(data.claimedAmount);
+    return lang === 'zh-Hans' || lang === 'zh-Hant'
+      ? `INJ Gift 红包领取成功${claimed ? `，收到 ${claimed} wei` : ''}。\n\n交易：\`${hash}\``
+      : `INJ Gift claim succeeded${claimed ? ` for ${claimed} wei` : ''}.\n\nTransaction: \`${hash}\``;
+  }
+
+  if (result.key === 'inj_gift_packet') {
+    const packet = data.packet && typeof data.packet === 'object' ? data.packet as Record<string, unknown> : {};
+    const total = stringValue(packet.totalAmount);
+    const claimed = stringValue(packet.claimedAmount);
+    const count = Number(packet.totalCount || 0);
+    const claimedCount = Number(packet.claimedCount || 0);
+    return lang === 'zh-Hans' || lang === 'zh-Hant'
+      ? `INJ Gift 红包状态：${packet.isActive ? '可领取' : '已结束'}，已领取 ${claimedCount}/${count}，总额 ${total} wei，已领取 ${claimed} wei。`
+      : `INJ Gift packet status: ${packet.isActive ? 'claimable' : 'closed'}, ${claimedCount}/${count} claimed, ${total} wei total and ${claimed} wei claimed.`;
+  }
+
+  if (result.key === 'user_rejected') {
+    return lang === 'zh-Hans' || lang === 'zh-Hant' ? '你已取消 INJ Gift 钱包授权。' : 'You cancelled the INJ Gift wallet authorization.';
+  }
 
   if (result.key === 'login_required') {
     return {

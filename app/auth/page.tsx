@@ -17,6 +17,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { keccak_256 } from '@noble/hashes/sha3.js';
 import {
   isValidOrigin,
+  isCurrentAuthRequestMessage,
   type AuthRequest,
   type AuthResponse,
   type WalletConnectRequest,
@@ -760,20 +761,28 @@ function AuthPageContent() {
     };
 
     const handleMessage = async (event: MessageEvent) => {
+      if (!isCurrentAuthRequestMessage(event.data, requestId)) {
+        return;
+      }
+
       if (event.source !== window.opener || event.origin !== originParam) {
-        showErrorToast('Origin verification failed');
-        setStatus('error');
+        console.warn('[INJ Pass /auth] Ignored protocol message with invalid origin', {
+          type: event.data.type,
+          actualOrigin: event.origin,
+          expectedOrigin: originParam,
+          openerMatches: event.source === window.opener,
+        });
         return;
       }
 
       const data = event.data;
 
       if (data.type === 'WALLET_CONNECT' && data.requestId === requestId) {
-        await handleWalletConnect(data as WalletConnectRequest, event.origin);
+        await handleWalletConnect(data, event.origin);
       }
 
       if (data.type === 'PASSKEY_SIGN' && data.requestId === requestId) {
-        await handlePasskeySign(data as AuthRequest, event.origin);
+        await handlePasskeySign(data, event.origin);
       }
 
       if (data.type === 'SIGN_REQUEST' && data.requestId === requestId) {

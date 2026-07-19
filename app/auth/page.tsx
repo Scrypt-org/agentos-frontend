@@ -8,9 +8,10 @@ import { WalletErrorToast } from '@/components/WalletErrorToast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useWalletErrorToast } from '@/lib/useWalletErrorToast';
 import { walletAuthorizationCapability } from '@/lib/wallet-authorization';
-import { unlockWalletKey } from '@/wallet/key-management';
-import { loadWallet, reconcileWalletStorage, setActiveWallet } from '@/wallet/keystore/storage';
+import { recoverWallet, unlockWalletKey } from '@/wallet/key-management';
+import { loadWallet, loadWallets, reconcileWalletStorage, setActiveWallet } from '@/wallet/keystore/storage';
 import { signAndSendTransaction } from '@/wallet/chain/evm/sendTransaction';
+import { recoverPasskeyForAuthorization } from '@/services/auth-passkey-recovery';
 import { INJECTIVE_MAINNET, INJECTIVE_TESTNET, type TransactionRequest } from '@/types/chain';
 import { NETWORK_CONFIG } from '@/config/network';
 import type { LocalKeystore } from '@/types/wallet';
@@ -207,6 +208,7 @@ function AuthPageContent() {
   const [status, setStatus] = useState<
     | 'waiting'
     | 'select_wallet'
+    | 'recovering_wallet'
     | 'unlock_wallet'
     | 'sign_pending'
     | 'tx_pending'
@@ -236,6 +238,7 @@ function AuthPageContent() {
     requestId: string;
     targetOrigin: string;
   } | null>(null);
+  const passkeyRecoveryInFlightRef = useRef(false);
   const { errorToast, showErrorToast, dismissErrorToast } = useWalletErrorToast();
 
   const BALL_W = 82;
@@ -410,6 +413,37 @@ function AuthPageContent() {
       return;
     }
     void finishWalletConnect(wallet);
+  };
+
+  const recoverExistingPasskey = async () => {
+    if (passkeyRecoveryInFlightRef.current || !pendingWalletConnectRef.current) return;
+
+    passkeyRecoveryInFlightRef.current = true;
+    dismissErrorToast(true);
+    setErrorMessage('');
+    setStatus('recovering_wallet');
+    setMessage('Choose an existing INJ Pass Passkey...');
+
+    try {
+      const wallet = await recoverPasskeyForAuthorization({
+        recover: recoverWallet,
+        loadWallets,
+      });
+      setAvailableWallets(loadWallets());
+      selectedWalletRef.current = wallet;
+      setSelectedWallet(wallet);
+      await finishWalletConnect(wallet);
+    } catch (error) {
+      const rawMessage = error instanceof Error ? error.message : 'Unable to recover this Passkey wallet.';
+      const friendlyMessage = friendlyErrorMessage(rawMessage);
+      showErrorToast(friendlyMessage);
+      setErrorMessage(friendlyMessage);
+      selectedWalletRef.current = null;
+      setSelectedWallet(null);
+      setStatus('select_wallet');
+    } finally {
+      passkeyRecoveryInFlightRef.current = false;
+    }
   };
 
   const rejectWalletConnect = () => {
@@ -885,6 +919,8 @@ function AuthPageContent() {
   const title =
     status === 'select_wallet'
       ? 'Choose an INJ Pass wallet'
+      : status === 'recovering_wallet'
+        ? 'Recover an existing Passkey wallet'
       : status === 'unlock_wallet'
         ? `Unlock ${selectedWallet?.walletName || 'traditional wallet'}`
       : status === 'sign_pending'
@@ -904,6 +940,8 @@ function AuthPageContent() {
   const description =
     status === 'select_wallet'
       ? `${callerLabel} is requesting an INJ Pass connection. Choose the wallet for this app session.`
+      : status === 'recovering_wallet'
+        ? 'Choose a Passkey already associated with your INJ Pass account.'
       : status === 'unlock_wallet'
         ? 'Enter this wallet\'s local password. It stays inside this secure INJ Pass window.'
       : status === 'sign_pending'
@@ -1053,6 +1091,15 @@ function AuthPageContent() {
                     );
                   })}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => void recoverExistingPasskey()}
+                  className={`mt-3 flex w-full items-center justify-center gap-2 rounded-[20px] border px-4 py-3 text-sm font-semibold transition ${primaryButtonTone}`}
+                >
+                  <FingerprintIcon className="h-4 w-4" />
+                  Use an existing Passkey wallet
+                </button>
 
                 {errorMessage ? <p className={`mt-3 text-xs leading-5 ${isLightMode ? 'text-rose-700' : 'text-rose-200'}`}>{errorMessage}</p> : null}
 
@@ -1217,7 +1264,7 @@ function AuthPageContent() {
               <div className="mt-5 flex min-h-0 flex-1 flex-col justify-between gap-4">
                 <div className={`rounded-[24px] border p-5 ${surfaceTone}`}>
                   <div className="flex flex-col items-center justify-center gap-4 py-4 text-center">
-                    {status === 'waiting' || status === 'processing' ? (
+                    {status === 'waiting' || status === 'processing' || status === 'recovering_wallet' ? (
                       <div
                         className={`h-12 w-12 animate-spin rounded-full border-[3px] ${
                           isLightMode
@@ -1243,8 +1290,8 @@ function AuthPageContent() {
                       <p className="text-base font-semibold">
                         {status === 'waiting'
                           ? 'Initializing secure window'
-                          : status === 'processing'
-                            ? message || 'Authorizing...'
+                          : status === 'processing' || status === 'recovering_wallet'
+                            ? message || (status === 'recovering_wallet' ? 'Waiting for Passkey selection...' : 'Authorizing...')
                             : status === 'success'
                               ? message || 'Authorization complete'
                               : status === 'error'

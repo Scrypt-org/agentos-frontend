@@ -20,11 +20,14 @@ describe('wallet authorization capability', () => {
     });
   });
 
-  it('allows legacy passkeys that retain their credential metadata', () => {
-    expect(walletAuthorizationCapability(wallet({ keyScheme: 'legacy-sha256', credentialId: 'credential' }))).toEqual({
+  it.each([
+    { keyScheme: 'legacy-sha256' as const, credentialId: 'credential' },
+    { keyScheme: undefined, credentialId: 'credential' },
+  ])('allows and labels legacy Passkeys: $keyScheme', (overrides) => {
+    expect(walletAuthorizationCapability(wallet(overrides))).toEqual({
       kind: 'passkey',
       enabled: true,
-      label: 'Passkey',
+      label: 'Legacy Passkey',
     });
   });
 

@@ -1,7 +1,7 @@
 # SDK 已有 Passkey 钱包恢复设计
 
-日期：2026-07-19  
-目标项目：`inj-pass-frontend`  
+日期：2026-07-19
+目标项目：`inj-pass-frontend`
 目标分支：`main`
 
 ## 背景

@@ -6,6 +6,10 @@ import WelcomeThemeIconButton from '@/components/WelcomeThemeIconButton';
 import { WalletErrorToast } from '@/components/WalletErrorToast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { triggerWalletConnect, triggerTxRequest, isValidOrigin } from '@/lib/auth-bridge';
+import {
+  connectionErrorPayload,
+  normalizeConnectionError,
+} from '@/lib/injpass-connection-error';
 import { useWalletErrorToast } from '@/lib/useWalletErrorToast';
 import { creditNinja, debitNinja, getNinjaStatus } from '@/services/points';
 import { getAuthToken, refreshToken, verifyToken } from '@/services/passkey';
@@ -530,9 +534,10 @@ export default function EmbedPage() {
         embeddingOrigin
       );
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Connection failed';
-      showErrorToast(errorMsg);
-      postToParent({ type: 'INJPASS_ERROR', error: errorMsg }, embeddingOrigin);
+      const connectionError = normalizeConnectionError(err);
+      const payload = connectionErrorPayload(connectionError);
+      showErrorToast(payload.error);
+      postToParent({ type: 'INJPASS_ERROR', ...payload }, embeddingOrigin);
     } finally {
       setLoading(false);
     }

@@ -7,8 +7,9 @@ import WelcomeThemeIconButton from '@/components/WelcomeThemeIconButton';
 import { WalletErrorToast } from '@/components/WalletErrorToast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useWalletErrorToast } from '@/lib/useWalletErrorToast';
+import { walletAuthorizationCapability } from '@/lib/wallet-authorization';
 import { unlockWalletKey } from '@/wallet/key-management';
-import { loadWallet, loadWallets, setActiveWallet } from '@/wallet/keystore/storage';
+import { loadWallet, reconcileWalletStorage, setActiveWallet } from '@/wallet/keystore/storage';
 import { signAndSendTransaction } from '@/wallet/chain/evm/sendTransaction';
 import { INJECTIVE_MAINNET, INJECTIVE_TESTNET, type TransactionRequest } from '@/types/chain';
 import { NETWORK_CONFIG } from '@/config/network';
@@ -167,14 +168,11 @@ function isTraditionalWallet(wallet: LocalKeystore | null): boolean {
 }
 
 function canUseWalletWithDapps(wallet: LocalKeystore): boolean {
-  return isTraditionalWallet(wallet) || Boolean(wallet.credentialId);
+  return walletAuthorizationCapability(wallet).enabled;
 }
 
 function walletSecurityLabel(wallet: LocalKeystore): string {
-  if (isTraditionalWallet(wallet)) return 'Traditional';
-  if (wallet.keyScheme === 'prf-v1') return 'Passkey PRF';
-  if (wallet.credentialId) return 'Passkey';
-  return 'Migration required';
+  return walletAuthorizationCapability(wallet).label;
 }
 
 function truncateWalletAddress(address: string): string {
@@ -308,6 +306,23 @@ function AuthPageContent() {
     traditionalSessionKeyRef.current = null;
   }, []);
 
+  useEffect(() => {
+    const notifyPendingCancellation = () => {
+      const pending = pendingWalletConnectRef.current;
+      if (!pending) return;
+      const response: WalletConnectResponse = {
+        type: 'WALLET_CONNECT_RESPONSE',
+        requestId: pending.requestId,
+        code: 'USER_CANCELLED',
+        error: 'Authentication window was closed',
+      };
+      window.opener?.postMessage(response, pending.targetOrigin);
+      pendingWalletConnectRef.current = null;
+    };
+    window.addEventListener('pagehide', notifyPendingCancellation);
+    return () => window.removeEventListener('pagehide', notifyPendingCancellation);
+  }, []);
+
   const getActionPrivateKey = async (): Promise<{
     privateKey: Uint8Array;
     ephemeral: boolean;
@@ -403,6 +418,7 @@ function AuthPageContent() {
       const response: WalletConnectResponse = {
         type: 'WALLET_CONNECT_RESPONSE',
         requestId: pending.requestId,
+        code: 'USER_CANCELLED',
         error: 'User cancelled wallet connection.',
       };
       window.opener?.postMessage(response, pending.targetOrigin);
@@ -652,7 +668,7 @@ function AuthPageContent() {
         if (effectiveAppOrigin && !isValidOrigin(effectiveAppOrigin)) {
           throw new Error('This app is not authorized to use INJ Pass.');
         }
-        const wallets = loadWallets();
+        const wallets = await reconcileWalletStorage();
         if (wallets.length === 0) {
           throw new Error(
             'No wallet found. Please create a wallet first at injpass.com'
@@ -1042,7 +1058,7 @@ function AuthPageContent() {
 
                 <div className="mt-4 flex items-center justify-between gap-3 border-t border-current/10 pt-4">
                   <button type="button" onClick={rejectWalletConnect} className={`rounded-full px-4 py-2.5 text-xs font-semibold transition ${secondaryButtonTone}`}>Cancel</button>
-                  <a href="/welcome" target="_blank" rel="noreferrer" className={`rounded-full px-4 py-2.5 text-xs font-semibold transition ${primaryButtonTone}`}>Create another wallet</a>
+                  <a href="/welcome" target="_blank" rel="noreferrer" className={`rounded-full px-4 py-2.5 text-xs font-semibold transition ${primaryButtonTone}`}>Create or recover wallet</a>
                 </div>
               </div>
             ) : status === 'unlock_wallet' && selectedWallet ? (

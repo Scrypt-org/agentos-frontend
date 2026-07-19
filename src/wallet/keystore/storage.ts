@@ -1,4 +1,6 @@
 import { LocalKeystore } from '@/types/wallet';
+import { listVaults } from '@/wallet/key-management/vault';
+import { mergeWalletSources } from './reconcile';
 
 const STORAGE_KEY = 'injective-pass-wallet';
 const WALLET_VAULT_KEY = 'injective-pass-wallets';
@@ -25,15 +27,22 @@ function writeWalletVault(wallets: LocalKeystore[]): void {
  */
 export function saveWallet(keystore: LocalKeystore): void {
   try {
+    const previousActiveWallet = loadWallet();
     const data = JSON.stringify(keystore);
-    localStorage.setItem(STORAGE_KEY, data);
     const wallets = readWalletVault();
+    if (
+      previousActiveWallet
+      && !wallets.some((wallet) => wallet.address.toLowerCase() === previousActiveWallet.address.toLowerCase())
+    ) {
+      wallets.push(previousActiveWallet);
+    }
     const existingIndex = wallets.findIndex((wallet) => wallet.address.toLowerCase() === keystore.address.toLowerCase());
     if (existingIndex >= 0) {
       wallets[existingIndex] = keystore;
     } else {
       wallets.unshift(keystore);
     }
+    localStorage.setItem(STORAGE_KEY, data);
     writeWalletVault(wallets);
   } catch (error) {
     throw new Error(`Failed to save wallet: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -47,6 +56,15 @@ export function loadWallets(): LocalKeystore[] {
     wallets.unshift(activeWallet);
     writeWalletVault(wallets);
   }
+  return wallets;
+}
+
+export async function reconcileWalletStorage(): Promise<LocalKeystore[]> {
+  const activeWallet = loadWallet();
+  const indexedWallets = readWalletVault();
+  const mnemonicVaults = await listVaults().catch(() => []);
+  const wallets = mergeWalletSources(indexedWallets, activeWallet, mnemonicVaults);
+  writeWalletVault(wallets);
   return wallets;
 }
 

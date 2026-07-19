@@ -3,6 +3,7 @@ export {
   saveWallet,
   loadWallet,
   loadWallets,
+  reconcileWalletStorage,
   setActiveWallet,
   hasWallet,
   deleteWallet,

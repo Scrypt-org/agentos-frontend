@@ -3,6 +3,11 @@
  * 解决 Storage Partitioning 导致的 iframe 中无法访问 LocalStorage 的问题
  */
 
+import {
+  InjPassConnectionError,
+  type InjPassConnectionErrorCode,
+} from './injpass-connection-error';
+
 // ===== 1. 安全配置 =====
 // 通过环境变量配置跨域白名单（逗号分隔）：
 // NEXT_PUBLIC_ALLOWED_ORIGINS=https://omisper.example.com,https://inj-pass-frontend-test.vercel.app
@@ -66,7 +71,21 @@ export interface WalletConnectResponse {
   address?: string;
   walletName?: string;
   walletType?: 'passkey' | 'traditional';
+  code?: InjPassConnectionErrorCode;
   error?: string;
+}
+
+export function watchPopupClosed(
+  popup: Pick<Window, 'closed'>,
+  onClose: () => void,
+  intervalMs = 250,
+): () => void {
+  const interval = setInterval(() => {
+    if (!popup.closed) return;
+    clearInterval(interval);
+    onClose();
+  }, intervalMs);
+  return () => clearInterval(interval);
 }
 
 export type CurrentAuthRequestMessage =
@@ -222,10 +241,12 @@ export function triggerWalletConnect(appOrigin?: string): Promise<{
     );
 
     if (!popup) {
-      reject(new Error('Popup blocked. Please allow popups for this site.'));
+      reject(new InjPassConnectionError('POPUP_BLOCKED', 'Popup blocked. Please allow popups for this site.'));
       return;
     }
     console.log('[INJPASS] connect: auth popup opened, waiting for AUTH_WINDOW_READY', { requestId });
+    let settled = false;
+    let stopCloseWatch: () => void = () => undefined;
 
     // 监听连接结果
     const handleMessage = (event: MessageEvent<WalletConnectResponse>) => {
@@ -242,11 +263,14 @@ export function triggerWalletConnect(appOrigin?: string): Promise<{
       }
 
       if (type === 'WALLET_CONNECT_RESPONSE' && respId === requestId) {
+        if (settled) return;
+        settled = true;
         console.log('[INJPASS] connect: WALLET_CONNECT_RESPONSE received', { hasError: !!error });
         // 清理资源（但不关闭弹窗！）
         clearTimeout(timeout);
         clearTimeout(blockedCheck);
         clearInterval(sendInterval);
+        stopCloseWatch();
         window.removeEventListener('message', handleMessage);
         
         // 🔐 不关闭弹窗，让它转换为持久化签名模式
@@ -256,7 +280,7 @@ export function triggerWalletConnect(appOrigin?: string): Promise<{
           if (!popup.closed) {
             popup.close();
           }
-          reject(new Error(error));
+          reject(new InjPassConnectionError(event.data.code || 'PROTOCOL_ERROR', error));
         } else if (address && walletName) {
           // 成功时返回弹窗引用
           resolve({ address, walletName, walletType, popup });
@@ -264,7 +288,7 @@ export function triggerWalletConnect(appOrigin?: string): Promise<{
           if (!popup.closed) {
             popup.close();
           }
-          reject(new Error('Invalid response from auth window'));
+          reject(new InjPassConnectionError('PROTOCOL_ERROR', 'Invalid response from auth window'));
         }
       }
     };
@@ -276,13 +300,25 @@ export function triggerWalletConnect(appOrigin?: string): Promise<{
     // 给出明确的"弹窗被拦截"提示，而不是误导性的"窗口被关闭"。
     const blockedCheck = setTimeout(() => {
       if (popup.closed) {
+        if (settled) return;
+        settled = true;
         clearInterval(sendInterval);
         clearTimeout(timeout);
         window.removeEventListener('message', handleMessage);
         reject(
-          new Error('Popup blocked. Please allow popups for this site and try again.')
+          new InjPassConnectionError('POPUP_BLOCKED', 'Popup blocked. Please allow popups for this site and try again.')
         );
+        return;
       }
+
+      stopCloseWatch = watchPopupClosed(popup, () => {
+        if (settled) return;
+        settled = true;
+        clearInterval(sendInterval);
+        clearTimeout(timeout);
+        window.removeEventListener('message', handleMessage);
+        reject(new InjPassConnectionError('USER_CANCELLED', 'Authentication window was closed'));
+      });
     }, 600);
 
     // 将连接请求发送给弹窗
@@ -300,13 +336,16 @@ export function triggerWalletConnect(appOrigin?: string): Promise<{
 
     // 超时处理（60秒）
     const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       clearInterval(sendInterval);
       clearTimeout(blockedCheck);
+      stopCloseWatch();
       window.removeEventListener('message', handleMessage);
       if (!popup.closed) {
         popup.close();
       }
-      reject(new Error('Connection timeout. Please try again.'));
+      reject(new InjPassConnectionError('CONNECTION_TIMEOUT', 'Connection timeout. Please try again.'));
     }, 60000);
 
     // 轮询发送请求（降低频率避免重复触发）
@@ -314,11 +353,14 @@ export function triggerWalletConnect(appOrigin?: string): Promise<{
     const maxAttempts = 5; // 减少到 5 次
     const sendInterval = setInterval(() => {
       if (popup.closed) {
+        if (settled) return;
+        settled = true;
         clearInterval(sendInterval);
         clearTimeout(timeout);
         clearTimeout(blockedCheck);
+        stopCloseWatch();
         window.removeEventListener('message', handleMessage);
-        reject(new Error('Authentication window was closed'));
+        reject(new InjPassConnectionError('USER_CANCELLED', 'Authentication window was closed'));
         return;
       }
 

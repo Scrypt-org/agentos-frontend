@@ -93,6 +93,42 @@ export interface ConnectedWallet {
   signer: InjPassSigner;
 }
 
+export type InjPassConnectorErrorCode =
+  | 'USER_CANCELLED'
+  | 'POPUP_BLOCKED'
+  | 'CONNECTION_TIMEOUT'
+  | 'WALLET_NOT_FOUND'
+  | 'WALLET_MIGRATION_REQUIRED'
+  | 'WALLET_UNLOCK_FAILED'
+  | 'PROTOCOL_ERROR';
+
+export class InjPassConnectorError extends Error {
+  constructor(public readonly code: InjPassConnectorErrorCode, message: string) {
+    super(message);
+    this.name = 'InjPassConnectorError';
+  }
+}
+
+const CONNECTOR_ERROR_CODES = new Set<InjPassConnectorErrorCode>([
+  'USER_CANCELLED',
+  'POPUP_BLOCKED',
+  'CONNECTION_TIMEOUT',
+  'WALLET_NOT_FOUND',
+  'WALLET_MIGRATION_REQUIRED',
+  'WALLET_UNLOCK_FAILED',
+  'PROTOCOL_ERROR',
+]);
+
+function connectorError(code: unknown, message: unknown): InjPassConnectorError {
+  const normalizedCode = typeof code === 'string' && CONNECTOR_ERROR_CODES.has(code as InjPassConnectorErrorCode)
+    ? code as InjPassConnectorErrorCode
+    : 'PROTOCOL_ERROR';
+  return new InjPassConnectorError(
+    normalizedCode,
+    typeof message === 'string' && message ? message : 'Connection failed',
+  );
+}
+
 /** Minimal EIP-1193 provider surface (compatible with `window.ethereum`). */
 export interface Eip1193Provider {
   isInjPass: boolean;
@@ -116,6 +152,7 @@ export class InjPassConnector {
   private rpcUrl?: string;
   private chainId?: number;
   private connectedWallet: ConnectedWallet | null = null;
+  private connectAttempt: Promise<ConnectedWallet> | null = null;
 
   constructor(config: InjPassConfig) {
     if (!config.embedUrl) {
@@ -170,13 +207,12 @@ export class InjPassConnector {
    * - WebAuthn in cross-origin iframes
    * - Third-party cookie blocking
    */
-  async connect(): Promise<ConnectedWallet> {
-    if (this.connected) {
-      throw new Error('Already connected');
-    }
+  connect(): Promise<ConnectedWallet> {
+    if (this.connectedWallet) return Promise.resolve(this.connectedWallet);
+    if (this.connectAttempt) return this.connectAttempt;
 
     // Wait for connection
-    return new Promise((resolve, reject) => {
+    const attempt = new Promise<ConnectedWallet>((resolve, reject) => {
       // The embed page proves it loaded and its JS ran by sending its first
       // INJPASS_RESIZE. If nothing arrives within 15s, the widget almost
       // certainly failed to load (network can't reach the embed host, an ad/
@@ -211,7 +247,8 @@ export class InjPassConnector {
           return; // Ignore messages from other origins
         }
 
-        const { type, address, walletName, walletType, error } = event.data;
+        if (event.source !== this.iframe?.contentWindow) return;
+        const { type, address, walletName, walletType, code, error } = event.data;
 
         if (type === 'INJPASS_CONNECTED') {
           clearTimeout(loadTimeout);
@@ -249,8 +286,9 @@ export class InjPassConnector {
         }
 
         if (type === 'INJPASS_ERROR') {
+          clearTimeout(loadTimeout);
           clearTimeout(timeout);
-          reject(new Error(error || 'Connection failed'));
+          reject(connectorError(code, error));
           this.disconnect();
         }
 
@@ -286,6 +324,16 @@ export class InjPassConnector {
         }
       });
     });
+    this.connectAttempt = attempt;
+    void attempt.then(
+      () => {
+        if (this.connectAttempt === attempt) this.connectAttempt = null;
+      },
+      () => {
+        if (this.connectAttempt === attempt) this.connectAttempt = null;
+      },
+    );
+    return attempt;
   }
 
   /**

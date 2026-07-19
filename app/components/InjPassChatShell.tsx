@@ -21,6 +21,11 @@ import { getEthereumAddress, getInjectiveAddress } from '@injectivelabs/sdk-ts';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useWallet } from '@/contexts/WalletContext';
 import { usePin } from '@/contexts/PinContext';
+import {
+  MINI_APP_FRAME_CLASS,
+  MINI_APP_PANEL_CLASS,
+  mainContentOverflowClass,
+} from '@/lib/mini-app-layout';
 import type { DApp } from '@/config/dapps';
 import {
   getMiniAppManifest,
@@ -118,7 +123,7 @@ import {
   type PreparedMnemonicWallet,
   type PrfDetection,
 } from '@/wallet/key-management';
-import { deleteWallet, deleteWalletByAddress, loadWallet, loadWallets, setActiveWallet } from '@/wallet/keystore';
+import { deleteWallet, deleteWalletByAddress, loadWallet, loadWallets, reconcileWalletStorage, setActiveWallet } from '@/wallet/keystore';
 import type { LocalKeystore } from '@/types/wallet';
 import { privateKeyToHex } from '@/utils/wallet';
 import { INJECTIVE_MAINNET, type GasEstimate } from '@/types/chain';
@@ -3947,7 +3952,7 @@ function MiniAppPanel({
   return (
     <section
       className={cx(
-        'relative mx-auto flex h-[calc(100dvh-7.15rem)] min-h-[560px] w-full max-w-[1440px] flex-col overflow-hidden rounded-lg border shadow-[0_20px_70px_rgba(0,0,0,0.09)]',
+        MINI_APP_PANEL_CLASS,
         isLight ? 'border-black/10 bg-[#f7f7f8]' : 'border-white/10 bg-[#0d0d0f] shadow-black/35',
       )}
     >
@@ -4080,7 +4085,7 @@ function MiniAppPanel({
         title={`${app.name} mini app`}
         allow="clipboard-read; clipboard-write; publickey-credentials-get; publickey-credentials-create"
         onLoad={onFrameLoad}
-        className="min-h-0 flex-1 border-0 bg-white"
+        className={MINI_APP_FRAME_CLASS}
       />
     </section>
   );
@@ -6103,6 +6108,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [accountSweepTarget, setAccountSweepTarget] = useState('');
   const [accountDeleteConfirmation, setAccountDeleteConfirmation] = useState('');
   const [passkeyRemovalSignaled, setPasskeyRemovalSignaled] = useState<boolean | null>(null);
+
   const [sidebarWalletSummary, setSidebarWalletSummary] = useState({
     inj: '0',
     lam: 0,
@@ -6113,6 +6119,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const creativeDraftRef = useRef('');
   const pointerDAppRef = useRef<DAppMarketItem | null>(null);
   const miniAppIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const mainContentScrollRef = useRef<HTMLDivElement | null>(null);
   const miniAppWindowRef = useRef<WindowProxy | null>(null);
   const miniAppAgentIframeRef = useRef<HTMLIFrameElement | null>(null);
   const miniAppAgentWindowRef = useRef<WindowProxy | null>(null);
@@ -6237,6 +6244,16 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         symbol: '$' as const,
       }));
   }, [allSkills, composerAssetBalances, composerTrigger, dappMarketItems, isAuthenticated, sidebarWalletSummary.lam]);
+
+  useEffect(() => {
+    let active = true;
+    void reconcileWalletStorage().then((wallets) => {
+      if (active) setLocalWallets(wallets);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (composerSuggestions.length === 0) {
@@ -6372,6 +6389,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }
     return copy.titleCreativePublished;
   }, [activeChatSurface, activeMiniApp?.name, activeMode, copy, creativeStage, guestSlogan, isAuthenticated]);
+
+  useEffect(() => {
+    if (activeChatSurface !== 'mini-app') return;
+    mainContentScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [activeChatSurface, activeMiniAppTabId]);
 
   useEffect(() => {
     const slogans = guestSlogansByLanguage[selectedLanguageCode];
@@ -10670,7 +10692,13 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             </div>
           </header>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-5 pt-32 sm:px-6 sm:pt-16">
+          <div
+            ref={mainContentScrollRef}
+            className={cx(
+              'flex min-h-0 flex-1 flex-col px-4 pb-5 pt-32 sm:px-6 sm:pt-16',
+              mainContentOverflowClass(activeChatSurface),
+            )}
+          >
             <div
               className={cx(
                 'relative isolate mx-auto flex w-full flex-1 flex-col',

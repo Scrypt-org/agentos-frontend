@@ -1,0 +1,55 @@
+.app {
+  --pull: 0;
+  min-height: 100svh;
+  overflow: hidden;
+  color: #fffdf8;
+  background:
+    radial-gradient(circle at 14% 8%, #ffe36ecc 0, transparent 29%),
+    radial-gradient(circle at 88% 18%, #ff728b99 0, transparent 34%),
+    radial-gradient(circle at 73% 82%, #65dcff66 0, transparent 32%),
+    linear-gradient(145deg, #7563f4, #5947df 38%, #496ee4 68%, #6b55dc);
+  font-family: Arial, Helvetica, sans-serif;
+  position: relative;
+}
+.grain { position: fixed; inset: 0; pointer-events: none; opacity: .06; background-image: repeating-radial-gradient(circle at 20% 20%, #fff 0 .4px, transparent .8px 4px); background-size: 11px 13px; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 22px 34px; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.live { color: #171710; background: #ffe36e; border-radius: 999px; padding: 8px 12px; }
+.hero { width: min(900px, calc(100% - 32px)); margin: 0 auto; text-align: center; }
+.hero h1 { margin: 20px 0 12px; font: 400 clamp(38px, 6vw, 68px)/1 Georgia, serif; letter-spacing: -.04em; }
+.hero > p { color: #ffffffc9; min-height: 48px; line-height: 1.6; }
+.machine { width: min(720px, 100%); height: 510px; margin: 25px auto 0; position: relative; perspective: 1200px; }
+.slot { position: absolute; top: 15px; left: 50%; width: min(560px, 82%); height: 48px; transform: translateX(-50%); border-radius: 22px; background: #21175d; box-shadow: inset 0 12px 18px #0008, 0 18px 40px #21105f55; }
+.voucher { position: absolute; top: 45px; left: 50%; width: min(570px, 88%); min-height: 310px; padding: 24px 30px; transform: translate(-50%, calc(-88% + var(--pull) * 92%)) rotateX(calc((1 - var(--pull)) * 8deg)); opacity: calc(.14 + var(--pull)); color: #201b17; text-align: left; border-radius: 8px; background: #f1eee4; box-shadow: 0 30px 70px #1d125c88; transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .3s; }
+.voucher.visible { transform: translate(-50%, 8%); opacity: 1; }
+.security { margin: -24px -30px 20px; padding: 7px 14px; overflow: hidden; white-space: nowrap; color: #7563f4; border-bottom: 1px solid #7563f455; font-size: 8px; letter-spacing: .25em; }
+.voucherHeader { display: flex; justify-content: space-between; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; }
+.voucherHeader strong { font: 700 24px Georgia, serif; text-transform: none; letter-spacing: 0; }
+.amount { margin: 36px 0 25px; display: flex; align-items: end; justify-content: space-between; border-bottom: 2px solid #29221a; }
+.amount small { padding-bottom: 8px; font-weight: 800; letter-spacing: .18em; }
+.amount b { font: 700 clamp(42px, 8vw, 72px)/1 Georgia, serif; }
+.details { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 12px; }
+.details span { color: #645d54; }
+.voucher p { margin-top: 18px; color: #645d54; font-size: 10px; line-height: 1.5; }
+.handle { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 180px; height: 126px; border: 0; color: white; background: transparent; cursor: grab; touch-action: none; }
+.handle:disabled { cursor: not-allowed; opacity: .4; }
+.handle span { display: block; width: 74px; height: 74px; margin: 0 auto 9px; border: 8px solid #241a69; border-radius: 50%; background: linear-gradient(145deg, #ffe36e, #ffad5f); box-shadow: 0 14px 25px #20135a88; }
+.handle b { font-size: 10px; letter-spacing: .13em; }
+.status { display: inline-flex; gap: 16px; margin-top: -5px; padding: 11px 18px; border: 1px solid #ffffff32; border-radius: 999px; background: #34278855; backdrop-filter: blur(12px); font-size: 12px; }
+.primary,.secondary { margin: 18px 6px 30px; padding: 12px 22px; border: 0; border-radius: 999px; font-weight: 800; cursor: pointer; }
+.primary { color: #211a17; background: #ffe36e; }
+.secondary { color: #fff; background: #ffffff1f; }
+.confetti { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+.confetti i { position: absolute; top: -20px; width: 8px; height: 15px; animation: fall 2.8s ease-in infinite; }
+.stateKeys { display: none; }
+@keyframes fall { to { transform: translate(30px, 105vh) rotate(540deg); } }
+@media (max-width: 640px) {
+  .header { padding: 18px; }
+  .header > span:last-child { display: none; }
+  .machine { height: 470px; }
+  .voucher { padding: 20px; min-height: 290px; }
+  .security { margin: -20px -20px 18px; }
+  .amount { margin-top: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voucher,.confetti i { transition: none; animation: none; }
+}

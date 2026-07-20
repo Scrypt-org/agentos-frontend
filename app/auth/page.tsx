@@ -12,6 +12,7 @@ import { recoverWallet, unlockWalletKey } from '@/wallet/key-management';
 import { loadWallet, loadWallets, reconcileWalletStorage, setActiveWallet } from '@/wallet/keystore/storage';
 import { signAndSendTransaction } from '@/wallet/chain/evm/sendTransaction';
 import { recoverPasskeyForAuthorization } from '@/services/auth-passkey-recovery';
+import { signTypedDataJson } from '@/services/typed-data-signing';
 import { INJECTIVE_MAINNET, INJECTIVE_TESTNET, type TransactionRequest } from '@/types/chain';
 import { NETWORK_CONFIG } from '@/config/network';
 import type { LocalKeystore } from '@/types/wallet';
@@ -221,6 +222,8 @@ function AuthPageContent() {
   const [currentSignRequest, setCurrentSignRequest] = useState<{
     requestId: string;
     message: string;
+    kind?: 'message' | 'typed-data';
+    typedData?: string;
     origin: string;
   } | null>(null);
   const [currentTxRequest, setCurrentTxRequest] = useState<{
@@ -275,11 +278,13 @@ function AuthPageContent() {
     const handleSignRequest = (event: MessageEvent) => {
       if (event.source !== window.opener || event.origin !== originParam) return;
 
-      const { type, requestId: reqId, message: msg, tx } = event.data;
+      const { type, requestId: reqId, message: msg, kind, typedData, tx } = event.data;
       if (type === 'SIGN_REQUEST' && statusRef.current === 'ready') {
         setCurrentSignRequest({
           requestId: reqId,
           message: msg,
+          kind,
+          typedData,
           origin: event.origin,
         });
         setStatus('sign_pending');
@@ -479,17 +484,27 @@ function AuthPageContent() {
       try {
         setMessage('Authorizing signature...');
 
-        const messageHash = hashPersonalMessage(msg);
-        const sigBytes = secp256k1.sign(messageHash, authorization.privateKey, {
-          lowS: true,
-          prehash: false,
-          format: 'recovered',
-        });
-
-        const ethSig = new Uint8Array(65);
-        ethSig.set(sigBytes.slice(1, 33), 0);
-        ethSig.set(sigBytes.slice(33, 65), 32);
-        ethSig[64] = sigBytes[0] + 27;
+        let ethSig: Uint8Array;
+        if (currentSignRequest.kind === 'typed-data') {
+          const signature = await signTypedDataJson(
+            authorization.privateKey,
+            currentSignRequest.typedData || msg,
+          );
+          ethSig = Uint8Array.from(
+            signature.slice(2).match(/.{2}/g)?.map((byte) => Number.parseInt(byte, 16)) ?? [],
+          );
+        } else {
+          const messageHash = hashPersonalMessage(msg);
+          const sigBytes = secp256k1.sign(messageHash, authorization.privateKey, {
+            lowS: true,
+            prehash: false,
+            format: 'recovered',
+          });
+          ethSig = new Uint8Array(65);
+          ethSig.set(sigBytes.slice(1, 33), 0);
+          ethSig.set(sigBytes.slice(33, 65), 32);
+          ethSig[64] = sigBytes[0] + 27;
+        }
 
         window.opener?.postMessage(
           {
@@ -717,7 +732,7 @@ function AuthPageContent() {
         setAvailableWallets(wallets);
         setWalletPassword('');
         setErrorMessage('');
-        setMessage('Choose the wallet INJ Gift may request actions from.');
+        setMessage('Choose the wallet this mini app may request actions from.');
         setStatus('select_wallet');
       } catch (err) {
         const rawMsg = err instanceof Error ? err.message : 'Connection failed';
@@ -1242,7 +1257,7 @@ function AuthPageContent() {
                 </div>
 
                 <div className={`rounded-[16px] border px-3 py-2 text-xs ${isLightMode ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-amber-400/20 bg-amber-500/10 text-amber-100'}`}>
-                  Review every field before approving. INJ Gift receives only the resulting transaction hash.
+                  Review every field before approving. The mini app receives only the resulting transaction hash.
                 </div>
 
                 <div className="mt-auto grid grid-cols-2 gap-2 pt-1 flex-shrink-0">

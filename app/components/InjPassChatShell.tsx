@@ -95,7 +95,7 @@ import { getN1NJ4NFTs, getNFTDetails, resolveNFTUri, type NFT } from '@/services
 import { getCatNFTDetails, getCatNFTsForOwner, mintSponsoredCatNFT } from '@/services/catnft';
 import { getUserStakingInfo, type StakingInfo } from '@/services/staking';
 import {
-  executeInjGiftCommand,
+  injGiftHelpMessage,
   isInjGiftMessage,
   parseInjGiftCommand,
 } from '@/services/inj-gift';
@@ -129,6 +129,7 @@ import { privateKeyToHex } from '@/utils/wallet';
 import { INJECTIVE_MAINNET, type GasEstimate } from '@/types/chain';
 import { QRCodeSVG } from 'qrcode.react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
+import MobileSidebarFrame from './MobileSidebarFrame';
 import PasskeyWalletActions from './PasskeyWalletActions';
 
 type ShellEntry = 'home' | 'welcome' | 'dashboard';
@@ -2591,6 +2592,14 @@ function SidebarCollapseIcon({ collapsed, className = 'h-4 w-4' }: { collapsed: 
       <rect x="3.5" y="4" width="17" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
       <path d="M9 4v16" stroke="currentColor" strokeWidth="1.7" />
       <path d={collapsed ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MenuIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -5965,6 +5974,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const { theme, toggleTheme, isThemeReady } = useTheme();
   const isLight = theme === 'light';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [activeMode, setActiveMode] = useState<ProductMode>('chat');
   const [activeChatSurface, setActiveChatSurface] = useState<ChatSurface>('default');
   const [walletOpen, setWalletOpen] = useState(false);
@@ -6244,6 +6254,31 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         symbol: '$' as const,
       }));
   }, [allSkills, composerAssetBalances, composerTrigger, dappMarketItems, isAuthenticated, sidebarWalletSummary.lam]);
+
+  useEffect(() => {
+    const desktopMedia = window.matchMedia('(min-width: 1024px)');
+    const handleBreakpointChange = (event: MediaQueryListEvent | MediaQueryList) => {
+      if (event.matches) {
+        setMobileSidebarOpen(false);
+      } else {
+        setSidebarCollapsed(false);
+      }
+    };
+
+    handleBreakpointChange(desktopMedia);
+    desktopMedia.addEventListener('change', handleBreakpointChange);
+    return () => desktopMedia.removeEventListener('change', handleBreakpointChange);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileSidebarOpen]);
 
   useEffect(() => {
     let active = true;
@@ -7114,6 +7149,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const loadBackendConversations = async () => {
+    setMobileSidebarOpen(false);
     switchProductMode('chat');
     setActiveChatSurface('default');
     setConversationSearchOpen(true);
@@ -7135,6 +7171,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openStoredConversation = async (conversationId: string) => {
+    setMobileSidebarOpen(false);
     const summary = storedConversations.find((conversation) => conversation.id === conversationId);
     const cached = conversationCacheRef.current.get(conversationId);
     const isBuildConversation = summary?.model === 'agent-os-build';
@@ -7503,16 +7540,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           throw new Error('INJ Gift mini app command runner is unavailable. Please try again.');
         }
         if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
-        const result = await executeInjGiftCommand(command, {
-          languageCode: selectedLanguageCode,
-        });
+        const body = injGiftHelpMessage(command.intent, selectedLanguageCode);
         if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
 
         const assistantMessage: ChatMessage = {
           id: `a-${messageStamp}`,
           role: 'assistant',
-          body: result.body,
-          action: !isAuthenticated && shouldOfferWalletLogin(trimmedText, result.body)
+          body,
+          action: !isAuthenticated && shouldOfferWalletLogin(trimmedText, body)
             ? 'login'
             : undefined,
         };
@@ -7530,7 +7565,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 content: message.body,
               })),
             { role: 'user' as const, content: trimmedText },
-            { role: 'assistant' as const, content: result.body },
+            { role: 'assistant' as const, content: body },
           ];
           setAgentConversationId(conversationId);
           setSelectedStoredConversationId(conversationId);
@@ -7758,6 +7793,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openWalletPanel = async (tab: WalletTab, force = false) => {
+    setMobileSidebarOpen(false);
     switchProductMode('chat');
     setActiveChatSurface('default');
     setActiveWalletTab(tab);
@@ -8246,6 +8282,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openDApp = (app: DAppMarketItem, path?: string) => {
+    setMobileSidebarOpen(false);
     if (!getMiniAppManifest(app.id)) {
       if (app.url) {
         window.open(app.url, '_blank', 'noopener,noreferrer');
@@ -8334,12 +8371,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openSkills = () => {
+    setMobileSidebarOpen(false);
     switchProductMode('chat');
     setActiveChatSurface('skills');
     setActiveWalletTab(null);
   };
 
   const openCloudDrive = () => {
+    setMobileSidebarOpen(false);
     switchProductMode('chat');
     setActiveChatSurface('cloud-drive');
     setActiveWalletTab(null);
@@ -9423,6 +9462,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openSupportChat = () => {
+    setMobileSidebarOpen(false);
     setProfileOpen(false);
     window.dispatchEvent(new CustomEvent('injpass:open-support'));
   };
@@ -9432,7 +9472,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   }
 
   return (
-    <main className={cx('inj-shell-font relative h-screen overflow-hidden transition-colors', isCreativeBuildSession && 'inj-creative-build-active', surfaceTone)} data-inj-entry={entry}>
+    <main className={cx('inj-shell-font relative h-dvh overflow-hidden transition-colors', isCreativeBuildSession && 'inj-creative-build-active', surfaceTone)} data-inj-entry={entry}>
       <ShellMotionStyles />
       <SandboxIntroModal
         open={sandboxIntroOpen}
@@ -9479,29 +9519,39 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         }}
       />
       <div className="flex h-full min-h-0">
-        <aside
+        <MobileSidebarFrame
+          open={mobileSidebarOpen}
+          isLight={isLight}
+          onClose={() => setMobileSidebarOpen(false)}
+        >
+        <div
           className={cx(
-            'inj-glass-surface hidden shrink-0 border-r py-3 transition-[width,padding] duration-300 lg:flex lg:flex-col',
-            sidebarCollapsed ? 'w-[76px] px-2' : 'w-[286px] px-3',
+            'inj-glass-surface flex h-full w-full shrink-0 flex-col overflow-y-auto border-r py-3 px-3 transition-[width,padding] duration-300',
+            sidebarCollapsed ? 'lg:w-[76px] lg:px-2' : 'lg:w-[286px] lg:px-3',
             sidebarTone
           )}
         >
           <div className={cx('flex items-center py-2', sidebarCollapsed ? 'justify-center px-1' : 'justify-between px-3')}>
-            {!sidebarCollapsed && <div>
+            <div className={sidebarCollapsed ? 'lg:hidden' : undefined}>
               <div className="text-sm font-bold">INJ Pass</div>
               <div className={cx('text-xs', isLight ? 'text-black/46' : 'text-white/46')}>{copy.brandSubtitle}</div>
-            </div>}
+            </div>
             <button
               type="button"
               onClick={() => {
-                setSidebarCollapsed((current) => !current);
+                if (window.matchMedia('(max-width: 1023px)').matches) {
+                  setMobileSidebarOpen(false);
+                } else {
+                  setSidebarCollapsed((current) => !current);
+                }
                 setProfileOpen(false);
               }}
               className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition', isLight ? 'text-black/52 hover:bg-black/5 hover:text-black' : 'text-white/52 hover:bg-white/8 hover:text-white')}
-              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={mobileSidebarOpen ? 'Close navigation menu' : sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={mobileSidebarOpen ? 'Close navigation menu' : sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              <SidebarCollapseIcon collapsed={sidebarCollapsed} />
+              <CloseIcon className="h-4 w-4 lg:hidden" />
+              <span className="hidden lg:block"><SidebarCollapseIcon collapsed={sidebarCollapsed} /></span>
             </button>
           </div>
 
@@ -9509,6 +9559,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             <button
               type="button"
               onClick={() => {
+                setMobileSidebarOpen(false);
                 switchProductMode('chat');
                 setActiveChatSurface('default');
                 setMessages([]);
@@ -9701,6 +9752,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               <button
                 type="button"
                 onClick={() => {
+                  setMobileSidebarOpen(false);
                   switchProductMode('chat');
                   setActiveChatSurface('campaign');
                   setActiveWalletTab(null);
@@ -9756,6 +9808,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               <button
                 type="button"
                 onClick={() => {
+                  setMobileSidebarOpen(false);
                   setActiveChatSurface('default');
                   switchProductMode('chat');
                 }}
@@ -9829,7 +9882,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             {hasPendingMnemonicBackup && !sidebarCollapsed && (
               <button
                 type="button"
-                onClick={() => void openMnemonicBackup()}
+                onClick={() => {
+                  setMobileSidebarOpen(false);
+                  void openMnemonicBackup();
+                }}
                 className={cx(
                   'w-full rounded-2xl border px-3 py-3 text-left transition',
                   isLight ? 'border-amber-300/70 bg-amber-50 text-amber-950 hover:bg-amber-100/70' : 'border-amber-200/18 bg-amber-200/8 text-amber-100 hover:bg-amber-200/12'
@@ -9901,6 +9957,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         <button
                           type="button"
                           onClick={() => {
+                            setMobileSidebarOpen(false);
                             setProfilePanel('tokens');
                             void refreshAiTokenPanel();
                           }}
@@ -9916,7 +9973,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         </button>
                         <button
                           type="button"
-                          onClick={() => setProfilePanel('language')}
+                          onClick={() => {
+                            setMobileSidebarOpen(false);
+                            setProfilePanel('language');
+                          }}
                           className={cx('w-full rounded-xl px-3 py-2 text-left transition', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
                         >
                           <div className="flex items-center justify-between gap-3">
@@ -9927,7 +9987,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         </button>
                         <button
                           type="button"
-                          onClick={() => setProfilePanel('preferences')}
+                          onClick={() => {
+                            setMobileSidebarOpen(false);
+                            setProfilePanel('preferences');
+                          }}
                           className={cx('w-full rounded-xl px-3 py-2 text-left transition', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
                         >
                           <div className="text-sm font-semibold">{copy.preferences}</div>
@@ -9937,6 +10000,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                           href="https://t.me/injpass"
                           target="_blank"
                           rel="noreferrer"
+                          onClick={() => setMobileSidebarOpen(false)}
                           className={cx('block w-full rounded-xl px-3 py-2 text-left transition', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
                         >
                           <div className="text-sm font-semibold">{copy.community}</div>
@@ -10520,12 +10584,26 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               </button>
             </div>}
           </div>
-        </aside>
+        </div>
+        </MobileSidebarFrame>
 
-        <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <section inert={mobileSidebarOpen ? true : undefined} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header className={cx('pointer-events-none fixed inset-x-0 top-0 z-20 px-4 py-4 transition-[left] duration-300 sm:px-6', sidebarCollapsed ? 'lg:left-[76px]' : 'lg:left-[286px]')}>
             <div className="relative flex items-center justify-between">
               <div className="pointer-events-auto flex items-center gap-2 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setMobileSidebarOpen(true)}
+                  aria-label="Open navigation menu"
+                  aria-controls="injpass-primary-sidebar"
+                  aria-expanded={mobileSidebarOpen}
+                  className={cx(
+                    'flex h-11 w-11 items-center justify-center rounded-xl transition',
+                    isLight ? 'text-black/72 hover:bg-black/5' : 'text-white/72 hover:bg-white/8',
+                  )}
+                >
+                  <MenuIcon />
+                </button>
                 <div className="text-sm font-bold">INJ Pass</div>
               </div>
               {!activeWalletTab && activeChatSurface !== 'mini-app' && activeChatSurface !== 'skills' && activeChatSurface !== 'dapp-market' && <div className="pointer-events-auto absolute left-1/2 top-12 -translate-x-1/2 sm:top-0">
@@ -10579,7 +10657,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                     }}
                     onKeyDownCapture={keepAuthMenuOpen}
                     className={cx(
-                      'inj-glass-surface inj-liquid-menu absolute right-0 top-11 max-h-[min(680px,calc(100vh-5rem))] w-[360px] overflow-y-auto rounded-2xl border p-2 shadow-2xl backdrop-blur-2xl motion-safe:animate-[injFadeDown_360ms_cubic-bezier(0.22,1,0.36,1)_both]',
+                      'inj-glass-surface inj-liquid-menu absolute right-0 top-11 max-h-[min(680px,calc(100dvh-5rem))] w-[min(360px,calc(100vw-2rem))] overflow-y-auto rounded-2xl border p-2 shadow-2xl backdrop-blur-2xl motion-safe:animate-[injFadeDown_360ms_cubic-bezier(0.22,1,0.36,1)_both]',
                       isLight ? 'border-black/8 bg-white/92 text-black shadow-black/12' : 'border-white/10 bg-[#18181b]/92 text-white shadow-black/45'
                     )}
                   >

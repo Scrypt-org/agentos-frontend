@@ -6274,15 +6274,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     if (!mobileSidebarOpen) return;
 
     const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setMobileSidebarOpen(false);
-    };
-
     document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [mobileSidebarOpen]);
 
@@ -7176,6 +7170,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openStoredConversation = async (conversationId: string) => {
+    setMobileSidebarOpen(false);
     const summary = storedConversations.find((conversation) => conversation.id === conversationId);
     const cached = conversationCacheRef.current.get(conversationId);
     const isBuildConversation = summary?.model === 'agent-os-build';
@@ -7799,6 +7794,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openWalletPanel = async (tab: WalletTab, force = false) => {
+    setMobileSidebarOpen(false);
     switchProductMode('chat');
     setActiveChatSurface('default');
     setActiveWalletTab(tab);
@@ -8287,6 +8283,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openDApp = (app: DAppMarketItem, path?: string) => {
+    setMobileSidebarOpen(false);
     if (!getMiniAppManifest(app.id)) {
       if (app.url) {
         window.open(app.url, '_blank', 'noopener,noreferrer');
@@ -8375,12 +8372,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openSkills = () => {
+    setMobileSidebarOpen(false);
     switchProductMode('chat');
     setActiveChatSurface('skills');
     setActiveWalletTab(null);
   };
 
   const openCloudDrive = () => {
+    setMobileSidebarOpen(false);
     switchProductMode('chat');
     setActiveChatSurface('cloud-drive');
     setActiveWalletTab(null);
@@ -9464,6 +9463,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openSupportChat = () => {
+    setMobileSidebarOpen(false);
     setProfileOpen(false);
     window.dispatchEvent(new CustomEvent('injpass:open-support'));
   };
@@ -9526,12 +9526,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           onClose={() => setMobileSidebarOpen(false)}
         >
         <div
-          onClickCapture={(event) => {
-            const target = event.target as HTMLElement;
-            const interactive = target.closest<HTMLElement>('button, a, [role="button"]');
-            if (!interactive || interactive.dataset.mobileSidebarKeepOpen === 'true') return;
-            if (window.matchMedia('(max-width: 1023px)').matches) setMobileSidebarOpen(false);
-          }}
           className={cx(
             'inj-glass-surface flex h-full w-full shrink-0 flex-col overflow-y-auto border-r py-3 px-3 transition-[width,padding] duration-300',
             sidebarCollapsed ? 'lg:w-[76px] lg:px-2' : 'lg:w-[286px] lg:px-3',
@@ -9566,6 +9560,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             <button
               type="button"
               onClick={() => {
+                setMobileSidebarOpen(false);
                 switchProductMode('chat');
                 setActiveChatSurface('default');
                 setMessages([]);
@@ -9623,7 +9618,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
           <button
             type="button"
-            data-mobile-sidebar-keep-open="true"
             onClick={() => setWalletOpen((current) => !current)}
             aria-expanded={walletOpen}
             className={cx(
@@ -9673,7 +9667,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
           <button
             type="button"
-            data-mobile-sidebar-keep-open="true"
             onClick={openDAppMarket}
             aria-expanded={dappMarketOpen}
             className={cx(
@@ -9738,7 +9731,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
           <button
             type="button"
-            data-mobile-sidebar-keep-open="true"
             onClick={openCampaign}
             aria-expanded={campaignOpen}
             className={cx(
@@ -9761,6 +9753,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               <button
                 type="button"
                 onClick={() => {
+                  setMobileSidebarOpen(false);
                   switchProductMode('chat');
                   setActiveChatSurface('campaign');
                   setActiveWalletTab(null);
@@ -9816,6 +9809,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
               <button
                 type="button"
                 onClick={() => {
+                  setMobileSidebarOpen(false);
                   setActiveChatSurface('default');
                   switchProductMode('chat');
                 }}
@@ -9889,7 +9883,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             {hasPendingMnemonicBackup && !sidebarCollapsed && (
               <button
                 type="button"
-                onClick={() => void openMnemonicBackup()}
+                onClick={() => {
+                  setMobileSidebarOpen(false);
+                  void openMnemonicBackup();
+                }}
                 className={cx(
                   'w-full rounded-2xl border px-3 py-3 text-left transition',
                   isLight ? 'border-amber-300/70 bg-amber-50 text-amber-950 hover:bg-amber-100/70' : 'border-amber-200/18 bg-amber-200/8 text-amber-100 hover:bg-amber-200/12'
@@ -9961,6 +9958,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         <button
                           type="button"
                           onClick={() => {
+                            setMobileSidebarOpen(false);
                             setProfilePanel('tokens');
                             void refreshAiTokenPanel();
                           }}
@@ -9976,7 +9974,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         </button>
                         <button
                           type="button"
-                          onClick={() => setProfilePanel('language')}
+                          onClick={() => {
+                            setMobileSidebarOpen(false);
+                            setProfilePanel('language');
+                          }}
                           className={cx('w-full rounded-xl px-3 py-2 text-left transition', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
                         >
                           <div className="flex items-center justify-between gap-3">
@@ -9987,7 +9988,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         </button>
                         <button
                           type="button"
-                          onClick={() => setProfilePanel('preferences')}
+                          onClick={() => {
+                            setMobileSidebarOpen(false);
+                            setProfilePanel('preferences');
+                          }}
                           className={cx('w-full rounded-xl px-3 py-2 text-left transition', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
                         >
                           <div className="text-sm font-semibold">{copy.preferences}</div>
@@ -9997,6 +10001,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                           href="https://t.me/injpass"
                           target="_blank"
                           rel="noreferrer"
+                          onClick={() => setMobileSidebarOpen(false)}
                           className={cx('block w-full rounded-xl px-3 py-2 text-left transition', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
                         >
                           <div className="text-sm font-semibold">{copy.community}</div>
@@ -10555,7 +10560,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
               <button
                 type="button"
-                data-mobile-sidebar-keep-open="true"
                 onClick={() => setProfileOpen((current) => {
                   if (sidebarCollapsed) {
                     setSidebarCollapsed(false);
@@ -10584,7 +10588,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         </div>
         </MobileSidebarFrame>
 
-        <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <section inert={mobileSidebarOpen ? true : undefined} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header className={cx('pointer-events-none fixed inset-x-0 top-0 z-20 px-4 py-4 transition-[left] duration-300 sm:px-6', sidebarCollapsed ? 'lg:left-[76px]' : 'lg:left-[286px]')}>
             <div className="relative flex items-center justify-between">
               <div className="pointer-events-auto flex items-center gap-2 lg:hidden">

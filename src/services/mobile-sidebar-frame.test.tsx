@@ -39,10 +39,19 @@ describe('MobileSidebarFrame', () => {
       new URL('../../app/components/InjPassChatShell.tsx', import.meta.url),
       'utf8',
     );
+    const frameSource = readFileSync(
+      new URL('../../app/components/MobileSidebarFrame.tsx', import.meta.url),
+      'utf8',
+    );
 
     expect(shellSource).toContain('<MobileSidebarFrame');
     expect(shellSource).toContain("'inj-shell-font relative h-dvh");
     expect(shellSource).toContain('aria-controls="injpass-primary-sidebar"');
     expect(shellSource).toContain('aria-expanded={mobileSidebarOpen}');
+    expect(shellSource).toContain('inert={mobileSidebarOpen ? true : undefined}');
+    expect(shellSource).not.toContain('onClickCapture=');
+    expect(frameSource).toContain('previouslyFocusedElement');
+    expect(frameSource).toContain('focusableSelector');
+    expect(frameSource).toContain("event.key !== 'Tab'");
   });
 });

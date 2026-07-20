@@ -53,5 +53,9 @@ describe('MobileSidebarFrame', () => {
     expect(frameSource).toContain('previouslyFocusedElement');
     expect(frameSource).toContain('focusableSelector');
     expect(frameSource).toContain("event.key !== 'Tab'");
+
+    const searchHandlerStart = shellSource.indexOf('const loadBackendConversations');
+    const searchHandlerEnd = shellSource.indexOf('const openStoredConversation', searchHandlerStart);
+    expect(shellSource.slice(searchHandlerStart, searchHandlerEnd)).toContain('setMobileSidebarOpen(false)');
   });
 });

@@ -7149,6 +7149,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const loadBackendConversations = async () => {
+    setMobileSidebarOpen(false);
     switchProductMode('chat');
     setActiveChatSurface('default');
     setConversationSearchOpen(true);

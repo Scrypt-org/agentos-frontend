@@ -349,18 +349,57 @@ assert.deepEqual(giftCreate?.params, {
   mode: 'equal',
 });
 
+const englishGiftCreate = parseMiniAppAgentCommand(
+  '@INJ Gift create 0.01 INJ for 2 gifts, password lucky',
+  'en',
+);
+assert.equal(englishGiftCreate?.action, 'create');
+
 const packetId = `0x${'ab'.repeat(32)}`;
 const giftClaim = parseMiniAppAgentCommand(`@INJ Gift 领取 ${packetId} 密码 lucky`, 'zh-Hans');
 assert.equal(giftClaim?.appId, 'inj-gift');
 assert.equal(giftClaim?.action, 'claim');
-assert.equal(giftClaim?.params.packetId, packetId);
+assert.equal(giftClaim?.params.packetReference, packetId);
+
+const shareCode = '4ERuUi6m';
+const shortCodeClaim = parseMiniAppAgentCommand(
+  `@INJ Gift 领取 ${shareCode} 密码 lucky`,
+  'zh-Hans',
+);
+assert.equal(shortCodeClaim?.action, 'claim');
+assert.equal(shortCodeClaim?.params.packetReference, shareCode);
+
+const shortLinkQuery = parseMiniAppAgentCommand(
+  `@INJ Gift 查询 https://gift.example/claim/${shareCode}`,
+  'zh-Hans',
+);
+assert.equal(shortLinkQuery?.action, 'query');
+assert.equal(
+  shortLinkQuery?.params.packetReference,
+  `https://gift.example/claim/${shareCode}`,
+);
+
+const missingGiftReference = parseMiniAppAgentCommand(
+  '@INJ Gift check the remaining balance',
+  'en',
+);
+assert.equal(missingGiftReference, null);
 
 const giftCreatedCopy = formatMiniAppAgentResult({
   ok: true,
   key: 'inj_gift_created',
-  data: { transactionHash: '0xcreate', packetId, password: 'lucky', amount: '0.01', count: 2 },
+  data: {
+    transactionHash: '0xcreate',
+    packetId,
+    password: 'lucky',
+    amount: '0.01',
+    count: 2,
+    shareUrl: `https://gift.example/claim/${shareCode}`,
+  },
 }, 'zh-Hans');
 assert.match(giftCreatedCopy, /红包已创建/);
 assert.match(giftCreatedCopy, new RegExp(packetId));
+assert.match(giftCreatedCopy, new RegExp(shareCode));
+assert.match(giftCreatedCopy, /领取口令.*lucky/);
 
 console.log('Mini-app command parsing tests passed.');

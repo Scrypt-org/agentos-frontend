@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { privateKeyToAccount } from 'viem/accounts';
-import { recoverMessageAddress, type Address, type Hex } from 'viem';
+import {
+  recoverMessageAddress,
+  recoverTypedDataAddress,
+  type Address,
+  type Hex,
+} from 'viem';
 
 import type { MiniAppManifest } from '@/config/mini-apps';
 import { handleMiniAppRpc } from '@/services/mini-app-host';
@@ -59,6 +64,56 @@ describe('handleMiniAppRpc signing authorization', () => {
       context(['accounts']),
     );
     await expect(request).rejects.toMatchObject({ code: 4100 });
+  });
+
+  it('signs EIP-712 data only for the authenticated wallet and registered contract', async () => {
+    const verifyingContract = account.address;
+    const typedData = {
+      domain: {
+        name: 'InjGift',
+        version: '1',
+        chainId: 1439,
+        verifyingContract,
+      },
+      primaryType: 'ClaimPermit',
+      types: {
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        ClaimPermit: [
+          { name: 'id', type: 'bytes32' },
+          { name: 'pwdHash', type: 'bytes32' },
+          { name: 'claimer', type: 'address' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      },
+      message: {
+        id: `0x${'11'.repeat(32)}`,
+        pwdHash: `0x${'22'.repeat(32)}`,
+        claimer: account.address,
+        nonce: '0',
+        deadline: '2000000000',
+      },
+    };
+    const typedManifest = manifest(['sign']);
+    typedManifest.allowedContracts = [verifyingContract];
+    const signature = await handleMiniAppRpc(
+      'eth_signTypedData_v4',
+      [account.address, JSON.stringify(typedData)],
+      { ...context(['sign']), manifest: typedManifest },
+    ) as Hex;
+
+    await expect(recoverTypedDataAddress({
+      domain: typedData.domain,
+      primaryType: 'ClaimPermit',
+      types: { ClaimPermit: typedData.types.ClaimPermit },
+      message: typedData.message,
+      signature,
+    })).resolves.toBe(account.address);
   });
 });
 

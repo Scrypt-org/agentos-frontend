@@ -33,7 +33,7 @@ export interface MiniAppAgentCommand {
     password?: string;
     durationSec?: number;
     mode?: 'random' | 'equal';
-    packetId?: string;
+    packetReference?: string;
   };
 }
 
@@ -159,7 +159,7 @@ export function parseMiniAppAgentCommand(text: string, language: string): MiniAp
       rawText: text,
       language,
       params: {
-        packetId: gift.packetId,
+        packetReference: gift.packetReference,
         password: gift.kind === 'claim' ? gift.password : undefined,
       },
     };
@@ -278,9 +278,10 @@ export function formatMiniAppAgentResult(
     const password = stringValue(data.password);
     const amount = stringValue(data.amount);
     const count = Number(data.count || 1);
+    const shareUrl = stringValue(data.shareUrl);
     return lang === 'zh-Hans' || lang === 'zh-Hant'
-      ? `INJ Gift 红包已创建：${amount} INJ，共 ${count} 份。\n\n- 红包 ID：\`${packetId}\`\n- 密码：\`${password}\`\n- 交易：\`${hash}\``
-      : `INJ Gift created a ${amount} INJ packet with ${count} gifts.\n\n- Packet ID: \`${packetId}\`\n- Password: \`${password}\`\n- Transaction: \`${hash}\``;
+      ? `INJ Gift 红包已创建：${amount} INJ，共 ${count} 份。\n\n- 分享链接：${shareUrl || '生成失败，请使用红包 ID'}\n- 领取口令：\`${password}\`\n- 红包 ID：\`${packetId}\`\n- 交易：\`${hash}\``
+      : `INJ Gift created a ${amount} INJ packet with ${count} gifts.\n\n- Share link: ${shareUrl || 'Unavailable; use the packet ID'}\n- Claim passcode: \`${password}\`\n- Packet ID: \`${packetId}\`\n- Transaction: \`${hash}\``;
   }
 
   if (result.key === 'inj_gift_claimed') {

@@ -806,7 +806,7 @@ export default function EmbedPage() {
                 Choose your INJ Pass wallet
               </p>
               <p className={`mt-1 text-xs leading-5 ${brandTextTone}`}>
-                Select a Passkey or traditional wallet. INJ Gift receives only
+                Select a Passkey or traditional wallet. The mini app receives only
                 the address and approved results.
               </p>
             </div>

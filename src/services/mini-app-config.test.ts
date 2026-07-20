@@ -23,7 +23,7 @@ describe('mini app URL resolution', () => {
     });
     expect(manifest!.rpcUrl).toContain('evm-rpc.injective.network');
     expect(manifest!.allowedContracts).toEqual([
-      '0x294cDD0Ac5B2ef8b23E2dc3A993E133356Ee72D5',
+      '0x5373A185ee8017eeDD8bF51C009f5A1F058A8D02',
     ]);
   });
 

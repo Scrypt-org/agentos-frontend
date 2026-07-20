@@ -95,7 +95,7 @@ import { getN1NJ4NFTs, getNFTDetails, resolveNFTUri, type NFT } from '@/services
 import { getCatNFTDetails, getCatNFTsForOwner, mintSponsoredCatNFT } from '@/services/catnft';
 import { getUserStakingInfo, type StakingInfo } from '@/services/staking';
 import {
-  executeInjGiftCommand,
+  injGiftHelpMessage,
   isInjGiftMessage,
   parseInjGiftCommand,
 } from '@/services/inj-gift';
@@ -7540,16 +7540,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           throw new Error('INJ Gift mini app command runner is unavailable. Please try again.');
         }
         if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
-        const result = await executeInjGiftCommand(command, {
-          languageCode: selectedLanguageCode,
-        });
+        const body = injGiftHelpMessage(command.intent, selectedLanguageCode);
         if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
 
         const assistantMessage: ChatMessage = {
           id: `a-${messageStamp}`,
           role: 'assistant',
-          body: result.body,
-          action: !isAuthenticated && shouldOfferWalletLogin(trimmedText, result.body)
+          body,
+          action: !isAuthenticated && shouldOfferWalletLogin(trimmedText, body)
             ? 'login'
             : undefined,
         };
@@ -7567,7 +7565,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 content: message.body,
               })),
             { role: 'user' as const, content: trimmedText },
-            { role: 'assistant' as const, content: result.body },
+            { role: 'assistant' as const, content: body },
           ];
           setAgentConversationId(conversationId);
           setSelectedStoredConversationId(conversationId);

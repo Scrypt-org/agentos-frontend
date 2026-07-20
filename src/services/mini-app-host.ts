@@ -138,5 +138,54 @@ export async function handleMiniAppRpc(
     return account.signMessage({ message: { raw } });
   }
 
+  if (method === 'eth_signTypedData_v4') {
+    requirePermission(manifest, 'sign');
+    if (!context.address) throw new MiniAppHostError(4100, 'Log in to INJ Pass first.');
+    const requestedAddress = String(params[0] || '');
+    if (requestedAddress.toLowerCase() !== context.address.toLowerCase()) {
+      throw new MiniAppHostError(4100, 'The requested signing account is not the authenticated INJ Pass wallet.');
+    }
+    const typedData = JSON.parse(String(params[1] || '{}')) as {
+      domain?: { chainId?: number | string; verifyingContract?: Address };
+      primaryType?: string;
+      types?: Record<string, Array<{ name: string; type: string }>>;
+      message?: Record<string, unknown>;
+    };
+    const verifyingContract = typedData.domain?.verifyingContract;
+    if (
+      Number(typedData.domain?.chainId) !== manifest.chainId
+      || !verifyingContract
+      || (
+        manifest.allowedContracts?.length
+        && !manifest.allowedContracts.some(
+          (contract) => contract.toLowerCase() === verifyingContract.toLowerCase(),
+        )
+      )
+    ) {
+      throw new MiniAppHostError(4100, 'Typed data is not authorized for this mini app contract.');
+    }
+    const claimer = typedData.message?.claimer;
+    if (
+      typeof claimer === 'string'
+      && claimer.toLowerCase() !== context.address.toLowerCase()
+    ) {
+      throw new MiniAppHostError(4100, 'The claim beneficiary is not the authenticated INJ Pass wallet.');
+    }
+    const privateKey = await context.getPrivateKey();
+    const account = privateKeyToAccount(privateKeyHex(privateKey));
+    const { EIP712Domain: _domainType, ...types } = typedData.types || {};
+    const domain = {
+      ...typedData.domain,
+      chainId: Number(typedData.domain?.chainId),
+    };
+    void _domainType;
+    return account.signTypedData({
+      domain,
+      primaryType: typedData.primaryType || '',
+      types,
+      message: typedData.message || {},
+    });
+  }
+
   return forwardRpc(manifest, method, params);
 }

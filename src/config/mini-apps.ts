@@ -21,7 +21,7 @@ export interface MiniAppManifest {
 
 const INJ_GIFT_CONTRACT = (
   process.env.NEXT_PUBLIC_INJ_GIFT_CONTRACT_ADDRESS
-  || '0x294cDD0Ac5B2ef8b23E2dc3A993E133356Ee72D5'
+  || '0x5373A185ee8017eeDD8bF51C009f5A1F058A8D02'
 ) as Address;
 
 const ERIC_MFER_CONTRACT = (

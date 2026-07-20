@@ -717,7 +717,7 @@ function AuthPageContent() {
         setAvailableWallets(wallets);
         setWalletPassword('');
         setErrorMessage('');
-        setMessage('Choose the wallet INJ Gift may request actions from.');
+        setMessage('Choose the wallet this mini app may request actions from.');
         setStatus('select_wallet');
       } catch (err) {
         const rawMsg = err instanceof Error ? err.message : 'Connection failed';
@@ -1242,7 +1242,7 @@ function AuthPageContent() {
                 </div>
 
                 <div className={`rounded-[16px] border px-3 py-2 text-xs ${isLightMode ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-amber-400/20 bg-amber-500/10 text-amber-100'}`}>
-                  Review every field before approving. INJ Gift receives only the resulting transaction hash.
+                  Review every field before approving. The mini app receives only the resulting transaction hash.
                 </div>
 
                 <div className="mt-auto grid grid-cols-2 gap-2 pt-1 flex-shrink-0">

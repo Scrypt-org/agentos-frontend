@@ -91,7 +91,13 @@ export function watchPopupClosed(
 export type CurrentAuthRequestMessage =
   | WalletConnectRequest
   | AuthRequest
-  | { type: 'SIGN_REQUEST'; requestId: string; message: string }
+  | {
+      type: 'SIGN_REQUEST';
+      requestId: string;
+      message: string;
+      kind?: 'message' | 'typed-data';
+      typedData?: string;
+    }
   | { type: 'TX_REQUEST'; requestId: string; tx: unknown };
 
 /** Return true only for an INJ Pass protocol message belonging to this request. */

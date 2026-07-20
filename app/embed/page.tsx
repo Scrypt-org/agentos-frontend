@@ -327,6 +327,8 @@ export default function EmbedPage() {
               type: 'SIGN_REQUEST',
               requestId: data.id,
               message: data.message,
+              kind: data.kind,
+              typedData: data.typedData,
             },
             window.location.origin
           );

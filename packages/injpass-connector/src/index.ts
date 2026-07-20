@@ -523,6 +523,7 @@ export class InjPassConnector {
             const data = params[1] ?? params[0];
             const sig = await wallet.signer.signMessage(
               typeof data === 'string' ? data : JSON.stringify(data),
+              'typed-data',
             );
             return toHex(sig);
           }
@@ -644,7 +645,10 @@ class InjPassSigner {
    * 
    * This ensures security while bypassing iframe limitations
    */
-  async signMessage(message: string): Promise<Uint8Array> {
+  async signMessage(
+    message: string,
+    kind: 'message' | 'typed-data' = 'message',
+  ): Promise<Uint8Array> {
     const requestId = `sign_${++this.requestCounter}_${Date.now()}`;
 
     return new Promise((resolve, reject) => {
@@ -699,6 +703,8 @@ class InjPassSigner {
         data: {
           id: requestId,
           message,
+          kind,
+          typedData: kind === 'typed-data' ? message : undefined,
         },
       }, this.targetOrigin);
     });

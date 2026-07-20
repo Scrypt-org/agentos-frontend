@@ -348,6 +348,21 @@ const languageOptions: Array<{
   { code: 'zh-Hant', label: '中文（繁體）', caption: 'Traditional Chinese' },
 ];
 
+const rewardBalanceLabels: Record<LanguageCode, {
+  ordinary: string;
+  reward: string;
+  expires: string;
+  expired: string;
+}> = {
+  en: { ordinary: 'Ordinary LAM', reward: 'Promotional LAM', expires: 'Expires', expired: 'Expired' },
+  de: { ordinary: 'Normales LAM', reward: 'Aktions-LAM', expires: 'Läuft ab', expired: 'Abgelaufen' },
+  fr: { ordinary: 'LAM standard', reward: 'LAM promotionnel', expires: 'Expire', expired: 'Expiré' },
+  ko: { ordinary: '일반 LAM', reward: '프로모션 LAM', expires: '만료', expired: '만료됨' },
+  ja: { ordinary: '通常 LAM', reward: 'プロモーション LAM', expires: '期限', expired: '期限切れ' },
+  'zh-Hans': { ordinary: '普通 LAM', reward: '活动 LAM', expires: '过期时间', expired: '已过期' },
+  'zh-Hant': { ordinary: '普通 LAM', reward: '活動 LAM', expires: '過期時間', expired: '已過期' },
+};
+
 const shellCopyEn = {
   modeChat: 'Interact',
   modeCreate: 'Build',
@@ -1057,6 +1072,15 @@ const erc721TransferAbi = [{
 }] as const;
 
 const dappMarketApps: DAppMarketItem[] = [
+  {
+    id: 'ai-token-lottery',
+    name: 'AI Token Lucky Draw',
+    category: 'Campaign',
+    body: 'One guaranteed reward for newly registered INJ Pass wallets, usable in AI Chat for 30 days.',
+    accent: 'from-violet-400 via-fuchsia-400 to-amber-300',
+    icon: '/ai-token-lottery.svg',
+    aiDriven: false,
+  },
   {
     id: 'eric-mfer',
     name: 'eric mfer',
@@ -6707,7 +6731,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         .filter((app, index, collection) => (
           collection.findIndex((candidate) => normalizeDAppIdentity(candidate.name) === normalizeDAppIdentity(app.name)) === index
         ));
-      const requiredAgentApps = dappMarketApps.filter((app) => app.aiDriven);
+      const requiredAgentApps = dappMarketApps.filter(
+        (app) => app.aiDriven || app.id === 'ai-token-lottery',
+      );
       const requiredNames = new Set(requiredAgentApps.map((app) => normalizeDAppIdentity(app.name)));
       const approvedComingSoonNames = new Set(comingSoonDAppOrder.map(normalizeDAppIdentity));
       const prioritized = requiredAgentApps.map((required) => {
@@ -6767,7 +6793,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setAiTokenProfile(profile);
       setAiTokenStatus(profile
         ? {
-          balance: profile.ninjaBalance,
+          balance: profile.spendableBalance,
+          ordinaryBalance: profile.ninjaBalance,
+          rewardBalance: profile.rewardBalance,
+          rewardExpiresAt: profile.rewardExpiresAt,
+          spendableBalance: profile.spendableBalance,
           chanceRemaining: profile.chanceRemaining,
           chanceCooldownEndsAt: profile.chanceCooldownEndsAt,
         }
@@ -10034,6 +10064,24 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                                   {formatAmount(aiTokenStatus?.balance ?? aiTokenProfile?.ninjaBalance ?? sidebarWalletSummary.lam, 2)}
                                 </div>
                                 <div className={cx('pb-1 text-sm font-semibold', isLight ? 'text-black/46' : 'text-white/46')}>LAM</div>
+                              </div>
+                              <div className={cx('mt-3 grid gap-2 border-t pt-3 text-xs', isLight ? 'border-black/8' : 'border-white/8')}>
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className={isLight ? 'text-black/48' : 'text-white/48'}>{rewardBalanceLabels[selectedLanguageCode].ordinary}</span>
+                                  <strong>{formatAmount(aiTokenStatus?.ordinaryBalance ?? aiTokenProfile?.ninjaBalance ?? 0, 2)} LAM</strong>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className={isLight ? 'text-black/48' : 'text-white/48'}>{rewardBalanceLabels[selectedLanguageCode].reward}</span>
+                                  <strong>{formatAmount(aiTokenStatus?.rewardBalance ?? aiTokenProfile?.rewardBalance ?? 0, 2)} LAM</strong>
+                                </div>
+                                {(aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt) && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className={isLight ? 'text-black/48' : 'text-white/48'}>{rewardBalanceLabels[selectedLanguageCode].expires}</span>
+                                    <span>{new Date(aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt || 0).getTime() <= Date.now()
+                                      ? rewardBalanceLabels[selectedLanguageCode].expired
+                                      : formatShortDate(aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt)}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
 

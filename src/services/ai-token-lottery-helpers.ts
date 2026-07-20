@@ -29,3 +29,17 @@ export function normalizeLotteryLanguage(value?: string | null): LotteryLanguage
 export function lotteryStateCanDraw(state: LotteryState): boolean {
   return state === 'eligible';
 }
+
+export function createUnavailableLotteryStatus() {
+  return {
+    state: 'wallet_unavailable' as const,
+    eligibleUntil: null,
+    claimedAt: null,
+    expiresAt: null,
+    rewardLam: 0,
+    remainingLam: 0,
+    displayAiTokens: 0,
+    estimatedInteractions: { min: 1, max: 5 },
+    tier: null,
+  };
+}

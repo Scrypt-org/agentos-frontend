@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import {
+  createUnavailableLotteryStatus,
   lotteryStateCanDraw,
   normalizeLotteryLanguage,
 } from './ai-token-lottery-helpers';
@@ -20,6 +21,14 @@ describe('AI Token lottery helpers', () => {
     expect(lotteryStateCanDraw('eligible')).toBe(true);
     expect(lotteryStateCanDraw('claimed')).toBe(false);
     expect(lotteryStateCanDraw('expired')).toBe(false);
+  });
+
+  it('creates a stable wallet-unavailable state for guests', () => {
+    expect(createUnavailableLotteryStatus()).toMatchObject({
+      state: 'wallet_unavailable',
+      rewardLam: 0,
+      remainingLam: 0,
+    });
   });
 });
 

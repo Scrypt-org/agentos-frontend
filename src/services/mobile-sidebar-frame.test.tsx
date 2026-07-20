@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -30,5 +32,17 @@ describe('MobileSidebarFrame', () => {
     expect(html).toContain('visible');
     expect(html).toContain('w-[min(86vw,320px)]');
     expect(html).toContain('Navigation');
+  });
+
+  it('is integrated with the shared shell mobile trigger and dynamic viewport height', () => {
+    const shellSource = readFileSync(
+      new URL('../../app/components/InjPassChatShell.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(shellSource).toContain('<MobileSidebarFrame');
+    expect(shellSource).toContain("'inj-shell-font relative h-dvh");
+    expect(shellSource).toContain('aria-controls="injpass-primary-sidebar"');
+    expect(shellSource).toContain('aria-expanded={mobileSidebarOpen}');
   });
 });

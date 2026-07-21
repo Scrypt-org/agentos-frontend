@@ -6412,7 +6412,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             id: `stored-${message.id}`,
             role: message.role === 'user' ? 'user' as const : 'assistant' as const,
             body: message.content,
-          }));
+          }))
+          // Drop tool_use / tool_result-only messages (no readable text).
+          .filter((message) => message.body.trim() !== '');
         conversationCacheRef.current.set(summary.id, {
           title: detail.conversation.title || summary.title || 'New chat',
           messages: prefetchedMessages,
@@ -7246,7 +7248,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           id: `stored-${message.id}`,
           role: message.role === 'user' ? 'user' as const : 'assistant' as const,
           body: message.content,
-        }));
+        }))
+        // Drop tool_use / tool_result-only messages (no readable text).
+        .filter((message) => message.body.trim() !== '');
       const nextTitle = detail.conversation.title || summary?.title || 'New chat';
       setCurrentConversationTitle(nextTitle);
       setMessages(nextMessages);

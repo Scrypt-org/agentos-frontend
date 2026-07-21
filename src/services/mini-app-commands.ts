@@ -1,4 +1,16 @@
+import { formatEther } from 'viem';
+
 import { isInjGiftMessage, parseInjGiftCommand } from '@/services/inj-gift';
+
+/** Format a raw wei string as a human-readable INJ amount ('' when absent/invalid). */
+function formatWeiToInj(raw: string): string {
+  if (!raw) return '';
+  try {
+    return formatEther(BigInt(raw));
+  } catch {
+    return raw;
+  }
+}
 
 export type MiniAppCommandAppId = 'bankrupt-elon-musk' | 'omisper' | 'inj-gift';
 
@@ -287,9 +299,10 @@ export function formatMiniAppAgentResult(
   if (result.key === 'inj_gift_claimed') {
     const hash = stringValue(data.transactionHash);
     const claimed = stringValue(data.claimedAmount);
+    const claimedInj = formatWeiToInj(claimed);
     return lang === 'zh-Hans' || lang === 'zh-Hant'
-      ? `INJ Gift 红包领取成功${claimed ? `，收到 ${claimed} wei` : ''}。\n\n交易：\`${hash}\``
-      : `INJ Gift claim succeeded${claimed ? ` for ${claimed} wei` : ''}.\n\nTransaction: \`${hash}\``;
+      ? `INJ Gift 红包领取成功${claimedInj ? `，收到 ${claimedInj} INJ` : ''}。\n\n交易：\`${hash}\``
+      : `INJ Gift claim succeeded${claimedInj ? ` for ${claimedInj} INJ` : ''}.\n\nTransaction: \`${hash}\``;
   }
 
   if (result.key === 'inj_gift_packet') {

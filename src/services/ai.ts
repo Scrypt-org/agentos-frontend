@@ -474,6 +474,29 @@ export async function searchStoredAgentConversations(
   }
 }
 
+/**
+ * Stored assistant messages persist their content as a serialized content-block
+ * array (e.g. `[{"type":"text","text":"..."}]`). Live messages, by contrast, are
+ * already flattened to plain text. Normalize both to plain markdown text so the
+ * renderer never shows raw JSON when a conversation is reopened from history.
+ */
+export function extractStoredMessageText(content: string): string {
+  if (typeof content !== 'string') return '';
+  const trimmed = content.trim();
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return content;
+  try {
+    const parsed = JSON.parse(trimmed);
+    const blocks = Array.isArray(parsed) ? parsed : [parsed];
+    const text = blocks
+      .filter((block) => block && typeof block === 'object' && block.type === 'text' && typeof block.text === 'string')
+      .map((block) => block.text)
+      .join('');
+    return text || content;
+  } catch {
+    return content;
+  }
+}
+
 export async function getStoredAgentConversation(
   conversationId: string,
 ): Promise<StoredConversationDetail | null> {
@@ -486,7 +509,14 @@ export async function getStoredAgentConversation(
       return null;
     }
 
-    return response.json();
+    const detail = (await response.json()) as StoredConversationDetail | null;
+    if (detail?.messages) {
+      detail.messages = detail.messages.map((message) => ({
+        ...message,
+        content: extractStoredMessageText(message.content),
+      }));
+    }
+    return detail;
   } catch (error) {
     console.error('[AI] Get stored conversation failed:', error);
     return null;

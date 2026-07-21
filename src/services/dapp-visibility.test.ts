@@ -35,7 +35,7 @@ describe('dApp shell visibility', () => {
     ]);
   });
 
-  it('keeps Campaign visible as coming soon', () => {
-    expect(campaignAvailability).toBe('coming-soon');
+  it('routes Campaign to the AI Token lottery', () => {
+    expect(campaignAvailability).toBe('ai-token-lottery');
   });
 });

@@ -81,6 +81,7 @@ import { executeSwap, getTokenBalances } from '@/services/dex-swap';
 import { fetchDapps } from '@/services/dapps';
 import { getDAppIconUrl } from '@/services/dapp-icons';
 import {
+  campaignAvailability,
   visibleComposerDApps,
   visibleMarketDApps,
   visibleSidebarDApps,
@@ -6335,6 +6336,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     () => visibleMarketDApps(dappMarketItems),
     [dappMarketItems]
   );
+  const campaignApp = useMemo(
+    () => dappMarketItems.find((app) => app.id === campaignAvailability) || null,
+    [dappMarketItems],
+  );
   const activeMiniAppManifest = useMemo(
     () => activeMiniApp ? getMiniAppManifest(activeMiniApp.id) : null,
     [activeMiniApp],
@@ -8396,10 +8401,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openCampaign = () => {
+    setCampaignOpen((current) => !current);
+    if (campaignApp) {
+      openDApp(campaignApp);
+      return;
+    }
     switchProductMode('chat');
     setActiveChatSurface('campaign');
     setActiveWalletTab(null);
-    setCampaignOpen((current) => !current);
   };
 
   const openSkills = () => {
@@ -9767,7 +9776,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             className={cx(
               'mt-2 flex h-10 w-full items-center rounded-xl text-sm font-bold transition',
               sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3',
-              activeMode === 'chat' && activeChatSurface === 'campaign'
+              activeMode === 'chat' && (
+                activeChatSurface === 'campaign'
+                || (activeChatSurface === 'mini-app' && activeMiniApp?.id === campaignAvailability)
+              )
                 ? isLight ? 'bg-white' : 'bg-white/[0.07]'
                 : isLight ? 'hover:bg-black/5' : 'hover:bg-white/8'
             )}
@@ -9785,13 +9797,17 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 type="button"
                 onClick={() => {
                   setMobileSidebarOpen(false);
+                  if (campaignApp) {
+                    openDApp(campaignApp);
+                    return;
+                  }
                   switchProductMode('chat');
                   setActiveChatSurface('campaign');
                   setActiveWalletTab(null);
                 }}
                 className={cx('inj-subtle-line w-full rounded-xl px-3 py-2 text-left text-sm transition', isLight ? 'text-black/70 hover:bg-black/5' : 'text-white/70 hover:bg-white/8')}
               >
-                {copy.comingSoon}
+                {campaignApp?.name || copy.comingSoon}
               </button>
             </div>
           )}

@@ -60,6 +60,17 @@ describe('AI Token lottery mini app contract', () => {
     );
   });
 
+  it('opens the lottery from Campaign and keeps Campaign active', async () => {
+    const source = await readFile(
+      new URL('../../app/components/InjPassChatShell.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).toContain('app.id === campaignAvailability');
+    expect(source).toContain('openDApp(campaignApp)');
+    expect(source).toContain('activeMiniApp?.id === campaignAvailability');
+    expect(source).toContain('{campaignApp?.name || copy.comingSoon}');
+  });
+
   it('uses backend-authoritative rewards and renders terminal states', async () => {
     const source = await readFile(
       new URL('../../app/mini-apps/ai-token-lottery/page.tsx', import.meta.url),

@@ -9590,6 +9590,23 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             <div className={sidebarCollapsed ? 'lg:hidden' : undefined}>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <div className="text-sm font-bold">INJ Pass</div>
+                {isAuthenticated && (
+                  <button
+                    type="button"
+                    onClick={() => void refreshAiTokenPanel()}
+                    disabled={isAiTokenLoading}
+                    aria-label={copy.refresh}
+                    title={copy.refresh}
+                    className={cx(
+                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition disabled:opacity-45',
+                      isLight
+                        ? 'border-black/12 text-black/55 hover:bg-black/5 hover:text-black/80'
+                        : 'border-white/16 text-white/60 hover:bg-white/8 hover:text-white'
+                    )}
+                  >
+                    <ReloadIcon className={cx('h-3.5 w-3.5', isAiTokenLoading && 'animate-spin')} />
+                  </button>
+                )}
                 {(() => {
                   const rewardBalance = Number(aiTokenStatus?.rewardBalance ?? aiTokenProfile?.rewardBalance ?? 0);
                   const rewardExpiresAt = aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt || null;
@@ -9621,21 +9638,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                     </span>
                   );
                 })()}
-                {isAuthenticated && (
-                  <button
-                    type="button"
-                    onClick={() => void refreshAiTokenPanel()}
-                    disabled={isAiTokenLoading}
-                    aria-label={copy.refresh}
-                    title={copy.refresh}
-                    className={cx(
-                      'flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition disabled:opacity-45',
-                      isLight ? 'text-black/42 hover:bg-black/5 hover:text-black/70' : 'text-white/42 hover:bg-white/8 hover:text-white/80'
-                    )}
-                  >
-                    <ReloadIcon className={cx('h-3 w-3', isAiTokenLoading && 'animate-spin')} />
-                  </button>
-                )}
               </div>
               <div className={cx('text-xs', isLight ? 'text-black/46' : 'text-white/46')}>{copy.brandSubtitle}</div>
             </div>

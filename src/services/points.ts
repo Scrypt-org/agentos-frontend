@@ -26,6 +26,19 @@ export interface ConsumeChanceResponse {
   error?: string;
 }
 
+/**
+ * Display-only conversion ratio between spendable LAM and the large "AI TOKEN"
+ * figure shown to users. Mirrors the backend `aiTokensPerLam` in
+ * `inj-pass-backend/src/config/ai-token-lottery.config.ts` — keep the two in sync.
+ * The big AI-token number is never persisted; it is derived from LAM on demand.
+ */
+export const AI_TOKENS_PER_LAM = 3485;
+
+/** Convert a LAM amount to its large AI-token display figure. */
+export function lamToAiTokens(lam: number): number {
+  return Math.round((Number(lam) || 0) * AI_TOKENS_PER_LAM);
+}
+
 export interface NinjaStatusResponse {
   balance: number;
   ordinaryBalance?: number;

@@ -86,7 +86,7 @@ import {
   visibleMarketDApps,
   visibleSidebarDApps,
 } from '@/services/dapp-visibility';
-import { claimDailyCheckIn, getNinjaStatus, getTransactions, type NinjaStatusResponse, type PointsTransaction } from '@/services/points';
+import { claimDailyCheckIn, getNinjaStatus, getTransactions, lamToAiTokens, type NinjaStatusResponse, type PointsTransaction } from '@/services/points';
 import { getUserProfile, type UserProfileResponse } from '@/services/user';
 import { authenticateWalletSession } from '@/services/wallet-auth';
 import { validateInviteCode } from '@/services/referral';
@@ -9584,7 +9584,40 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         >
           <div className={cx('flex items-center py-2', sidebarCollapsed ? 'justify-center px-1' : 'justify-between px-3')}>
             <div className={sidebarCollapsed ? 'lg:hidden' : undefined}>
-              <div className="text-sm font-bold">INJ Pass</div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <div className="text-sm font-bold">INJ Pass</div>
+                {(() => {
+                  const rewardBalance = Number(aiTokenStatus?.rewardBalance ?? aiTokenProfile?.rewardBalance ?? 0);
+                  const rewardExpiresAt = aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt || null;
+                  if (!isAuthenticated || (!rewardBalance && !rewardExpiresAt)) return null;
+                  const labels = rewardBalanceLabels[selectedLanguageCode];
+                  const aiTokens = lamToAiTokens(rewardBalance);
+                  const expired = rewardExpiresAt ? new Date(rewardExpiresAt).getTime() <= Date.now() : false;
+                  const expiryText = rewardExpiresAt
+                    ? (expired ? labels.expired : `${labels.expires} ${formatShortDate(rewardExpiresAt)}`)
+                    : '';
+                  return (
+                    <span
+                      title={`${labels.reward}: ${aiTokens.toLocaleString()} AI · ${formatAmount(rewardBalance, 2)} LAM${expiryText ? ` · ${expiryText}` : ''}`}
+                      className={cx(
+                        'inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none',
+                        expired
+                          ? (isLight ? 'border-black/10 bg-black/[0.04] text-black/40' : 'border-white/10 bg-white/[0.05] text-white/40')
+                          : (isLight ? 'border-amber-300/60 bg-amber-100/70 text-amber-700' : 'border-amber-200/20 bg-amber-300/10 text-amber-200')
+                      )}
+                    >
+                      <span aria-hidden>🎟</span>
+                      <span className="tabular-nums">{aiTokens.toLocaleString()}</span>
+                      <span className={cx('font-bold', expired ? undefined : (isLight ? 'text-amber-700/80' : 'text-amber-200/80'))}>AI</span>
+                      {expiryText && (
+                        <span className={cx('truncate font-normal', expired ? undefined : (isLight ? 'text-amber-700/70' : 'text-amber-200/70'))}>
+                          · {expired ? labels.expired : formatShortDate(rewardExpiresAt)}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })()}
+              </div>
               <div className={cx('text-xs', isLight ? 'text-black/46' : 'text-white/46')}>{copy.brandSubtitle}</div>
             </div>
             <button

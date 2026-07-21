@@ -84,4 +84,30 @@ describe('AI Token lottery mini app contract', () => {
     expect(source).toContain("'expired'");
     expect(source).toContain("'eligibility_expired'");
   });
+
+  it('hides the hard-coded reward range and returns to chat without a popup', async () => {
+    const source = await readFile(
+      new URL('../../app/mini-apps/ai-token-lottery/page.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).not.toContain('2,400–12,200 AI TOKENS');
+    expect(source).not.toContain("window.open('/', '_blank'");
+    expect(source).toContain('connectorRef.current.openHostChat()');
+    expect(source).toContain("window.location.assign('/')");
+  });
+
+  it('routes the lottery chat action through the connector and host shell', async () => {
+    const connectorSource = await readFile(
+      new URL('../../packages/injpass-connector/src/miniapp.ts', import.meta.url),
+      'utf8',
+    );
+    const shellSource = await readFile(
+      new URL('../../app/components/InjPassChatShell.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(connectorSource).toContain('openHostChat(): void');
+    expect(connectorSource).toContain("type: 'open-host-chat'");
+    expect(shellSource).toContain("message.type === 'open-host-chat'");
+    expect(shellSource).toContain("setActiveChatSurface('default')");
+  });
 });

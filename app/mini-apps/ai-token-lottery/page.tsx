@@ -45,6 +45,7 @@ export default function AiTokenLotteryPage() {
   const [now, setNow] = useState(Date.now());
   const startY = useRef(0);
   const pointerId = useRef<number | null>(null);
+  const connectorRef = useRef<InjPassMiniAppConnector | null>(null);
   const copy = LOTTERY_COPY[language];
   const visibleStatus = status ? expireLotteryStatus(status, now) : null;
   const canDraw = Boolean(visibleStatus && lotteryStateCanDraw(visibleStatus.state) && phase !== 'drawing');
@@ -67,12 +68,14 @@ export default function AiTokenLotteryPage() {
     setLanguage(normalizeLotteryLanguage(stored || window.navigator.language));
     if (InjPassMiniAppConnector.isEmbedded()) {
       connector = new InjPassMiniAppConnector();
+      connectorRef.current = connector;
       connector.onSession((session) => setLanguage(normalizeLotteryLanguage(session.language)));
     }
     void refresh();
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => {
       connector?.destroy();
+      connectorRef.current = null;
       window.clearInterval(timer);
     };
   }, []);
@@ -101,6 +104,14 @@ export default function AiTokenLotteryPage() {
     }
   };
 
+  const startAiChat = () => {
+    if (connectorRef.current) {
+      connectorRef.current.openHostChat();
+      return;
+    }
+    window.location.assign('/');
+  };
+
   return (
     <main className={styles.app} style={{ '--pull': pull } as React.CSSProperties}>
       <div className={styles.grain} />
@@ -110,7 +121,6 @@ export default function AiTokenLotteryPage() {
 
       <header className={styles.header}>
         <span className={styles.live}>{copy.live}</span>
-        <span>2,400–12,200 AI TOKENS</span>
       </header>
 
       <section className={styles.hero}>
@@ -182,7 +192,7 @@ export default function AiTokenLotteryPage() {
         </div>
 
         {phase === 'error' && <button className={styles.secondary} onClick={() => void refresh()}>{copy.retry}</button>}
-        {won && <button className={styles.primary} onClick={() => window.open('/', '_blank', 'noopener,noreferrer')}>{copy.chat}</button>}
+        {won && <button className={styles.primary} onClick={startAiChat}>{copy.chat}</button>}
 
         <div className={styles.stateKeys} aria-hidden="true">
           {'eligible'} {'claimed'} {'expired'} {'eligibility_expired'}

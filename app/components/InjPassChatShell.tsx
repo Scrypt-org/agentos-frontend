@@ -8852,11 +8852,21 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }, target);
 
     const handleMiniAppMessage = (event: MessageEvent) => {
-      if (event.origin !== miniAppOrigin || !event.source) return;
+      if (
+        event.origin !== miniAppOrigin
+        || event.source !== miniAppIframeRef.current?.contentWindow
+      ) return;
       const message = event.data as Record<string, unknown> | null;
       if (!message || message.channel !== 'injpass-miniapp-v1') return;
       const source = event.source as WindowProxy;
       miniAppWindowRef.current = source;
+      if (message.type === 'open-host-chat') {
+        switchProductMode('chat');
+        setActiveChatSurface('default');
+        setActiveWalletTab(null);
+        setConversationSearchOpen(false);
+        return;
+      }
       if (message.type === 'navigation' && typeof message.path === 'string') {
         const nextPath = message.path.startsWith('/') ? message.path.slice(0, 2_048) : '/';
         setMiniAppNavigation({

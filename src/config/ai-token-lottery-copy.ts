@@ -13,6 +13,7 @@ export interface LotteryCopy {
   eligibility: string;
   interactions: string;
   lamEquivalent: string;
+  countdownUnits: { day: string; hour: string; minute: string };
   retry: string;
   chat: string;
   states: Record<LotteryState, string>;
@@ -32,6 +33,7 @@ const en: LotteryCopy = {
   eligibility: 'Claim window',
   interactions: 'Estimated 1–5 AI interactions. Actual usage varies by model and message length.',
   lamEquivalent: 'LAM equivalent',
+  countdownUnits: { day: 'd', hour: 'h', minute: 'm' },
   retry: 'Retry',
   chat: 'Start AI Chat',
   states: {
@@ -55,6 +57,7 @@ export const LOTTERY_COPY: Record<LotteryLanguage, LotteryCopy> = {
     eligibility: 'Einlösezeitraum', retry: 'Erneut versuchen', chat: 'AI Chat starten',
     interactions: 'Geschätzt 1–5 AI-Interaktionen. Die tatsächliche Nutzung hängt von Modell und Nachrichtenlänge ab.',
     lamEquivalent: 'LAM-Gegenwert',
+    countdownUnits: { day: 'T', hour: 'Std', minute: 'Min' },
     states: {
       eligible: 'Deine Wallet ist berechtigt. Einmal ziehen, um die Belohnung aufzudecken.',
       claimed: 'Deine Belohnung ist aktiv und kann im AI Chat genutzt werden.',
@@ -73,6 +76,7 @@ export const LOTTERY_COPY: Record<LotteryLanguage, LotteryCopy> = {
     eligibility: 'Période de retrait', retry: 'Réessayer', chat: 'Ouvrir AI Chat',
     interactions: 'Environ 1 à 5 interactions IA. L’usage réel dépend du modèle et de la longueur des messages.',
     lamEquivalent: 'Équivalent LAM',
+    countdownUnits: { day: 'j', hour: 'h', minute: 'min' },
     states: {
       eligible: 'Votre portefeuille est éligible. Tirez une fois pour révéler votre récompense.',
       claimed: 'Votre récompense est active dans AI Chat.',
@@ -89,6 +93,7 @@ export const LOTTERY_COPY: Record<LotteryLanguage, LotteryCopy> = {
     pull: '당겨서 받기', pulling: '계속 당기기', release: '놓아서 확인',
     reward: '내 보상', remaining: '남은 보상', expires: '만료까지', eligibility: '수령 기간',
     retry: '다시 시도', chat: 'AI Chat 시작', lamEquivalent: 'LAM 환산',
+    countdownUnits: { day: '일', hour: '시간', minute: '분' },
     interactions: '예상 AI 상호작용 1–5회. 실제 사용량은 모델과 메시지 길이에 따라 달라집니다.',
     states: {
       eligible: '이 지갑은 대상입니다. 한 번 당겨 보상을 확인하세요.',
@@ -106,6 +111,7 @@ export const LOTTERY_COPY: Record<LotteryLanguage, LotteryCopy> = {
     pull: '引いて受け取る', pulling: 'そのまま引く', release: '離して表示',
     reward: '報酬', remaining: '残り報酬', expires: '有効期限まで', eligibility: '受取期間',
     retry: '再試行', chat: 'AI Chat を開始', lamEquivalent: 'LAM 換算',
+    countdownUnits: { day: '日', hour: '時間', minute: '分' },
     interactions: 'AI 対話の目安は1〜5回です。実際の使用量はモデルとメッセージ長で変わります。',
     states: {
       eligible: 'このウォレットは対象です。1回引いて報酬を確認してください。',
@@ -123,6 +129,7 @@ export const LOTTERY_COPY: Record<LotteryLanguage, LotteryCopy> = {
     pull: '下拉领取', pulling: '继续下拉', release: '松手揭晓',
     reward: '你的奖励', remaining: '剩余奖励', expires: '距离过期', eligibility: '领取期限',
     retry: '重试', chat: '开始 AI Chat', lamEquivalent: 'LAM 等值',
+    countdownUnits: { day: '天', hour: '小时', minute: '分钟' },
     interactions: '预计可进行 1–5 次 AI 交互，实际次数取决于模型和消息长度。',
     states: {
       eligible: '该钱包符合资格，下拉一次即可揭晓奖励。',
@@ -140,6 +147,7 @@ export const LOTTERY_COPY: Record<LotteryLanguage, LotteryCopy> = {
     pull: '下拉領取', pulling: '繼續下拉', release: '鬆手揭曉',
     reward: '你的獎勵', remaining: '剩餘獎勵', expires: '距離過期', eligibility: '領取期限',
     retry: '重試', chat: '開始 AI Chat', lamEquivalent: 'LAM 等值',
+    countdownUnits: { day: '天', hour: '小時', minute: '分鐘' },
     interactions: '預計可進行 1–5 次 AI 互動，實際次數取決於模型和訊息長度。',
     states: {
       eligible: '此錢包符合資格，下拉一次即可揭曉獎勵。',

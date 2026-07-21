@@ -8,6 +8,7 @@ import {
   type LotteryStatus,
 } from '@/services/ai-token-lottery';
 import {
+  expireLotteryStatus,
   lotteryStateCanDraw,
   normalizeLotteryLanguage,
   type LotteryLanguage,
@@ -23,13 +24,17 @@ const CONFETTI = Array.from({ length: 30 }, (_, index) => ({
   color: ['#ffe36e', '#ff826f', '#71ddff', '#fff8e9', '#d6a4ff'][index % 5],
 }));
 
-function formatCountdown(target: string | null, now: number) {
+function formatCountdown(
+  target: string | null,
+  now: number,
+  units: { day: string; hour: string; minute: string },
+) {
   if (!target) return '—';
   const remaining = Math.max(0, new Date(target).getTime() - now);
   const days = Math.floor(remaining / 86_400_000);
   const hours = Math.floor((remaining % 86_400_000) / 3_600_000);
   const minutes = Math.floor((remaining % 3_600_000) / 60_000);
-  return `${days}d ${hours}h ${minutes}m`;
+  return `${days}${units.day} ${hours}${units.hour} ${minutes}${units.minute}`;
 }
 
 export default function AiTokenLotteryPage() {
@@ -41,8 +46,9 @@ export default function AiTokenLotteryPage() {
   const startY = useRef(0);
   const pointerId = useRef<number | null>(null);
   const copy = LOTTERY_COPY[language];
-  const canDraw = Boolean(status && lotteryStateCanDraw(status.state) && phase !== 'drawing');
-  const won = Boolean(status?.claimedAt && (phase === 'revealed' || status.state !== 'eligible'));
+  const visibleStatus = status ? expireLotteryStatus(status, now) : null;
+  const canDraw = Boolean(visibleStatus && lotteryStateCanDraw(visibleStatus.state) && phase !== 'drawing');
+  const won = Boolean(visibleStatus?.claimedAt && (phase === 'revealed' || visibleStatus.state !== 'eligible'));
 
   const refresh = async () => {
     setPhase('loading');
@@ -72,8 +78,12 @@ export default function AiTokenLotteryPage() {
   }, []);
 
   const countdown = useMemo(
-    () => formatCountdown(status?.expiresAt || status?.eligibleUntil || null, now),
-    [now, status?.eligibleUntil, status?.expiresAt],
+    () => formatCountdown(
+      visibleStatus?.expiresAt || visibleStatus?.eligibleUntil || null,
+      now,
+      copy.countdownUnits,
+    ),
+    [copy.countdownUnits, now, visibleStatus?.eligibleUntil, visibleStatus?.expiresAt],
   );
 
   const reveal = async () => {
@@ -105,7 +115,7 @@ export default function AiTokenLotteryPage() {
 
       <section className={styles.hero}>
         <h1>{won ? copy.reward : copy.title}</h1>
-        <p>{status ? copy.states[status.state] : copy.subtitle}</p>
+        <p>{visibleStatus ? copy.states[visibleStatus.state] : copy.subtitle}</p>
 
         <div className={styles.machine}>
           <div className={styles.slot} />
@@ -113,17 +123,17 @@ export default function AiTokenLotteryPage() {
             <div className={styles.security}>INJ PASS • VERIFIED • AI TOKEN •</div>
             <div className={styles.voucherHeader}>
               <strong>INJ Pass</strong>
-              <span>{status?.tier ? copy.tiers[status.tier] : 'AI TOKEN'}</span>
+              <span>{visibleStatus?.tier ? copy.tiers[visibleStatus.tier] : 'AI TOKEN'}</span>
             </div>
             <div className={styles.amount}>
               <small>AI TOKEN</small>
-              <b>{(status?.displayAiTokens || 0).toLocaleString()}</b>
+              <b>{(visibleStatus?.displayAiTokens || 0).toLocaleString()}</b>
             </div>
             <div className={styles.details}>
               <span>{copy.lamEquivalent}</span>
-              <strong>{Number(status?.rewardLam || 0).toFixed(2)} LAM</strong>
+              <strong>{Number(visibleStatus?.rewardLam || 0).toFixed(2)} LAM</strong>
               <span>{copy.remaining}</span>
-              <strong>{Number(status?.remainingLam || 0).toFixed(2)} LAM</strong>
+              <strong>{Number(visibleStatus?.remainingLam || 0).toFixed(2)} LAM</strong>
             </div>
             <p>{copy.interactions}</p>
           </article>
@@ -167,7 +177,7 @@ export default function AiTokenLotteryPage() {
         </div>
 
         <div className={styles.status}>
-          <span>{status?.claimedAt ? copy.expires : copy.eligibility}</span>
+          <span>{visibleStatus?.claimedAt ? copy.expires : copy.eligibility}</span>
           <strong>{countdown}</strong>
         </div>
 

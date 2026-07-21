@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import {
   createUnavailableLotteryStatus,
+  expireLotteryStatus,
   lotteryStateCanDraw,
   normalizeLotteryLanguage,
 } from './ai-token-lottery-helpers';
@@ -27,6 +28,18 @@ describe('AI Token lottery helpers', () => {
     expect(createUnavailableLotteryStatus()).toMatchObject({
       state: 'wallet_unavailable',
       rewardLam: 0,
+      remainingLam: 0,
+    });
+  });
+
+  it('turns a claimed reward into an expired display state at its boundary', () => {
+    expect(expireLotteryStatus({
+      ...createUnavailableLotteryStatus(),
+      state: 'claimed',
+      expiresAt: '2026-08-01T00:00:00.000Z',
+      remainingLam: 1.5,
+    }, new Date('2026-08-01T00:00:00.000Z').getTime())).toMatchObject({
+      state: 'expired',
       remainingLam: 0,
     });
   });

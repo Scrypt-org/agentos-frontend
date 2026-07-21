@@ -43,3 +43,16 @@ export function createUnavailableLotteryStatus() {
     tier: null,
   };
 }
+
+export function expireLotteryStatus<
+  T extends { state: LotteryState; expiresAt: string | null; remainingLam: number },
+>(status: T, now: number): T {
+  if (
+    status.state === 'claimed' &&
+    status.expiresAt &&
+    new Date(status.expiresAt).getTime() <= now
+  ) {
+    return { ...status, state: 'expired', remainingLam: 0 } as T;
+  }
+  return status;
+}

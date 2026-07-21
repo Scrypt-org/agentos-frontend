@@ -2,6 +2,7 @@ import { API_BASE_URL } from './api-base';
 import { getAuthToken } from './passkey';
 export {
   createUnavailableLotteryStatus,
+  expireLotteryStatus,
   lotteryStateCanDraw,
   normalizeLotteryLanguage,
 } from './ai-token-lottery-helpers';

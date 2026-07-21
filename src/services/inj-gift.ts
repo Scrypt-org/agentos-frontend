@@ -14,17 +14,7 @@ export type InjGiftCommand =
     }
   | { kind: 'claim'; packetReference: string; password: string }
   | { kind: 'query'; packetReference: string }
-  | { kind: 'help'; intent?: 'create' | 'claim' | 'query' };
-
-function randomPassword(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-  const bytes = new Uint8Array(8);
-  globalThis.crypto?.getRandomValues(bytes);
-  return Array.from(
-    bytes,
-    (byte, index) => alphabet[(byte || Date.now() + index) % alphabet.length],
-  ).join('');
-}
+  | { kind: 'help'; intent?: 'create' | 'create-passcode' | 'claim' | 'query' };
 
 function parseDuration(text: string): number {
   const match = text.match(
@@ -65,16 +55,18 @@ export function parseInjGiftCommand(rawText: string): InjGiftCommand {
   if (createIntent) {
     const amount = text.match(/(\d+(?:\.\d+)?)\s*INJ\b/i)?.[1];
     if (!amount || Number(amount) <= 0) return { kind: 'help', intent: 'create' };
+    // A gift must have a claim passcode — never auto-generate one. If the user
+    // didn't provide it, ask them to before creating.
+    if (!password) return { kind: 'help', intent: 'create-passcode' };
     const countMatch = text.match(/(\d+)\s*(?:份|个|人|packets?|gifts?|copies?)/i);
-    const generatedPassword = !password;
     return {
       kind: 'create',
       amount,
       count: Math.max(1, countMatch ? Number(countMatch[1]) : 1),
-      password: password || randomPassword(),
+      password,
       durationSec: parseDuration(text),
       mode: /(平分|平均|等额|equal|even)/i.test(text) ? 'equal' : 'random',
-      generatedPassword,
+      generatedPassword: false,
     };
   }
 
@@ -91,11 +83,14 @@ export function parseInjGiftCommand(rawText: string): InjGiftCommand {
 }
 
 export function injGiftHelpMessage(
-  intent: 'create' | 'claim' | 'query' | undefined,
+  intent: 'create' | 'create-passcode' | 'claim' | 'query' | undefined,
   languageCode: string,
 ): string {
   const zh = languageCode.startsWith('zh');
   if (zh) {
+    if (intent === 'create-passcode') {
+      return '红包必须设置领取口令。请补上口令再创建，例如：`@INJ Gift 发 0.1 INJ 红包，2 份，口令 8888`。';
+    }
     if (intent === 'create') {
       return '请带上金额，例如：`@INJ Gift 创建 0.1 INJ 红包，5 份，密码 lucky，24 小时，随机分配`。';
     }
@@ -106,6 +101,9 @@ export function injGiftHelpMessage(
       return '请粘贴分享链接、8 位分享码或完整红包 ID。';
     }
     return 'INJ Gift 支持创建、领取和查询红包，所有业务操作均由独立的 INJ Gift mini-app 执行。';
+  }
+  if (intent === 'create-passcode') {
+    return 'A gift needs a claim passcode. Add one before creating, e.g. `@INJ Gift send a 0.1 INJ gift for 2 people, passcode 8888`.';
   }
   if (intent === 'create') {
     return 'Include an amount, for example: `@INJ Gift create a 0.1 INJ gift for 5 people, password lucky`.';

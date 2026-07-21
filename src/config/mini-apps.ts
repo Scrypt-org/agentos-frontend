@@ -35,6 +35,19 @@ const ERIC_MFER_CONTRACT = (
  */
 export const MINI_APP_MANIFESTS: readonly MiniAppManifest[] = [
   {
+    appId: 'ai-token-lottery',
+    slug: 'ai-token-lottery',
+    name: 'AI Token Lucky Draw',
+    sameOrigin: true,
+    developmentUrl: process.env.NEXT_PUBLIC_INJ_PASS_APP_URL || 'http://localhost:3000',
+    productionUrl: 'https://injpass.com',
+    entryPath: '/mini-apps/ai-token-lottery',
+    networkName: NETWORK_CONFIG.mainnet.name,
+    chainId: NETWORK_CONFIG.mainnet.chainId,
+    rpcUrl: NETWORK_CONFIG.mainnet.rpcUrl,
+    permissions: ['accounts', 'read'],
+  },
+  {
     appId: 'eric-mfer',
     slug: 'eric-mfer',
     name: 'eric mfer',

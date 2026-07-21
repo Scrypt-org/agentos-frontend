@@ -81,11 +81,12 @@ import { executeSwap, getTokenBalances } from '@/services/dex-swap';
 import { fetchDapps } from '@/services/dapps';
 import { getDAppIconUrl } from '@/services/dapp-icons';
 import {
+  campaignAvailability,
   visibleComposerDApps,
   visibleMarketDApps,
   visibleSidebarDApps,
 } from '@/services/dapp-visibility';
-import { claimDailyCheckIn, getNinjaStatus, getTransactions, type NinjaStatusResponse, type PointsTransaction } from '@/services/points';
+import { claimDailyCheckIn, getNinjaStatus, getTransactions, lamToAiTokens, type NinjaStatusResponse, type PointsTransaction } from '@/services/points';
 import { getUserProfile, type UserProfileResponse } from '@/services/user';
 import { authenticateWalletSession } from '@/services/wallet-auth';
 import { validateInviteCode } from '@/services/referral';
@@ -347,6 +348,21 @@ const languageOptions: Array<{
   { code: 'zh-Hans', label: '中文（简体）', caption: 'Simplified Chinese' },
   { code: 'zh-Hant', label: '中文（繁體）', caption: 'Traditional Chinese' },
 ];
+
+const rewardBalanceLabels: Record<LanguageCode, {
+  ordinary: string;
+  reward: string;
+  expires: string;
+  expired: string;
+}> = {
+  en: { ordinary: 'Ordinary LAM', reward: 'Promotional LAM', expires: 'Expires', expired: 'Expired' },
+  de: { ordinary: 'Normales LAM', reward: 'Aktions-LAM', expires: 'Läuft ab', expired: 'Abgelaufen' },
+  fr: { ordinary: 'LAM standard', reward: 'LAM promotionnel', expires: 'Expire', expired: 'Expiré' },
+  ko: { ordinary: '일반 LAM', reward: '프로모션 LAM', expires: '만료', expired: '만료됨' },
+  ja: { ordinary: '通常 LAM', reward: 'プロモーション LAM', expires: '期限', expired: '期限切れ' },
+  'zh-Hans': { ordinary: '普通 LAM', reward: '活动 LAM', expires: '过期时间', expired: '已过期' },
+  'zh-Hant': { ordinary: '普通 LAM', reward: '活動 LAM', expires: '過期時間', expired: '已過期' },
+};
 
 const shellCopyEn = {
   modeChat: 'Interact',
@@ -1057,6 +1073,15 @@ const erc721TransferAbi = [{
 }] as const;
 
 const dappMarketApps: DAppMarketItem[] = [
+  {
+    id: 'ai-token-lottery',
+    name: 'AI Token Lucky Draw',
+    category: 'Campaign',
+    body: 'One guaranteed reward for newly registered INJ Pass wallets, usable in AI Chat for 30 days.',
+    accent: 'from-violet-400 via-fuchsia-400 to-amber-300',
+    icon: '/ai-token-lottery.svg',
+    aiDriven: true,
+  },
   {
     id: 'eric-mfer',
     name: 'eric mfer',
@@ -6302,12 +6327,18 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     composerSuggestionRefs.current[composerSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
   }, [composerSuggestionIndex]);
   const pinnedDApps = useMemo(
-    () => visibleSidebarDApps(dappMarketItems).filter((app) => app.aiDriven),
+    () => visibleSidebarDApps(dappMarketItems).filter(
+      (app) => app.aiDriven && app.id !== 'ai-token-lottery',
+    ),
     [dappMarketItems]
   );
   const marketDApps = useMemo(
     () => visibleMarketDApps(dappMarketItems),
     [dappMarketItems]
+  );
+  const campaignApp = useMemo(
+    () => dappMarketItems.find((app) => app.id === campaignAvailability) || null,
+    [dappMarketItems],
   );
   const activeMiniAppManifest = useMemo(
     () => activeMiniApp ? getMiniAppManifest(activeMiniApp.id) : null,
@@ -6707,7 +6738,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         .filter((app, index, collection) => (
           collection.findIndex((candidate) => normalizeDAppIdentity(candidate.name) === normalizeDAppIdentity(app.name)) === index
         ));
-      const requiredAgentApps = dappMarketApps.filter((app) => app.aiDriven);
+      const requiredAgentApps = dappMarketApps.filter(
+        (app) => app.aiDriven || app.id === 'ai-token-lottery',
+      );
       const requiredNames = new Set(requiredAgentApps.map((app) => normalizeDAppIdentity(app.name)));
       const approvedComingSoonNames = new Set(comingSoonDAppOrder.map(normalizeDAppIdentity));
       const prioritized = requiredAgentApps.map((required) => {
@@ -6767,7 +6800,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setAiTokenProfile(profile);
       setAiTokenStatus(profile
         ? {
-          balance: profile.ninjaBalance,
+          balance: profile.spendableBalance,
+          ordinaryBalance: profile.ninjaBalance,
+          rewardBalance: profile.rewardBalance,
+          rewardExpiresAt: profile.rewardExpiresAt,
+          spendableBalance: profile.spendableBalance,
           chanceRemaining: profile.chanceRemaining,
           chanceCooldownEndsAt: profile.chanceCooldownEndsAt,
         }
@@ -8364,10 +8401,14 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const openCampaign = () => {
+    setCampaignOpen((current) => !current);
+    if (campaignApp) {
+      openDApp(campaignApp);
+      return;
+    }
     switchProductMode('chat');
     setActiveChatSurface('campaign');
     setActiveWalletTab(null);
-    setCampaignOpen((current) => !current);
   };
 
   const openSkills = () => {
@@ -8811,11 +8852,21 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     }, target);
 
     const handleMiniAppMessage = (event: MessageEvent) => {
-      if (event.origin !== miniAppOrigin || !event.source) return;
+      if (
+        event.origin !== miniAppOrigin
+        || event.source !== miniAppIframeRef.current?.contentWindow
+      ) return;
       const message = event.data as Record<string, unknown> | null;
       if (!message || message.channel !== 'injpass-miniapp-v1') return;
       const source = event.source as WindowProxy;
       miniAppWindowRef.current = source;
+      if (message.type === 'open-host-chat') {
+        switchProductMode('chat');
+        setActiveChatSurface('default');
+        setActiveWalletTab(null);
+        setConversationSearchOpen(false);
+        return;
+      }
       if (message.type === 'navigation' && typeof message.path === 'string') {
         const nextPath = message.path.startsWith('/') ? message.path.slice(0, 2_048) : '/';
         setMiniAppNavigation({
@@ -9533,7 +9584,40 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         >
           <div className={cx('flex items-center py-2', sidebarCollapsed ? 'justify-center px-1' : 'justify-between px-3')}>
             <div className={sidebarCollapsed ? 'lg:hidden' : undefined}>
-              <div className="text-sm font-bold">INJ Pass</div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <div className="text-sm font-bold">INJ Pass</div>
+                {(() => {
+                  const rewardBalance = Number(aiTokenStatus?.rewardBalance ?? aiTokenProfile?.rewardBalance ?? 0);
+                  const rewardExpiresAt = aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt || null;
+                  if (!isAuthenticated || (!rewardBalance && !rewardExpiresAt)) return null;
+                  const labels = rewardBalanceLabels[selectedLanguageCode];
+                  const aiTokens = lamToAiTokens(rewardBalance);
+                  const expired = rewardExpiresAt ? new Date(rewardExpiresAt).getTime() <= Date.now() : false;
+                  const expiryText = rewardExpiresAt
+                    ? (expired ? labels.expired : `${labels.expires} ${formatShortDate(rewardExpiresAt)}`)
+                    : '';
+                  return (
+                    <span
+                      title={`${labels.reward}: ${aiTokens.toLocaleString()} AI · ${formatAmount(rewardBalance, 2)} LAM${expiryText ? ` · ${expiryText}` : ''}`}
+                      className={cx(
+                        'inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none',
+                        expired
+                          ? (isLight ? 'border-black/10 bg-black/[0.04] text-black/40' : 'border-white/10 bg-white/[0.05] text-white/40')
+                          : (isLight ? 'border-amber-300/60 bg-amber-100/70 text-amber-700' : 'border-amber-200/20 bg-amber-300/10 text-amber-200')
+                      )}
+                    >
+                      <span aria-hidden>🎟</span>
+                      <span className="tabular-nums">{aiTokens.toLocaleString()}</span>
+                      <span className={cx('font-bold', expired ? undefined : (isLight ? 'text-amber-700/80' : 'text-amber-200/80'))}>AI</span>
+                      {expiryText && (
+                        <span className={cx('truncate font-normal', expired ? undefined : (isLight ? 'text-amber-700/70' : 'text-amber-200/70'))}>
+                          · {expired ? labels.expired : formatShortDate(rewardExpiresAt)}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })()}
+              </div>
               <div className={cx('text-xs', isLight ? 'text-black/46' : 'text-white/46')}>{copy.brandSubtitle}</div>
             </div>
             <button
@@ -9735,7 +9819,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             className={cx(
               'mt-2 flex h-10 w-full items-center rounded-xl text-sm font-bold transition',
               sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3',
-              activeMode === 'chat' && activeChatSurface === 'campaign'
+              activeMode === 'chat' && (
+                activeChatSurface === 'campaign'
+                || (activeChatSurface === 'mini-app' && activeMiniApp?.id === campaignAvailability)
+              )
                 ? isLight ? 'bg-white' : 'bg-white/[0.07]'
                 : isLight ? 'hover:bg-black/5' : 'hover:bg-white/8'
             )}
@@ -9753,13 +9840,17 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 type="button"
                 onClick={() => {
                   setMobileSidebarOpen(false);
+                  if (campaignApp) {
+                    openDApp(campaignApp);
+                    return;
+                  }
                   switchProductMode('chat');
                   setActiveChatSurface('campaign');
                   setActiveWalletTab(null);
                 }}
                 className={cx('inj-subtle-line w-full rounded-xl px-3 py-2 text-left text-sm transition', isLight ? 'text-black/70 hover:bg-black/5' : 'text-white/70 hover:bg-white/8')}
               >
-                {copy.comingSoon}
+                {campaignApp?.name || copy.comingSoon}
               </button>
             </div>
           )}
@@ -10034,6 +10125,24 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                                   {formatAmount(aiTokenStatus?.balance ?? aiTokenProfile?.ninjaBalance ?? sidebarWalletSummary.lam, 2)}
                                 </div>
                                 <div className={cx('pb-1 text-sm font-semibold', isLight ? 'text-black/46' : 'text-white/46')}>LAM</div>
+                              </div>
+                              <div className={cx('mt-3 grid gap-2 border-t pt-3 text-xs', isLight ? 'border-black/8' : 'border-white/8')}>
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className={isLight ? 'text-black/48' : 'text-white/48'}>{rewardBalanceLabels[selectedLanguageCode].ordinary}</span>
+                                  <strong>{formatAmount(aiTokenStatus?.ordinaryBalance ?? aiTokenProfile?.ninjaBalance ?? 0, 2)} LAM</strong>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className={isLight ? 'text-black/48' : 'text-white/48'}>{rewardBalanceLabels[selectedLanguageCode].reward}</span>
+                                  <strong>{formatAmount(aiTokenStatus?.rewardBalance ?? aiTokenProfile?.rewardBalance ?? 0, 2)} LAM</strong>
+                                </div>
+                                {(aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt) && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className={isLight ? 'text-black/48' : 'text-white/48'}>{rewardBalanceLabels[selectedLanguageCode].expires}</span>
+                                    <span>{new Date(aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt || 0).getTime() <= Date.now()
+                                      ? rewardBalanceLabels[selectedLanguageCode].expired
+                                      : formatShortDate(aiTokenStatus?.rewardExpiresAt || aiTokenProfile?.rewardExpiresAt)}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
 

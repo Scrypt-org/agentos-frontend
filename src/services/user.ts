@@ -6,6 +6,9 @@ export interface UserProfileResponse {
   inviteCode: string;
   invitedBy: string | null;
   ninjaBalance: number;
+  rewardBalance: number;
+  rewardExpiresAt: string | null;
+  spendableBalance: number;
   chanceRemaining: number;
   chanceCooldownEndsAt: number;
   createdAt: string;
@@ -40,6 +43,10 @@ export async function getUserProfile(): Promise<UserProfileResponse | null> {
       inviteCode: data.inviteCode || '',
       invitedBy: data.invitedBy ?? null,
       ninjaBalance: Number(data.ninjaBalance) || 0,
+      rewardBalance: Number(data.rewardBalance) || 0,
+      rewardExpiresAt: data.rewardExpiresAt ?? null,
+      spendableBalance:
+        Number(data.spendableBalance) || Number(data.ninjaBalance) || 0,
       chanceRemaining: Number(data.chanceRemaining) || 0,
       chanceCooldownEndsAt: Number(data.chanceCooldownEndsAt) || 0,
       createdAt: data.createdAt,

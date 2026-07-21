@@ -14,6 +14,14 @@ afterEach(() => {
 });
 
 describe('mini app URL resolution', () => {
+  it('registers the AI Token lottery as a same-origin read-only app', () => {
+    expect(getMiniAppManifest('ai-token-lottery')).toMatchObject({
+      sameOrigin: true,
+      entryPath: '/mini-apps/ai-token-lottery',
+      permissions: ['accounts', 'read'],
+    });
+  });
+
   it('registers INJ Gift on Injective EVM Mainnet', () => {
     const manifest = getMiniAppManifest('inj-gift');
     expect(manifest).not.toBeNull();

@@ -13,4 +13,4 @@ export const visibleComposerDApps = <T extends DAppIdentity>(apps: T[]): T[] =>
 export const visibleMarketDApps = <T extends DAppIdentity>(apps: T[]): T[] =>
   apps.filter(isVisibleInShell);
 
-export const campaignAvailability = 'coming-soon' as const;
+export const campaignAvailability = 'ai-token-lottery' as const;

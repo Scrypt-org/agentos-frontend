@@ -26,8 +26,25 @@ export interface ConsumeChanceResponse {
   error?: string;
 }
 
+/**
+ * Display-only conversion ratio between spendable LAM and the large "AI TOKEN"
+ * figure shown to users. Mirrors the backend `aiTokensPerLam` in
+ * `inj-pass-backend/src/config/ai-token-lottery.config.ts` — keep the two in sync.
+ * The big AI-token number is never persisted; it is derived from LAM on demand.
+ */
+export const AI_TOKENS_PER_LAM = 3485;
+
+/** Convert a LAM amount to its large AI-token display figure. */
+export function lamToAiTokens(lam: number): number {
+  return Math.round((Number(lam) || 0) * AI_TOKENS_PER_LAM);
+}
+
 export interface NinjaStatusResponse {
   balance: number;
+  ordinaryBalance?: number;
+  rewardBalance?: number;
+  rewardExpiresAt?: string | null;
+  spendableBalance?: number;
   chanceRemaining: number;
   chanceCooldownEndsAt: number;
 }
@@ -186,6 +203,16 @@ export async function getNinjaStatus(): Promise<NinjaStatusResponse> {
     const data = await response.json() as Partial<NinjaStatusResponse>;
     return {
       balance: Number.isFinite(Number(data.balance)) ? Number(data.balance) : 0,
+      ordinaryBalance: Number.isFinite(Number(data.ordinaryBalance))
+        ? Number(data.ordinaryBalance)
+        : Number(data.balance) || 0,
+      rewardBalance: Number.isFinite(Number(data.rewardBalance))
+        ? Number(data.rewardBalance)
+        : 0,
+      rewardExpiresAt: data.rewardExpiresAt ?? null,
+      spendableBalance: Number.isFinite(Number(data.spendableBalance))
+        ? Number(data.spendableBalance)
+        : Number(data.balance) || 0,
       chanceRemaining: Number.isFinite(Number(data.chanceRemaining))
         ? Math.max(0, Math.floor(Number(data.chanceRemaining)))
         : 0,

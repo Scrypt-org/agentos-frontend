@@ -168,6 +168,10 @@ export class InjPassMiniAppConnector {
     });
   }
 
+  openHostChat(): void {
+    this.post({ type: 'open-host-chat' });
+  }
+
   destroy(): void {
     window.removeEventListener('message', this.handleMessage);
     window.removeEventListener('popstate', this.sendNavigation);

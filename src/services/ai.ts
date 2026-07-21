@@ -474,6 +474,48 @@ export async function searchStoredAgentConversations(
   }
 }
 
+/**
+ * Stored messages persist their content as a serialized content-block array,
+ * e.g. `[{"type":"text","text":"..."}]`, `[{"type":"tool_use",...}]`, or
+ * `[{"type":"tool_result",...}]`. Live messages, by contrast, are already
+ * flattened to plain text. This normalizes stored content to plain markdown:
+ * it keeps the text from `text` blocks and drops non-text blocks (tool_use /
+ * tool_result), which have no human-readable body and should not render as raw
+ * JSON. Returns an empty string for messages that carry only non-text blocks —
+ * callers should skip rendering those (see the load paths in InjPassChatShell).
+ */
+export function extractStoredMessageText(content: string): string {
+  if (typeof content !== 'string') return '';
+  const trimmed = content.trim();
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return content;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return content;
+  }
+
+  const blocks = Array.isArray(parsed) ? parsed : [parsed];
+  const looksLikeContentBlocks = blocks.some(
+    (block) => block && typeof block === 'object' && typeof (block as { type?: unknown }).type === 'string',
+  );
+  // Not a content-block array (e.g. some other JSON payload) — leave it as-is.
+  if (!looksLikeContentBlocks) return content;
+
+  // Keep only the readable text; tool_use / tool_result blocks collapse to ''.
+  return blocks
+    .filter(
+      (block): block is { type: 'text'; text: string } =>
+        !!block &&
+        typeof block === 'object' &&
+        (block as { type?: unknown }).type === 'text' &&
+        typeof (block as { text?: unknown }).text === 'string',
+    )
+    .map((block) => block.text)
+    .join('');
+}
+
 export async function getStoredAgentConversation(
   conversationId: string,
 ): Promise<StoredConversationDetail | null> {
@@ -486,7 +528,14 @@ export async function getStoredAgentConversation(
       return null;
     }
 
-    return response.json();
+    const detail = (await response.json()) as StoredConversationDetail | null;
+    if (detail?.messages) {
+      detail.messages = detail.messages.map((message) => ({
+        ...message,
+        content: extractStoredMessageText(message.content),
+      }));
+    }
+    return detail;
   } catch (error) {
     console.error('[AI] Get stored conversation failed:', error);
     return null;

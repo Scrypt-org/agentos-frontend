@@ -50,10 +50,18 @@ export function parseInjGiftCommand(rawText: string): InjGiftCommand {
   const password = parsePassword(text);
   const queryIntent = /(查询|查看|余额|状态|剩余|详情|check|query|status|balance|remaining)/i.test(text);
   const claimIntent = /(领取|接收|打开红包|领红包|claim|receive|redeem)/i.test(text);
-  const createIntent = /(创建|新建|发送|发一个|发红包|生成|create|send|make)/i.test(text);
+  const createIntent =
+    /(创建|新建|发送|发一个|发红包|发个|生成|create|send|make)/i.test(text)
+    // "包一个/包个/包 … 红包" — treat 包 as a verb only when it isn't the 包 in
+    // 红包 (require a non-红 prefix) and is followed by a number (amount/count),
+    // so claim/query messages that merely contain 红包 aren't misrouted to create.
+    || /(?:^|[^红])\s*包\s*(?:一?个|一?份)?\s*\d/.test(text);
 
   if (createIntent) {
-    const amount = text.match(/(\d+(?:\.\d+)?)\s*INJ\b/i)?.[1];
+    // Prefer an amount qualified with "INJ"; otherwise take the first bare number
+    // that isn't immediately a count (份/个/人) or a duration (小时/分/天…).
+    const amount = text.match(/(\d+(?:\.\d+)?)\s*INJ\b/i)?.[1]
+      ?? text.match(/(\d+(?:\.\d+)?)(?!\s*(?:份|个|人|packets?|gifts?|copies?|小时|分钟|分|时|天|秒|hours?|hrs?|min(?:ute)?s?|days?))/i)?.[1];
     if (!amount || Number(amount) <= 0) return { kind: 'help', intent: 'create' };
     // A gift must have a claim passcode — never auto-generate one. If the user
     // didn't provide it, ask them to before creating.

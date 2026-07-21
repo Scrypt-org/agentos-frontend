@@ -46,6 +46,20 @@ describe('AI Token lottery helpers', () => {
 });
 
 describe('AI Token lottery mini app contract', () => {
+  it('is available in the Apps market without being pinned in the sidebar', async () => {
+    const source = await readFile(
+      new URL('../../app/components/InjPassChatShell.tsx', import.meta.url),
+      'utf8',
+    );
+    const lotteryApp = source.match(
+      /\{\n    id: 'ai-token-lottery',[\s\S]*?\n  \},/,
+    )?.[0];
+    expect(lotteryApp).toContain('aiDriven: true,');
+    expect(source).toMatch(
+      /\.filter\(\s*\(app\) => app\.aiDriven && app\.id !== 'ai-token-lottery',?\s*\)/,
+    );
+  });
+
   it('uses backend-authoritative rewards and renders terminal states', async () => {
     const source = await readFile(
       new URL('../../app/mini-apps/ai-token-lottery/page.tsx', import.meta.url),

@@ -1079,7 +1079,7 @@ const dappMarketApps: DAppMarketItem[] = [
     body: 'One guaranteed reward for newly registered INJ Pass wallets, usable in AI Chat for 30 days.',
     accent: 'from-violet-400 via-fuchsia-400 to-amber-300',
     icon: '/ai-token-lottery.svg',
-    aiDriven: false,
+    aiDriven: true,
   },
   {
     id: 'eric-mfer',
@@ -6326,7 +6326,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     composerSuggestionRefs.current[composerSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
   }, [composerSuggestionIndex]);
   const pinnedDApps = useMemo(
-    () => visibleSidebarDApps(dappMarketItems).filter((app) => app.aiDriven),
+    () => visibleSidebarDApps(dappMarketItems).filter(
+      (app) => app.aiDriven && app.id !== 'ai-token-lottery',
+    ),
     [dappMarketItems]
   );
   const marketDApps = useMemo(

@@ -31,9 +31,14 @@ import {
   getMiniAppManifest,
   isAllowedMiniAppOrigin,
   resolveMiniAppAgentUrl,
+  resolveMiniAppBase,
   resolveMiniAppUrl,
   type MiniAppManifest,
 } from '@/config/mini-apps';
+import {
+  createInjGiftPacket,
+  syncInjGiftShareCode,
+} from '@/services/inj-gift-create';
 import {
   compileCreativeContracts,
   confirmAgentAction,
@@ -1058,6 +1063,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
 
 const pinFreeWindows = [0, 1, 5, 15, 30, 60] as const;
 const QUICK_MENU_AUTO_HIDE_MS = 850;
+const HOVER_MENU_MEDIA_QUERY = '(hover: hover) and (pointer: fine)';
 const reasoningOptions: ReasoningLevel[] = ['High', 'Medium', 'Low'];
 const agentModelOptions: AgentModel[] = ['AgentOS 1.5', 'AgentOS 1.0'];
 const erc721TransferAbi = [{
@@ -6622,7 +6628,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
   useEffect(() => {
     if (authMenuTimerRef.current) window.clearTimeout(authMenuTimerRef.current);
-    if (!authMenuOpen || authMenuPinnedRef.current) return;
+    if (
+      !authMenuOpen
+      || authMenuPinnedRef.current
+      || !window.matchMedia(HOVER_MENU_MEDIA_QUERY).matches
+    ) return;
     authMenuTimerRef.current = window.setTimeout(() => {
       if (authMenuPinnedRef.current) return;
       setAuthMenuOpen(false);
@@ -7484,6 +7494,101 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     chatAbortControllerRef.current?.abort();
     chatAbortControllerRef.current = controller;
     beginThinkingProgress(trimmedText, 'chat');
+
+    // INJ Gift CREATE runs natively in the host — the same pattern that makes the
+    // eric mfer mint reliable (mintSponsoredCatNFT below): the host signs and
+    // broadcasts directly with viem, so create never depends on the cross-origin
+    // gift iframe / postMessage bridge. Claim & query still fall through to the
+    // iframe path (claim already works via the gasless relayer).
+    if (isInjGiftMessage(trimmedText)) {
+      const giftCommand = parseInjGiftCommand(trimmedText);
+      if (giftCommand.kind === 'create') {
+        setIsAgentRunning(true);
+        try {
+          if (!isAuthenticated) {
+            throw new Error(injGiftHelpMessage('create', selectedLanguageCode));
+          }
+          if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+
+          const giftManifest = getMiniAppManifest('inj-gift');
+          const contractAddress = giftManifest?.allowedContracts?.[0];
+          if (!giftManifest || !contractAddress) {
+            throw new Error('INJ Gift is not registered for on-chain create.');
+          }
+          const { baseOverride } = resolveMiniAppAgentUrl(giftManifest, dappMarketItems);
+          const giftBaseUrl = resolveMiniAppBase(giftManifest, baseOverride).replace(/\/$/, '');
+
+          const signingKey = await requireWalletPrivateKey();
+          if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+
+          const created = await createInjGiftPacket(signingKey, contractAddress, {
+            amount: giftCommand.amount,
+            count: giftCommand.count,
+            password: giftCommand.password,
+            durationSec: giftCommand.durationSec,
+            mode: giftCommand.mode,
+          });
+
+          let shareCode: string | undefined;
+          if (created.packetId) {
+            const synced = await syncInjGiftShareCode(giftBaseUrl, {
+              packetId: created.packetId,
+              txHash: created.hash,
+            });
+            shareCode = synced?.shareCode;
+          }
+          const shareRef = shareCode ?? created.packetId;
+          const zh = selectedLanguageCode.startsWith('zh');
+
+          const body = created.packetId
+            ? formatMiniAppAgentResult({
+                ok: true,
+                key: 'inj_gift_created',
+                data: {
+                  amount: giftCommand.amount,
+                  count: giftCommand.count,
+                  password: giftCommand.password,
+                  packetId: created.packetId,
+                  shareCode,
+                  shareUrl: shareRef ? `${giftBaseUrl}/claim/${shareRef}` : undefined,
+                  transactionHash: created.hash,
+                },
+              }, selectedLanguageCode)
+            : (zh
+                ? `红包交易已提交，等待确认中。稍后可在「我的红包」页查看。\n\n- 领取口令：\`${giftCommand.password}\`\n- 交易：\`${created.hash}\``
+                : `Gift transaction submitted and awaiting confirmation — check My Packets shortly.\n\n- Claim passcode: \`${giftCommand.password}\`\n- Transaction: \`${created.hash}\``);
+
+          const assistantMessage: ChatMessage = { id: `a-${messageStamp}`, role: 'assistant', body };
+          stopThinkingProgress();
+          await streamAssistantMessage(assistantMessage, controller.signal);
+          setChatWorkStatus('complete');
+          persistCommandConversation(messageStamp, trimmedText, assistantMessage, 'inj-gift');
+        } catch (error) {
+          if (isAbortError(error)) {
+            setChatWorkStatus('idle');
+            return;
+          }
+          const assistantMessage: ChatMessage = {
+            id: `a-${messageStamp}`,
+            role: 'assistant',
+            body: error instanceof Error
+              ? error.message
+              : formatMiniAppAgentResult({ ok: false, key: 'unknown_error' }, selectedLanguageCode),
+            action: !isAuthenticated ? 'login' : undefined,
+          };
+          setMessages((current) => [...current, assistantMessage]);
+          setChatWorkStatus('idle');
+          persistCommandConversation(messageStamp, trimmedText, assistantMessage, 'inj-gift');
+        } finally {
+          stopThinkingProgress();
+          if (chatAbortControllerRef.current === controller) {
+            chatAbortControllerRef.current = null;
+            setIsAgentRunning(false);
+          }
+        }
+        return;
+      }
+    }
 
     const miniAppCommand = parseMiniAppAgentCommand(trimmedText, selectedLanguageCode);
     if (miniAppCommand) {
@@ -9461,7 +9566,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   };
 
   const scheduleAuthMenuClose = () => {
-    if (authMenuPinnedRef.current) return;
+    if (
+      authMenuPinnedRef.current
+      || !window.matchMedia(HOVER_MENU_MEDIA_QUERY).matches
+    ) return;
     if (authMenuTimerRef.current) window.clearTimeout(authMenuTimerRef.current);
     authMenuTimerRef.current = window.setTimeout(() => {
       setAuthMenuOpen(false);

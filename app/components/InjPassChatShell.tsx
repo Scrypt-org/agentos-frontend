@@ -1063,7 +1063,6 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
 
 const pinFreeWindows = [0, 1, 5, 15, 30, 60] as const;
 const QUICK_MENU_AUTO_HIDE_MS = 850;
-const HOVER_MENU_MEDIA_QUERY = '(hover: hover) and (pointer: fine)';
 const reasoningOptions: ReasoningLevel[] = ['High', 'Medium', 'Low'];
 const agentModelOptions: AgentModel[] = ['AgentOS 1.5', 'AgentOS 1.0'];
 const erc721TransferAbi = [{
@@ -6176,8 +6175,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const historyDeleteTimerRef = useRef<number | null>(null);
   const profileMenuTimerRef = useRef<number | null>(null);
   const modelMenuTimerRef = useRef<number | null>(null);
-  const authMenuTimerRef = useRef<number | null>(null);
-  const authMenuPinnedRef = useRef(false);
   const authMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const authMenuPanelRef = useRef<HTMLDivElement | null>(null);
   const walletInviteValidationRequestRef = useRef(0);
@@ -6627,48 +6624,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   }, [modelMenuOpen]);
 
   useEffect(() => {
-    if (authMenuTimerRef.current) window.clearTimeout(authMenuTimerRef.current);
-    if (
-      !authMenuOpen
-      || authMenuPinnedRef.current
-      || !window.matchMedia(HOVER_MENU_MEDIA_QUERY).matches
-    ) return;
-    authMenuTimerRef.current = window.setTimeout(() => {
-      if (authMenuPinnedRef.current) return;
-      setAuthMenuOpen(false);
-      authMenuTimerRef.current = null;
-    }, 850);
-    return () => {
-      if (authMenuTimerRef.current) window.clearTimeout(authMenuTimerRef.current);
-      authMenuTimerRef.current = null;
-    };
-  }, [authMenuOpen]);
-
-  useEffect(() => {
     if (!authMenuOpen) return;
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      const isInsideAuthArea = Boolean(
-        authMenuTriggerRef.current?.contains(target)
-        || authMenuPanelRef.current?.contains(target)
-      );
-
-      if (isInsideAuthArea) {
-        if (authMenuTimerRef.current) {
-          window.clearTimeout(authMenuTimerRef.current);
-          authMenuTimerRef.current = null;
-        }
-        return;
-      }
-
-      if (authMenuPinnedRef.current || authMenuTimerRef.current) return;
-      authMenuTimerRef.current = window.setTimeout(() => {
-        setAuthMenuOpen(false);
-        authMenuTimerRef.current = null;
-      }, 850);
-    };
 
     const handleOutsidePointerDown = (event: PointerEvent) => {
       const target = event.target;
@@ -6680,18 +6636,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         return;
       }
 
-      authMenuPinnedRef.current = false;
-      if (authMenuTimerRef.current) {
-        window.clearTimeout(authMenuTimerRef.current);
-        authMenuTimerRef.current = null;
-      }
       setAuthMenuOpen(false);
     };
 
-    document.addEventListener('pointermove', handlePointerMove, true);
     document.addEventListener('pointerdown', handleOutsidePointerDown, true);
     return () => {
-      document.removeEventListener('pointermove', handlePointerMove, true);
       document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
     };
   }, [authMenuOpen]);
@@ -9014,11 +8963,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         setOrphanWalletAddress(null);
         setLocalWallets(loadWallets());
         void detectPrfSupport().then(setPrfDetection).catch(() => undefined);
-        authMenuPinnedRef.current = true;
-        if (authMenuTimerRef.current) {
-          window.clearTimeout(authMenuTimerRef.current);
-          authMenuTimerRef.current = null;
-        }
         setAuthMethod('mnemonic');
         setAuthMenuOpen(true);
         respond(true);
@@ -9180,7 +9124,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         setOrphanWalletAddress(null);
         setLocalWallets(loadWallets());
         void detectPrfSupport().then(setPrfDetection).catch(() => undefined);
-        authMenuPinnedRef.current = true;
         setAuthMethod('mnemonic');
         setAuthMenuOpen(true);
         respond(requestId, true, undefined, source);
@@ -9556,31 +9499,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setOrphanWalletAddress(null);
     setLocalWallets(loadWallets());
     void detectPrfSupport().then(setPrfDetection).catch(() => undefined);
-    authMenuPinnedRef.current = false;
     setAuthMenuOpen((current) => !current);
-  };
-
-  const keepAuthMenuOpen = () => {
-    if (authMenuTimerRef.current) window.clearTimeout(authMenuTimerRef.current);
-    authMenuTimerRef.current = null;
-  };
-
-  const scheduleAuthMenuClose = () => {
-    if (
-      authMenuPinnedRef.current
-      || !window.matchMedia(HOVER_MENU_MEDIA_QUERY).matches
-    ) return;
-    if (authMenuTimerRef.current) window.clearTimeout(authMenuTimerRef.current);
-    authMenuTimerRef.current = window.setTimeout(() => {
-      setAuthMenuOpen(false);
-      authMenuTimerRef.current = null;
-    }, 850);
-  };
-
-  const pinAuthMenuOpen = () => {
-    authMenuPinnedRef.current = true;
-    if (authMenuTimerRef.current) window.clearTimeout(authMenuTimerRef.current);
-    authMenuTimerRef.current = null;
   };
 
   const keepModelMenuOpen = () => {
@@ -10882,18 +10801,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 {authMenuOpen && (
                   <div
                     ref={authMenuPanelRef}
-                    onPointerEnter={keepAuthMenuOpen}
-                    onPointerMove={keepAuthMenuOpen}
-                    onPointerLeave={scheduleAuthMenuClose}
-                    onFocusCapture={(event) => {
-                      const tagName = (event.target as HTMLElement).tagName;
-                      if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
-                        pinAuthMenuOpen();
-                      } else {
-                        keepAuthMenuOpen();
-                      }
-                    }}
-                    onKeyDownCapture={keepAuthMenuOpen}
                     className={cx(
                       'inj-glass-surface inj-liquid-menu absolute right-0 top-11 max-h-[min(680px,calc(100dvh-5rem))] w-[min(360px,calc(100vw-2rem))] overflow-y-auto rounded-2xl border p-2 shadow-2xl backdrop-blur-2xl motion-safe:animate-[injFadeDown_360ms_cubic-bezier(0.22,1,0.36,1)_both]',
                       isLight ? 'border-black/8 bg-white/92 text-black shadow-black/12' : 'border-white/10 bg-[#18181b]/92 text-white shadow-black/45'
@@ -10983,7 +10890,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                       <button
                         type="button"
                         onClick={() => {
-                          authMenuPinnedRef.current = false;
                           setAuthMenuOpen(false);
                           void logout();
                         }}
@@ -11252,7 +11158,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                         setOrphanWalletAddress(null);
                         setLocalWallets(loadWallets());
                         void detectPrfSupport().then(setPrfDetection).catch(() => undefined);
-                        authMenuPinnedRef.current = true;
                         setAuthMenuOpen(true);
                       }}
                       onOpenExternal={() => {

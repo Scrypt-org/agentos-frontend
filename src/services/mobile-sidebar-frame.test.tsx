@@ -58,4 +58,27 @@ describe('MobileSidebarFrame', () => {
     const searchHandlerEnd = shellSource.indexOf('const openStoredConversation', searchHandlerStart);
     expect(shellSource.slice(searchHandlerStart, searchHandlerEnd)).toContain('setMobileSidebarOpen(false)');
   });
+
+  it('keeps the login menu open until an explicit close action', () => {
+    const shellSource = readFileSync(
+      new URL('../../app/components/InjPassChatShell.tsx', import.meta.url),
+      'utf8',
+    );
+    const authLifecycleEffectStart = shellSource.indexOf(
+      'useEffect(() => {\n    if (!authMenuOpen) return;',
+    );
+    const authLifecycleEffectEnd = shellSource.indexOf(
+      'useEffect(() => {\n    if (profileMenuTimerRef.current)',
+      authLifecycleEffectStart,
+    );
+    const authLifecycleEffect = shellSource.slice(
+      authLifecycleEffectStart,
+      authLifecycleEffectEnd,
+    );
+
+    expect(authLifecycleEffect).toContain("document.addEventListener('pointerdown', handleOutsidePointerDown, true)");
+    expect(authLifecycleEffect).not.toContain('setTimeout');
+    expect(authLifecycleEffect).not.toContain("addEventListener('pointermove'");
+    expect(shellSource).not.toContain('onPointerLeave={scheduleAuthMenuClose}');
+  });
 });

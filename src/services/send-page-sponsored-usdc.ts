@@ -19,6 +19,28 @@ export interface SponsoredUsdcStatusPresentation {
   tone: 'pending' | 'success' | 'error';
 }
 
+export interface SponsoredUsdcPrimaryAction {
+  label: string;
+  isError: boolean;
+  disabled: true;
+  canRetry: boolean;
+}
+
+export type OperationToken = number;
+
+export interface OperationGuard {
+  begin: () => OperationToken;
+  tryBegin: () => OperationToken | null;
+  finish: (token: OperationToken) => void;
+  invalidate: () => void;
+  isCurrent: (token: OperationToken) => boolean;
+}
+
+export interface SponsoredUsdcIntent {
+  token: OperationToken;
+  transferId: string;
+}
+
 export interface ClearedSendIntent {
   amount: '';
   gasEstimate: GasEstimate | null;
@@ -119,6 +141,63 @@ export function getSponsoredUsdcStatusPresentation(
         tone: 'error',
       };
   }
+}
+
+export function getSponsoredUsdcPrimaryAction(
+  transfer: SponsoredUsdcTransfer,
+): SponsoredUsdcPrimaryAction {
+  const presentation = getSponsoredUsdcStatusPresentation(transfer);
+  const canRetry = presentation.tone === 'error';
+
+  return {
+    label: presentation.label,
+    isError: canRetry,
+    disabled: true,
+    canRetry,
+  };
+}
+
+export function createOperationGuard(): OperationGuard {
+  let generation = 0;
+  let activeToken: OperationToken | null = null;
+
+  const begin = (): OperationToken => {
+    generation += 1;
+    activeToken = generation;
+    return activeToken;
+  };
+
+  return {
+    begin,
+    tryBegin: () => activeToken === null ? begin() : null,
+    finish: (token) => {
+      if (activeToken === token) activeToken = null;
+    },
+    invalidate: () => {
+      generation += 1;
+      activeToken = null;
+    },
+    isCurrent: (token) => token === generation,
+  };
+}
+
+export function isCurrentSponsoredUsdcIntent(
+  guard: OperationGuard,
+  intent: SponsoredUsdcIntent,
+  asset: 'INJ' | 'USDC',
+  preparedTransferId: string | null,
+): boolean {
+  return asset === 'USDC'
+    && preparedTransferId === intent.transferId
+    && guard.isCurrent(intent.token);
+}
+
+export function cancelSponsoredUsdcIntent(
+  guard: OperationGuard,
+  clearPrepared: () => void,
+): void {
+  guard.invalidate();
+  clearPrepared();
 }
 
 export function createClearedSendIntent(): ClearedSendIntent {

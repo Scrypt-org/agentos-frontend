@@ -25,9 +25,14 @@ import {
 } from '@/services/sponsored-usdc';
 import { signTypedDataJson } from '@/services/typed-data-signing';
 import {
+  cancelSponsoredUsdcIntent,
+  createOperationGuard,
   createClearedSendIntent,
+  getSponsoredUsdcPrimaryAction,
   getSponsoredUsdcStatusPresentation,
   getUsdcAmountValidation,
+  isCurrentSponsoredUsdcIntent,
+  type SponsoredUsdcIntent,
 } from '@/services/send-page-sponsored-usdc';
 
 interface AddressBookEntry {
@@ -55,6 +60,10 @@ function SendPageContent() {
   const { isUnlocked, privateKey, address, isCheckingSession } = useWallet();
   const { isPinLocked, autoLockMinutes } = usePin();
   const intentVersionRef = useRef(0);
+  const sponsoredPrepareGuardRef = useRef(createOperationGuard());
+  const gasEstimateGuardRef = useRef(createOperationGuard());
+  const selectedAssetRef = useRef<SendAsset>('INJ');
+  const preparedUsdcIntentRef = useRef<SponsoredUsdcIntent | null>(null);
   const [isEmbedded, setIsEmbedded] = useState(false);
   const [asset, setAsset] = useState<SendAsset>('INJ');
   const [recipient, setRecipient] = useState('');
@@ -90,6 +99,7 @@ function SendPageContent() {
     useState<SponsoredUsdcPrepareResponse | null>(null);
   const [sponsoredTransfer, setSponsoredTransfer] =
     useState<SponsoredUsdcTransfer | null>(null);
+  const transferControlsLocked = asset === 'USDC' && sponsoredTransfer !== null;
 
   // Load address book from localStorage
   useEffect(() => {
@@ -131,10 +141,13 @@ function SendPageContent() {
 
   const clearTransferIntent = () => {
     intentVersionRef.current += 1;
+    sponsoredPrepareGuardRef.current.invalidate();
+    preparedUsdcIntentRef.current = null;
     setPreparedUsdc(null);
     setSponsoredTransfer(null);
     setTxHash('');
     setError('');
+    setLoading(false);
   };
 
   // Save address to address book
@@ -274,6 +287,16 @@ function SendPageContent() {
         disabled: true,
       };
     }
+    if (asset === 'USDC' && preparedUsdc) {
+      return {
+        label: 'Authorization ready',
+        isError: false,
+        disabled: true,
+      };
+    }
+    if (asset === 'USDC' && sponsoredTransfer) {
+      return getSponsoredUsdcPrimaryAction(sponsoredTransfer);
+    }
     if (recipient && !isValidRecipientAddress(recipient)) {
       return { label: 'Invalid Address', isError: true, disabled: true };
     }
@@ -307,9 +330,13 @@ function SendPageContent() {
   };
 
   const handleAssetChange = (nextAsset: SendAsset) => {
-    if (nextAsset === asset) return;
+    if (nextAsset === asset || transferControlsLocked) return;
     const cleared = createClearedSendIntent();
     intentVersionRef.current += 1;
+    sponsoredPrepareGuardRef.current.invalidate();
+    gasEstimateGuardRef.current.invalidate();
+    selectedAssetRef.current = nextAsset;
+    preparedUsdcIntentRef.current = null;
     setAsset(nextAsset);
     setAmount(cleared.amount);
     setGasEstimate(cleared.gasEstimate);
@@ -319,6 +346,7 @@ function SendPageContent() {
     setError(cleared.error);
     setLoading(false);
     setEstimating(false);
+    setCostFlashing(false);
     setShowAuthModal(false);
   };
 
@@ -356,7 +384,7 @@ function SendPageContent() {
   }, []);
 
   const handleEstimate = useCallback(async (useDefaults = false) => {
-    if (asset !== 'INJ') return;
+    if (asset !== 'INJ' || selectedAssetRef.current !== 'INJ') return;
     console.log('[Send] handleEstimate called:', { useDefaults, recipient, amount, address, hasPrivateKey: !!privateKey });
     
     // Use default values if requested or use actual values
@@ -376,6 +404,12 @@ function SendPageContent() {
     const originalRecipient = estimateRecipient;
     estimateRecipient = getEvmAddress(estimateRecipient);
     console.log('[Send] Address conversion:', { original: originalRecipient, converted: estimateRecipient });
+
+    const estimateToken = gasEstimateGuardRef.current.begin();
+    const isCurrentEstimate = () => (
+      selectedAssetRef.current === 'INJ'
+      && gasEstimateGuardRef.current.isCurrent(estimateToken)
+    );
 
     setEstimating(true);
     setError('');
@@ -403,7 +437,8 @@ function SendPageContent() {
         maxFeePerGas: estimate.maxFeePerGas.toString(),
         totalCost: estimate.totalCost.toString()
       });
-      
+
+      if (!isCurrentEstimate()) return;
       setGasEstimate(estimate);
     } catch (err) {
       console.error('[Send] Gas estimation error:', err);
@@ -411,7 +446,8 @@ function SendPageContent() {
         message: err instanceof Error ? err.message : 'Unknown error',
         stack: err instanceof Error ? err.stack : undefined
       });
-      
+
+      if (!isCurrentEstimate()) return;
       // Ignore transient validation issues while the user is still typing
       if (!useDefaults) {
         const msg = err instanceof Error ? err.message : 'Failed to estimate gas';
@@ -420,8 +456,11 @@ function SendPageContent() {
         }
       }
     } finally {
+      if (!isCurrentEstimate()) return;
       setEstimating(false);
-      setTimeout(() => setCostFlashing(false), 300);
+      setTimeout(() => {
+        if (isCurrentEstimate()) setCostFlashing(false);
+      }, 300);
     }
   }, [asset, recipient, amount, address, privateKey, getEvmAddress]);
 
@@ -486,6 +525,9 @@ function SendPageContent() {
 
   const handleSendClick = async () => {
     if (asset === 'USDC') {
+      if (loading || preparedUsdc || sponsoredTransfer) return;
+      const prepareToken = sponsoredPrepareGuardRef.current.tryBegin();
+      if (prepareToken === null) return;
       const intentVersion = intentVersionRef.current + 1;
       intentVersionRef.current = intentVersion;
       setLoading(true);
@@ -503,7 +545,14 @@ function SendPageContent() {
           normalizedRecipient,
           amount,
         );
-        if (intentVersionRef.current !== intentVersion) return;
+        if (
+          intentVersionRef.current !== intentVersion
+          || !sponsoredPrepareGuardRef.current.isCurrent(prepareToken)
+        ) return;
+        preparedUsdcIntentRef.current = {
+          token: prepareToken,
+          transferId: prepared.transferId,
+        };
         setPreparedUsdc(prepared);
         setShowAuthModal(true);
       } catch (cause) {
@@ -511,6 +560,7 @@ function SendPageContent() {
           setError(toSponsoredUsdcMessage(cause));
         }
       } finally {
+        sponsoredPrepareGuardRef.current.finish(prepareToken);
         if (intentVersionRef.current === intentVersion) {
           setLoading(false);
         }
@@ -527,9 +577,17 @@ function SendPageContent() {
 
   const handleSponsoredUsdcAuthorization = async (
     authorizedKey: Uint8Array,
+    intent: SponsoredUsdcIntent,
+    prepared: SponsoredUsdcPrepareResponse,
   ) => {
-    const prepared = preparedUsdc;
-    if (asset !== 'USDC' || !prepared) return;
+    const isCurrentIntent = () => isCurrentSponsoredUsdcIntent(
+      sponsoredPrepareGuardRef.current,
+      intent,
+      asset,
+      preparedUsdcIntentRef.current?.transferId ?? null,
+    ) && prepared.transferId === intent.transferId;
+
+    if (!isCurrentIntent()) return;
 
     const intentVersion = intentVersionRef.current;
     setLoading(true);
@@ -537,13 +595,20 @@ function SendPageContent() {
 
     try {
       const signature = await signTypedDataJson(authorizedKey, prepared.typedData);
-      if (intentVersionRef.current !== intentVersion) return;
+      if (
+        intentVersionRef.current !== intentVersion
+        || !isCurrentIntent()
+      ) return;
 
       const queued = await submitSponsoredUsdcTransfer(
         prepared.transferId,
         signature,
       );
-      if (intentVersionRef.current !== intentVersion) return;
+      if (
+        intentVersionRef.current !== intentVersion
+        || !sponsoredPrepareGuardRef.current.isCurrent(intent.token)
+      ) return;
+      preparedUsdcIntentRef.current = null;
       setPreparedUsdc(null);
       setSponsoredTransfer(queued);
 
@@ -560,11 +625,17 @@ function SendPageContent() {
         }
       }
     } catch (cause) {
-      if (intentVersionRef.current === intentVersion) {
+      if (
+        intentVersionRef.current === intentVersion
+        && sponsoredPrepareGuardRef.current.isCurrent(intent.token)
+      ) {
         setError(toSponsoredUsdcMessage(cause));
       }
     } finally {
-      if (intentVersionRef.current === intentVersion) {
+      if (
+        intentVersionRef.current === intentVersion
+        && sponsoredPrepareGuardRef.current.isCurrent(intent.token)
+      ) {
         setLoading(false);
       }
     }
@@ -603,16 +674,47 @@ function SendPageContent() {
   };
 
   const handleAuthSuccess = async (authorizedKey: Uint8Array) => {
-    setShowAuthModal(false);
     if (asset === 'INJ') {
+      setShowAuthModal(false);
       await handleSend(authorizedKey);
       return;
     }
-    await handleSponsoredUsdcAuthorization(authorizedKey);
+
+    const intent = preparedUsdcIntentRef.current;
+    const prepared = preparedUsdc;
+    if (
+      !intent
+      || !prepared
+      || !isCurrentSponsoredUsdcIntent(
+        sponsoredPrepareGuardRef.current,
+        intent,
+        asset,
+        prepared.transferId,
+      )
+    ) return;
+
+    setShowAuthModal(false);
+    await handleSponsoredUsdcAuthorization(authorizedKey, intent, prepared);
+  };
+
+  const handleAuthModalClose = () => {
+    if (asset === 'USDC') {
+      cancelSponsoredUsdcIntent(
+        sponsoredPrepareGuardRef.current,
+        () => {
+          preparedUsdcIntentRef.current = null;
+          setPreparedUsdc(null);
+        },
+      );
+    }
+    setShowAuthModal(false);
   };
 
   const sponsoredStatus = sponsoredTransfer
     ? getSponsoredUsdcStatusPresentation(sponsoredTransfer)
+    : null;
+  const sponsoredPrimaryAction = sponsoredTransfer
+    ? getSponsoredUsdcPrimaryAction(sponsoredTransfer)
     : null;
   const successExplorerUrl = asset === 'USDC'
     ? sponsoredTransfer?.explorerUrl
@@ -841,6 +943,7 @@ function SendPageContent() {
                   key={option}
                   type="button"
                   onClick={() => handleAssetChange(option)}
+                  disabled={transferControlsLocked}
                   aria-pressed={asset === option}
                   className={`min-h-10 rounded-lg px-4 text-sm font-bold transition ${
                     asset === option
@@ -860,9 +963,10 @@ function SendPageContent() {
               Recipient Address
             </label>
             <div className="relative">
-            <input
-              type="text"
-              value={recipient}
+              <input
+                type="text"
+                value={recipient}
+                disabled={transferControlsLocked}
                 onChange={(e) => {
                   clearTransferIntent();
                   setRecipient(e.target.value);
@@ -874,7 +978,10 @@ function SendPageContent() {
               {/* Convert Address Button */}
               <button
                 onClick={convertAddress}
-                disabled={!isEvmAddress(recipient) && !isCosmosAddress(recipient)}
+                disabled={
+                  transferControlsLocked
+                  || (!isEvmAddress(recipient) && !isCosmosAddress(recipient))
+                }
                 className={`absolute right-24 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${
                   isEvmAddress(recipient) || isCosmosAddress(recipient)
                     ? 'hover:bg-white/10 text-gray-400 hover:text-white cursor-pointer'
@@ -890,6 +997,7 @@ function SendPageContent() {
               {/* NFC Scan Button (Hand/Touch Icon) */}
               <button
                 onClick={openNfcScanner}
+                disabled={transferControlsLocked}
                 className="absolute right-12 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/10 transition-all"
                 title="Scan Card (Experimental)"
               >
@@ -901,6 +1009,7 @@ function SendPageContent() {
               {/* Address Book Button */}
               <button
                 onClick={() => setShowAddressBook(!showAddressBook)}
+                disabled={transferControlsLocked}
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/10 transition-all"
                 title="Address Book"
               >
@@ -994,6 +1103,7 @@ function SendPageContent() {
                 type="text"
                 inputMode="decimal"
                 value={amount}
+                disabled={transferControlsLocked}
                 onChange={(e) => {
                   clearTransferIntent();
                   setAmount(e.target.value);
@@ -1085,6 +1195,16 @@ function SendPageContent() {
                   className="mt-3 text-sm font-bold text-white underline decoration-white/30 underline-offset-4 transition hover:decoration-white disabled:opacity-40"
                 >
                   Refresh status
+                </button>
+              )}
+              {sponsoredPrimaryAction?.canRetry && (
+                <button
+                  type="button"
+                  onClick={() => clearTransferIntent()}
+                  disabled={loading}
+                  className="mt-3 text-sm font-bold text-white underline decoration-white/30 underline-offset-4 transition hover:decoration-white disabled:opacity-40"
+                >
+                  Try again
                 </button>
               )}
             </div>
@@ -1334,7 +1454,7 @@ function SendPageContent() {
       {/* Transaction Authentication Modal */}
       <TransactionAuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        onClose={handleAuthModalClose}
         onSuccess={handleAuthSuccess}
         transactionType="send"
       />

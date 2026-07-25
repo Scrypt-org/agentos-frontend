@@ -8,9 +8,13 @@ import type {
 vi.mock('./api-base', () => ({ API_BASE_URL: 'https://api.example.test' }));
 
 import {
+  cancelSponsoredUsdcIntent,
+  createOperationGuard,
   createClearedSendIntent,
+  getSponsoredUsdcPrimaryAction,
   getSponsoredUsdcStatusPresentation,
   getUsdcAmountValidation,
+  isCurrentSponsoredUsdcIntent,
 } from './send-page-sponsored-usdc';
 
 const transfer: SponsoredUsdcTransfer = {
@@ -84,6 +88,140 @@ describe('Send page sponsored USDC behavior', () => {
       error: '',
     });
   });
+
+  it.each(['CREATED', 'SIGNED', 'QUEUED', 'BROADCASTING'] as const)(
+    'disables the primary action while %s is pending',
+    (status) => {
+      const prepare = vi.fn();
+      const action = getSponsoredUsdcPrimaryAction({
+        ...transfer,
+        status,
+      });
+
+      if (!action.disabled) prepare();
+
+      expect(action).toMatchObject({
+        disabled: true,
+        isError: false,
+        canRetry: false,
+      });
+      expect(prepare).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['EXPIRED', 'REJECTED', 'FAILED'] as const)(
+    'requires an explicit retry reset after %s',
+    (status) => {
+      expect(getSponsoredUsdcPrimaryAction({
+        ...transfer,
+        status,
+      })).toMatchObject({
+        disabled: true,
+        isError: true,
+        canRetry: true,
+      });
+    },
+  );
+
+  it('rejects a duplicate operation while the first is active', () => {
+    const guard = createOperationGuard();
+    const first = guard.tryBegin();
+
+    expect(first).not.toBeNull();
+    expect(guard.tryBegin()).toBeNull();
+
+    guard.finish(first!);
+
+    expect(guard.isCurrent(first!)).toBe(true);
+    expect(guard.tryBegin()).not.toBeNull();
+  });
+
+  it('invalidates a cancelled intent before a late auth callback can submit', () => {
+    const guard = createOperationGuard();
+    const token = guard.tryBegin();
+    const clearPrepared = vi.fn();
+    const submit = vi.fn();
+    const intent = {
+      token: token!,
+      transferId: transfer.id,
+    };
+
+    expect(isCurrentSponsoredUsdcIntent(
+      guard,
+      intent,
+      'USDC',
+      transfer.id,
+    )).toBe(true);
+
+    cancelSponsoredUsdcIntent(guard, clearPrepared);
+
+    if (isCurrentSponsoredUsdcIntent(
+      guard,
+      intent,
+      'USDC',
+      transfer.id,
+    )) {
+      submit();
+    }
+
+    expect(clearPrepared).toHaveBeenCalledOnce();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it.each(['resolve', 'reject'] as const)(
+    'ignores a stale INJ estimate that %ss after switching to USDC',
+    async (outcome) => {
+      const guard = createOperationGuard();
+      const token = guard.begin();
+      let selectedAsset: 'INJ' | 'USDC' = 'INJ';
+      const state = {
+        gasEstimate: 'old estimate',
+        error: 'old error',
+        estimating: true,
+        costFlashing: true,
+      };
+      let settleEstimate!: (value: string) => void;
+      const estimate = new Promise<string>((resolve, reject) => {
+        settleEstimate = outcome === 'resolve'
+          ? resolve
+          : (reason) => reject(reason);
+      });
+      const isCurrentEstimate = () => (
+        selectedAsset === 'INJ' && guard.isCurrent(token)
+      );
+
+      const pendingEstimate = estimate
+        .then((value) => {
+          if (isCurrentEstimate()) state.gasEstimate = value;
+        })
+        .catch(() => {
+          if (isCurrentEstimate()) state.error = 'estimate failed';
+        })
+        .finally(() => {
+          if (isCurrentEstimate()) {
+            state.estimating = false;
+            state.costFlashing = false;
+          }
+        });
+
+      selectedAsset = 'USDC';
+      guard.invalidate();
+      state.gasEstimate = 'USDC gas state';
+      state.error = '';
+      state.estimating = false;
+      state.costFlashing = false;
+
+      settleEstimate('late estimate');
+      await pendingEstimate;
+
+      expect(state).toEqual({
+        gasEstimate: 'USDC gas state',
+        error: '',
+        estimating: false,
+        costFlashing: false,
+      });
+    },
+  );
 });
 
 describe('Send page sponsored USDC contract', () => {
@@ -101,8 +239,16 @@ describe('Send page sponsored USDC contract', () => {
     expect(source).toContain('pollSponsoredUsdcTransfer(');
     expect(source).toContain('getUsdcAmountValidation(amount, usdcBalance.value)');
     expect(source).toContain('setShowAuthModal(true)');
-    expect(source).toContain('onClose={() => setShowAuthModal(false)}');
+    expect(source).toContain('onClose={handleAuthModalClose}');
     expect(source).toContain('sponsoredTransfer?.explorerUrl');
+    expect(source).toContain(
+      "const transferControlsLocked = asset === 'USDC' && sponsoredTransfer !== null",
+    );
+    expect(source).toContain('if (loading || preparedUsdc || sponsoredTransfer) return;');
+    expect(source).toContain('disabled={transferControlsLocked}');
+    expect(source).toContain('const gasEstimateGuardRef = useRef(createOperationGuard())');
+    expect(source).toContain('gasEstimateGuardRef.current.invalidate()');
+    expect(source).toContain("selectedAssetRef.current === 'INJ'");
     expect(source).toContain('Network fee');
     expect(source).toContain('0 INJ');
     expect(source).toContain('Sponsored by INJ Pass');

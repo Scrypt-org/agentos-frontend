@@ -12,7 +12,10 @@ vi.mock('@/contexts/WalletContext', () => ({
   useWallet: vi.fn(),
 }));
 
-import { finishTransactionAuthorization } from '@/components/TransactionAuthModal';
+import {
+  finishTransactionAuthorization,
+  requestTransactionAuthClose,
+} from '@/components/TransactionAuthModal';
 
 describe('transaction authorization completion', () => {
   it('returns the exact newly authorized key to the caller', () => {
@@ -28,5 +31,15 @@ describe('transaction authorization completion', () => {
     expect(resetActivity).toHaveBeenCalledOnce();
     expect(onSuccess).toHaveBeenCalledOnce();
     expect(onSuccess.mock.calls[0]?.[0]).toBe(key);
+  });
+
+  it('does not close from the backdrop while verification is active', () => {
+    const onClose = vi.fn();
+
+    requestTransactionAuthClose(true, onClose);
+    expect(onClose).not.toHaveBeenCalled();
+
+    requestTransactionAuthClose(false, onClose);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

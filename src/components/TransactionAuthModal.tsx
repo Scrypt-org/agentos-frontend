@@ -24,6 +24,13 @@ export function finishTransactionAuthorization(
   onSuccess(key);
 }
 
+export function requestTransactionAuthClose(
+  verifying: boolean,
+  onClose: () => void,
+): void {
+  if (!verifying) onClose();
+}
+
 export default function TransactionAuthModal({
   isOpen,
   onClose,
@@ -224,7 +231,7 @@ export default function TransactionAuthModal({
 
           <div className="flex gap-3 pt-2">
             <button
-              onClick={onClose}
+              onClick={() => requestTransactionAuthClose(verifying, onClose)}
               disabled={verifying}
               className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 font-bold text-sm hover:bg-white/10 transition-all disabled:opacity-50"
             >
@@ -265,7 +272,7 @@ export default function TransactionAuthModal({
           className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${
             isOpen ? 'opacity-100' : 'opacity-0'
           }`}
-          onClick={onClose}
+          onClick={() => requestTransactionAuthClose(verifying, onClose)}
         />
         <div
           className={`relative w-full max-w-md transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
@@ -281,7 +288,7 @@ export default function TransactionAuthModal({
   return (
     <div 
       className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
+      onClick={() => requestTransactionAuthClose(verifying, onClose)}
     >
       {authCard}
     </div>

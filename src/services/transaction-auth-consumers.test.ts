@@ -16,7 +16,13 @@ describe('transaction authorization consumers', () => {
     expect(source).toMatch(/if \(!recipient \|\| !amount \|\| !transactionKey\) return;/);
     expect(source).toMatch(/sendTransaction\(\s*transactionKey,/s);
     expect(source).toMatch(
-      /const handleAuthSuccess = \(authorizedKey: Uint8Array\) => \{\s*setShowAuthModal\(false\);\s*handleSend\(authorizedKey\);\s*\};/s,
+      /const handleAuthSuccess = async \(authorizedKey: Uint8Array\) => \{\s*setShowAuthModal\(false\);\s*if \(asset === 'INJ'\) \{\s*await handleSend\(authorizedKey\);\s*return;\s*\}\s*await handleSponsoredUsdcAuthorization\(authorizedKey\);\s*\};/s,
+    );
+    expect(source).toMatch(
+      /signTypedDataJson\(authorizedKey, prepared\.typedData\)/,
+    );
+    expect(source).not.toMatch(
+      /signTypedDataJson\(privateKey, prepared\.typedData\)/,
     );
   });
 

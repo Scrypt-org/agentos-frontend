@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@/contexts/WalletContext';
 import { usePin } from '@/contexts/PinContext';
@@ -11,17 +11,52 @@ import { resolveTransactionKey } from '@/services/transaction-key';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import TransactionAuthModal from '@/components/TransactionAuthModal';
 import { getInjectiveAddress, getEthereumAddress } from '@injectivelabs/sdk-ts';
+import { isAddress, type Address } from 'viem';
+import {
+  getUsdcBalance,
+  pollSponsoredUsdcTransfer,
+  prepareSponsoredUsdcTransfer,
+  SponsoredUsdcApiError,
+  sponsoredUsdcErrorMessage,
+  submitSponsoredUsdcTransfer,
+  type SponsoredUsdcPrepareResponse,
+  type SponsoredUsdcTransfer,
+  type TokenBalance,
+} from '@/services/sponsored-usdc';
+import { signTypedDataJson } from '@/services/typed-data-signing';
+import {
+  createClearedSendIntent,
+  getSponsoredUsdcStatusPresentation,
+  getUsdcAmountValidation,
+} from '@/services/send-page-sponsored-usdc';
 
 interface AddressBookEntry {
   name: string;
   address: string;
 }
 
+type SendAsset = 'INJ' | 'USDC';
+
+function toSponsoredUsdcMessage(cause: unknown): string {
+  if (cause instanceof SponsoredUsdcApiError) {
+    return sponsoredUsdcErrorMessage(cause.code);
+  }
+  if (
+    cause instanceof Error
+    && cause.message.startsWith('USDC amount must')
+  ) {
+    return cause.message;
+  }
+  return sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE');
+}
+
 function SendPageContent() {
   const router = useRouter();
   const { isUnlocked, privateKey, address, isCheckingSession } = useWallet();
   const { isPinLocked, autoLockMinutes } = usePin();
+  const intentVersionRef = useRef(0);
   const [isEmbedded, setIsEmbedded] = useState(false);
+  const [asset, setAsset] = useState<SendAsset>('INJ');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [gasEstimate, setGasEstimate] = useState<GasEstimate | null>(null);
@@ -44,7 +79,17 @@ function SendPageContent() {
   const [copied, setCopied] = useState(false);
   const [nfcError, setNfcError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [userBalance, setUserBalance] = useState('0');
+  const [injBalance, setInjBalance] = useState('0');
+  const [usdcBalance, setUsdcBalance] = useState<TokenBalance>({
+    value: 0n,
+    formatted: '0',
+    decimals: 6,
+    symbol: 'USDC',
+  });
+  const [preparedUsdc, setPreparedUsdc] =
+    useState<SponsoredUsdcPrepareResponse | null>(null);
+  const [sponsoredTransfer, setSponsoredTransfer] =
+    useState<SponsoredUsdcTransfer | null>(null);
 
   // Load address book from localStorage
   useEffect(() => {
@@ -73,11 +118,24 @@ function SendPageContent() {
   useEffect(() => {
     if (!address) return;
     getBalance(address, INJECTIVE_MAINNET)
-      .then((balance) => setUserBalance(balance.formatted))
+      .then((balance) => setInjBalance(balance.formatted))
       .catch((error) => {
         console.error('[Send] Failed to load balance:', error);
       });
+    getUsdcBalance(address as Address)
+      .then(setUsdcBalance)
+      .catch((error) => {
+        console.error('[Send] Failed to load USDC balance:', error);
+      });
   }, [address]);
+
+  const clearTransferIntent = () => {
+    intentVersionRef.current += 1;
+    setPreparedUsdc(null);
+    setSponsoredTransfer(null);
+    setTxHash('');
+    setError('');
+  };
 
   // Save address to address book
   const saveToAddressBook = () => {
@@ -106,6 +164,7 @@ function SendPageContent() {
 
   // Select address from address book
   const selectAddress = (address: string) => {
+    clearTransferIntent();
     setRecipient(address);
     closeAddressBook();
   };
@@ -155,6 +214,7 @@ function SendPageContent() {
       // If card has address, use it
       if (cardData.address) {
         setTimeout(() => {
+          clearTransferIntent();
           setRecipient(cardData.address!);
           setTimeout(() => {
             closeNfcScanner();
@@ -199,28 +259,67 @@ function SendPageContent() {
     return isEvmAddress(nextAddress) || isCosmosAddress(nextAddress);
   }, []);
 
-  const isInsufficientBalance = (): boolean => {
+  const isInjInsufficientBalance = (): boolean => {
     if (!amount || !recipient) return false;
     const nextAmount = parseFloat(amount);
-    const nextBalance = parseFloat(userBalance);
+    const nextBalance = parseFloat(injBalance);
     return !Number.isNaN(nextAmount) && nextAmount > 0 && nextAmount > nextBalance;
   };
 
   const getButtonState = (): { label: string; isError: boolean; disabled: boolean } => {
-    if (loading) return { label: 'Sending...', isError: false, disabled: true };
+    if (loading) {
+      return {
+        label: asset === 'USDC' ? 'Processing...' : 'Sending...',
+        isError: false,
+        disabled: true,
+      };
+    }
     if (recipient && !isValidRecipientAddress(recipient)) {
       return { label: 'Invalid Address', isError: true, disabled: true };
     }
-    if (recipient && amount && isInsufficientBalance()) {
+    if (asset === 'USDC' && amount) {
+      const validation = getUsdcAmountValidation(amount, usdcBalance.value);
+      if (!validation.valid) {
+        return { label: 'Invalid USDC Amount', isError: true, disabled: true };
+      }
+      if (validation.insufficient) {
+        return { label: 'Insufficient Balance', isError: true, disabled: true };
+      }
+    }
+    if (asset === 'INJ' && recipient && amount && isInjInsufficientBalance()) {
       return { label: 'Insufficient Balance', isError: true, disabled: true };
     }
     if (error) {
-      return { label: error, isError: true, disabled: true };
+      return {
+        label: asset === 'USDC' ? 'Transfer unavailable' : error,
+        isError: true,
+        disabled: true,
+      };
     }
-    if (!recipient || !amount || !gasEstimate) {
+    if (!recipient || !amount || (asset === 'INJ' && !gasEstimate)) {
       return { label: 'Send Transaction', isError: false, disabled: true };
     }
-    return { label: 'Send Transaction', isError: false, disabled: false };
+    return {
+      label: asset === 'USDC' ? 'Send USDC' : 'Send Transaction',
+      isError: false,
+      disabled: false,
+    };
+  };
+
+  const handleAssetChange = (nextAsset: SendAsset) => {
+    if (nextAsset === asset) return;
+    const cleared = createClearedSendIntent();
+    intentVersionRef.current += 1;
+    setAsset(nextAsset);
+    setAmount(cleared.amount);
+    setGasEstimate(cleared.gasEstimate);
+    setPreparedUsdc(cleared.preparedUsdc);
+    setSponsoredTransfer(cleared.sponsoredTransfer);
+    setTxHash(cleared.txHash);
+    setError(cleared.error);
+    setLoading(false);
+    setEstimating(false);
+    setShowAuthModal(false);
   };
 
   // Convert between EVM and Cosmos addresses using official Injective SDK
@@ -229,10 +328,12 @@ function SendPageContent() {
       if (isEvmAddress(recipient)) {
         // EVM to Cosmos using official SDK (same as receive page)
         const cosmosAddress = getInjectiveAddress(recipient);
+        clearTransferIntent();
         setRecipient(cosmosAddress);
       } else if (isCosmosAddress(recipient)) {
         // Cosmos to EVM using official SDK
         const evmAddress = getEthereumAddress(recipient);
+        clearTransferIntent();
         setRecipient(evmAddress);
       }
     } catch (err) {
@@ -255,6 +356,7 @@ function SendPageContent() {
   }, []);
 
   const handleEstimate = useCallback(async (useDefaults = false) => {
+    if (asset !== 'INJ') return;
     console.log('[Send] handleEstimate called:', { useDefaults, recipient, amount, address, hasPrivateKey: !!privateKey });
     
     // Use default values if requested or use actual values
@@ -321,24 +423,31 @@ function SendPageContent() {
       setEstimating(false);
       setTimeout(() => setCostFlashing(false), 300);
     }
-  }, [recipient, amount, address, privateKey, getEvmAddress]);
+  }, [asset, recipient, amount, address, privateKey, getEvmAddress]);
 
   // Initial gas estimate on page load with default values
   useEffect(() => {
-    if (address && !recipient && !amount) {
+    if (asset === 'INJ' && address && !recipient && !amount) {
       handleEstimate(true);
     }
-  }, [address, recipient, amount, handleEstimate]);
+  }, [asset, address, recipient, amount, handleEstimate]);
 
   // Auto-estimate gas when recipient and amount are filled
   useEffect(() => {
-    if (recipient && amount && address && isValidRecipientAddress(recipient)) {
+    if (
+      asset === 'INJ'
+      && recipient
+      && amount
+      && address
+      && isValidRecipientAddress(recipient)
+    ) {
       handleEstimate(false);
     }
-  }, [recipient, amount, address, handleEstimate, isValidRecipientAddress]);
+  }, [asset, recipient, amount, address, handleEstimate, isValidRecipientAddress]);
 
   // Auto-refresh every 3 seconds
   useEffect(() => {
+    if (asset !== 'INJ') return;
     const shouldEstimate = (recipient && amount && isValidRecipientAddress(recipient)) || (!recipient && !amount);
     if (!address || !shouldEstimate) return;
 
@@ -347,18 +456,7 @@ function SendPageContent() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [recipient, amount, address, handleEstimate, isValidRecipientAddress]);
-
-  const handleSendClick = () => {
-    // Check if authentication is needed
-    if (isPinLocked || autoLockMinutes === 0) {
-      // Need authentication
-      setShowAuthModal(true);
-    } else {
-      // Within PIN-free window, send directly
-      handleSend();
-    }
-  };
+  }, [asset, recipient, amount, address, handleEstimate, isValidRecipientAddress]);
 
   const handleSend = async (authorizedKey?: Uint8Array) => {
     const transactionKey = resolveTransactionKey(authorizedKey, privateKey);
@@ -386,10 +484,141 @@ function SendPageContent() {
     }
   };
 
-  const handleAuthSuccess = (authorizedKey: Uint8Array) => {
-    setShowAuthModal(false);
-    handleSend(authorizedKey);
+  const handleSendClick = async () => {
+    if (asset === 'USDC') {
+      const intentVersion = intentVersionRef.current + 1;
+      intentVersionRef.current = intentVersion;
+      setLoading(true);
+      setError('');
+      setTxHash('');
+      setPreparedUsdc(null);
+      setSponsoredTransfer(null);
+
+      try {
+        const normalizedRecipient = getEvmAddress(recipient);
+        if (!isAddress(normalizedRecipient)) {
+          throw new SponsoredUsdcApiError('INVALID_RECIPIENT');
+        }
+        const prepared = await prepareSponsoredUsdcTransfer(
+          normalizedRecipient,
+          amount,
+        );
+        if (intentVersionRef.current !== intentVersion) return;
+        setPreparedUsdc(prepared);
+        setShowAuthModal(true);
+      } catch (cause) {
+        if (intentVersionRef.current === intentVersion) {
+          setError(toSponsoredUsdcMessage(cause));
+        }
+      } finally {
+        if (intentVersionRef.current === intentVersion) {
+          setLoading(false);
+        }
+      }
+      return;
+    }
+
+    if (!privateKey || isPinLocked || autoLockMinutes === 0) {
+      setShowAuthModal(true);
+      return;
+    }
+    await handleSend(privateKey);
   };
+
+  const handleSponsoredUsdcAuthorization = async (
+    authorizedKey: Uint8Array,
+  ) => {
+    const prepared = preparedUsdc;
+    if (asset !== 'USDC' || !prepared) return;
+
+    const intentVersion = intentVersionRef.current;
+    setLoading(true);
+    setError('');
+
+    try {
+      const signature = await signTypedDataJson(authorizedKey, prepared.typedData);
+      if (intentVersionRef.current !== intentVersion) return;
+
+      const queued = await submitSponsoredUsdcTransfer(
+        prepared.transferId,
+        signature,
+      );
+      if (intentVersionRef.current !== intentVersion) return;
+      setPreparedUsdc(null);
+      setSponsoredTransfer(queued);
+
+      const finalOrPending = await pollSponsoredUsdcTransfer(queued.id);
+      if (intentVersionRef.current !== intentVersion) return;
+      setSponsoredTransfer(finalOrPending);
+      if (
+        finalOrPending.status === 'CONFIRMED'
+        && finalOrPending.txHash
+      ) {
+        setTxHash(finalOrPending.txHash);
+        if (address) {
+          setUsdcBalance(await getUsdcBalance(address as Address));
+        }
+      }
+    } catch (cause) {
+      if (intentVersionRef.current === intentVersion) {
+        setError(toSponsoredUsdcMessage(cause));
+      }
+    } finally {
+      if (intentVersionRef.current === intentVersion) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleSponsoredUsdcRefresh = async () => {
+    if (!sponsoredTransfer) return;
+    const intentVersion = intentVersionRef.current;
+    setLoading(true);
+    setError('');
+
+    try {
+      const finalOrPending = await pollSponsoredUsdcTransfer(
+        sponsoredTransfer.id,
+      );
+      if (intentVersionRef.current !== intentVersion) return;
+      setSponsoredTransfer(finalOrPending);
+      if (
+        finalOrPending.status === 'CONFIRMED'
+        && finalOrPending.txHash
+      ) {
+        setTxHash(finalOrPending.txHash);
+        if (address) {
+          setUsdcBalance(await getUsdcBalance(address as Address));
+        }
+      }
+    } catch (cause) {
+      if (intentVersionRef.current === intentVersion) {
+        setError(toSponsoredUsdcMessage(cause));
+      }
+    } finally {
+      if (intentVersionRef.current === intentVersion) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleAuthSuccess = async (authorizedKey: Uint8Array) => {
+    setShowAuthModal(false);
+    if (asset === 'INJ') {
+      await handleSend(authorizedKey);
+      return;
+    }
+    await handleSponsoredUsdcAuthorization(authorizedKey);
+  };
+
+  const sponsoredStatus = sponsoredTransfer
+    ? getSponsoredUsdcStatusPresentation(sponsoredTransfer)
+    : null;
+  const successExplorerUrl = asset === 'USDC'
+    ? sponsoredTransfer?.explorerUrl
+    : txHash
+      ? `${INJECTIVE_MAINNET.explorerUrl}/tx/${txHash}`
+      : null;
 
   if (isCheckingSession) {
     return <LoadingSpinner progress={44} statusLabel="Checking wallet session" />;
@@ -477,17 +706,19 @@ function SendPageContent() {
                 </button>
                 
                 {/* View Explorer Button */}
-                <a
-                  href={`${INJECTIVE_MAINNET.explorerUrl}/tx/${txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 rounded-lg hover:bg-white/10 transition-all group"
-                  title="View on Explorer"
-                >
-                  <svg className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
+                {successExplorerUrl && (
+                  <a
+                    href={successExplorerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg hover:bg-white/10 transition-all group"
+                    title="View on Explorer"
+                  >
+                    <svg className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                )}
                 
                 {/* Share Button */}
                 <button
@@ -521,7 +752,9 @@ function SendPageContent() {
             </div>
             <div className="flex justify-between items-center py-2 border-t border-white/5">
               <span className="text-sm text-gray-400">Amount</span>
-              <span className="text-sm font-mono font-bold text-white">{amount} INJ</span>
+              <span className="text-sm font-mono font-bold text-white">
+                {amount} {asset}
+              </span>
             </div>
             <div className="flex justify-between items-center py-2 border-t border-white/5">
               <span className="text-sm text-gray-400">To</span>
@@ -593,6 +826,34 @@ function SendPageContent() {
 
         {/* Form */}
         <div className="space-y-6">
+          {/* Asset */}
+          <div>
+            <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
+              Asset
+            </label>
+            <div
+              className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-white/5 p-1"
+              role="group"
+              aria-label="Send asset"
+            >
+              {(['INJ', 'USDC'] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => handleAssetChange(option)}
+                  aria-pressed={asset === option}
+                  className={`min-h-10 rounded-lg px-4 text-sm font-bold transition ${
+                    asset === option
+                      ? 'bg-white text-black'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Recipient */}
           <div>
             <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
@@ -602,11 +863,14 @@ function SendPageContent() {
             <input
               type="text"
               value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
+                onChange={(e) => {
+                  clearTransferIntent();
+                  setRecipient(e.target.value);
+                }}
                 placeholder="0x... or inj1..."
               className="w-full py-4 px-4 pr-32 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-white/30 transition-all font-mono text-sm"
             />
-              
+
               {/* Convert Address Button */}
               <button
                 onClick={convertAddress}
@@ -714,48 +978,117 @@ function SendPageContent() {
 
           {/* Amount */}
           <div>
-            <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
-              Amount
-            </label>
-            <input
-              type="text"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.001"
-              className="w-full py-4 px-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-white/30 transition-all font-mono text-sm"
-            />
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <label className="text-sm font-bold text-gray-400 uppercase tracking-wider">
+                Amount
+              </label>
+              <span className="min-w-0 truncate text-right text-xs text-gray-500">
+                Balance:{' '}
+                <span className="font-mono text-gray-300">
+                  {asset === 'USDC' ? usdcBalance.formatted : injBalance} {asset}
+                </span>
+              </span>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => {
+                  clearTransferIntent();
+                  setAmount(e.target.value);
+                }}
+                placeholder={asset === 'USDC' ? '0.00' : '0.001'}
+                className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 pl-4 pr-20 font-mono text-sm text-white placeholder-gray-500 transition-all focus:border-white/30 focus:outline-none"
+              />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-300">
+                {asset}
+              </span>
+            </div>
           </div>
 
-          {/* Gas Estimate - Always Display */}
-          <div className="p-5 rounded-2xl bg-black border border-white/10 space-y-3">
-            <div className="flex items-center gap-2 mb-4">
-              <svg className={`w-4 h-4 text-gray-400 ${estimating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Gas Estimate</span>
+          {asset === 'INJ' ? (
+            <div className="p-5 rounded-2xl bg-black border border-white/10 space-y-3">
+              <div className="flex items-center gap-2 mb-4">
+                <svg className={`w-4 h-4 text-gray-400 ${estimating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Gas Estimate</span>
+              </div>
+
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-gray-400">Gas Limit:</span>
+                <span className="text-sm font-mono text-white">
+                  {gasEstimate ? gasEstimate.gasLimit.toString() : '--'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-gray-400">Max Fee:</span>
+                <span className="text-sm font-mono text-white">
+                  {gasEstimate ? `${(Number(gasEstimate.maxFeePerGas) / 1e9).toFixed(2)} Gwei` : '--'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-2 border-t border-white/10 pt-3">
+                <span className="text-sm font-bold text-gray-300">Est. Cost:</span>
+                <span className={`text-sm font-mono font-bold text-white transition-opacity duration-300 ${costFlashing ? 'opacity-30' : 'opacity-100'}`}>
+                  {gasEstimate ? `${(Number(gasEstimate.totalCost) / 1e18).toFixed(6)} INJ` : '--'}
+                </span>
+              </div>
             </div>
-            
-            <div className="flex justify-between items-center py-2">
-              <span className="text-sm text-gray-400">Gas Limit:</span>
-              <span className="text-sm font-mono text-white">
-                {gasEstimate ? gasEstimate.gasLimit.toString() : '--'}
-              </span>
+          ) : (
+            <div className="space-y-3 rounded-2xl border border-white/10 bg-black p-5">
+              <div className="flex justify-between gap-4 py-2">
+                <span className="text-sm text-gray-400">Network fee</span>
+                <span className="text-sm font-mono font-bold text-white">0 INJ</span>
+              </div>
+              <div className="flex justify-between gap-4 border-t border-white/10 pt-3">
+                <span className="text-sm text-gray-400">Gas sponsor</span>
+                <span className="text-right text-sm font-bold text-emerald-300">
+                  Sponsored by INJ Pass
+                </span>
+              </div>
             </div>
-            
-            <div className="flex justify-between items-center py-2">
-              <span className="text-sm text-gray-400">Max Fee:</span>
-              <span className="text-sm font-mono text-white">
-                {gasEstimate ? `${(Number(gasEstimate.maxFeePerGas) / 1e9).toFixed(2)} Gwei` : '--'}
-              </span>
+          )}
+
+          {asset === 'USDC' && (preparedUsdc || sponsoredStatus) && (
+            <div
+              className={`rounded-2xl border p-4 ${
+                sponsoredStatus?.tone === 'error'
+                  ? 'border-red-500/30 bg-red-500/10'
+                  : sponsoredStatus?.tone === 'success'
+                    ? 'border-emerald-500/30 bg-emerald-500/10'
+                    : 'border-white/10 bg-white/5'
+              }`}
+              role="status"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white">
+                    {sponsoredStatus?.label ?? 'Authorization ready'}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-gray-400">
+                    {sponsoredStatus?.message
+                      ?? 'Review and authorize this sponsored USDC transfer.'}
+                  </p>
+                </div>
+                {(sponsoredStatus?.pending ?? true) && (
+                  <span className="mt-1 h-2 w-2 flex-none rounded-full bg-amber-300" />
+                )}
+              </div>
+              {sponsoredStatus?.canRefresh && (
+                <button
+                  type="button"
+                  onClick={handleSponsoredUsdcRefresh}
+                  disabled={loading}
+                  className="mt-3 text-sm font-bold text-white underline decoration-white/30 underline-offset-4 transition hover:decoration-white disabled:opacity-40"
+                >
+                  Refresh status
+                </button>
+              )}
             </div>
-            
-            <div className="flex justify-between items-center py-2 border-t border-white/10 pt-3">
-              <span className="text-sm font-bold text-gray-300">Est. Cost:</span>
-              <span className={`text-sm font-mono font-bold text-white transition-opacity duration-300 ${costFlashing ? 'opacity-30' : 'opacity-100'}`}>
-                {gasEstimate ? `${(Number(gasEstimate.totalCost) / 1e18).toFixed(6)} INJ` : '--'}
-              </span>
-            </div>
-          </div>
+          )}
 
           {/* Send Button */}
           <button
@@ -772,7 +1105,7 @@ function SendPageContent() {
                 <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Sending...
+                {buttonState.label}
               </>
             ) : (
               <>

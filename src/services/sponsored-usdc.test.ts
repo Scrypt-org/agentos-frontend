@@ -110,6 +110,7 @@ describe('sponsored USDC client', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -225,15 +226,15 @@ describe('sponsored USDC client', () => {
       prepareSponsoredUsdcTransfer(recipient, '10', fetchImpl),
     ).rejects.toMatchObject({
       code: 'RELAYER_UNAVAILABLE',
-      message: 'Sign in to use sponsored USDC transfers.',
+      message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),
     });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('keeps known backend error codes and normalizes unknown error codes', async () => {
+  it('uses local messages for known and unknown backend error codes', async () => {
     const knownFetch = vi.fn().mockResolvedValue(jsonResponse({
       code: 'INSUFFICIENT_USDC',
-      message: 'The wallet does not have enough USDC.',
+      message: 'This untrusted backend message must never reach the UI.',
     }, 400));
     const unknownFetch = vi.fn().mockResolvedValue(jsonResponse({
       code: 'UNSTABLE_INTERNAL_CODE',
@@ -244,10 +245,67 @@ describe('sponsored USDC client', () => {
       prepareSponsoredUsdcTransfer(recipient, '10', knownFetch),
     ).rejects.toMatchObject({
       code: 'INSUFFICIENT_USDC',
-      message: 'The wallet does not have enough USDC.',
+      message: sponsoredUsdcErrorMessage('INSUFFICIENT_USDC'),
     });
     await expect(
       prepareSponsoredUsdcTransfer(recipient, '10', unknownFetch),
+    ).rejects.toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),
+    });
+  });
+
+  it('normalizes rejected fetches and preserves already-normalized API errors', async () => {
+    const normalized = new SponsoredUsdcApiError('INVALID_AMOUNT');
+    const rejectedFetch = vi.fn().mockRejectedValue(
+      new TypeError('CORS details must not reach the UI'),
+    );
+    const normalizedFetch = vi.fn().mockRejectedValue(normalized);
+
+    await expect(
+      prepareSponsoredUsdcTransfer(recipient, '10', rejectedFetch),
+    ).rejects.toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),
+    });
+    await expect(
+      prepareSponsoredUsdcTransfer(recipient, '10', normalizedFetch),
+    ).rejects.toBe(normalized);
+  });
+
+  it.each([
+    ['unknown status', { ...baseTransfer, status: 'NOT_A_TRANSFER_STATE' }],
+    ['malformed sender address', { ...baseTransfer, fromAddress: 'not-an-evm-address' }],
+    ['malformed transaction hash', { ...baseTransfer, txHash: '0x1234' }],
+    ['unsafe explorer URL', { ...baseTransfer, explorerUrl: 'javascript:alert(1)' }],
+    ['invalid transfer ID', { ...baseTransfer, id: 'not-a-uuid' }],
+    ['invalid timestamp', { ...baseTransfer, createdAt: 'not-a-timestamp' }],
+  ])('rejects a transfer response with %s', async (_name, payload) => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(payload));
+
+    await expect(
+      getSponsoredUsdcTransfer(transferId, fetchImpl),
+    ).rejects.toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),
+    });
+  });
+
+  it('rejects malformed typed-data addresses while preserving valid backend shapes', async () => {
+    const payload = {
+      ...prepareResponse,
+      typedData: {
+        ...prepareResponse.typedData,
+        domain: {
+          ...prepareResponse.typedData.domain,
+          verifyingContract: 'not-an-evm-address',
+        },
+      },
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(payload));
+
+    await expect(
+      prepareSponsoredUsdcTransfer(recipient, '10', fetchImpl),
     ).rejects.toMatchObject({
       code: 'RELAYER_UNAVAILABLE',
       message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),
@@ -300,11 +358,67 @@ describe('sponsored USDC client', () => {
     })).resolves.toMatchObject({ status: 'BROADCASTING' });
   });
 
+  it('returns the latest pending transfer at the deadline when a status request hangs', async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    const fetchStatus = vi.fn()
+      .mockResolvedValueOnce({ ...baseTransfer, status: 'BROADCASTING' as const })
+      .mockImplementationOnce((_id: string, signal?: AbortSignal) => {
+        requestSignal = signal;
+        return new Promise<SponsoredUsdcTransfer>(() => {});
+      });
+    const pollPromise = pollSponsoredUsdcTransfer(transferId, {
+      fetchStatus,
+      delay: vi.fn().mockResolvedValue(undefined),
+      intervalMs: 0,
+      timeoutMs: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    const deadlineResult = Promise.race([
+      pollPromise,
+      new Promise<'test-timeout'>((resolve) => {
+        setTimeout(() => resolve('test-timeout'), 101);
+      }),
+    ]);
+    await vi.advanceTimersByTimeAsync(101);
+
+    await expect(deadlineResult).resolves.toMatchObject({ status: 'BROADCASTING' });
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it('bounds a pending poll delay to the remaining deadline', async () => {
+    vi.useFakeTimers();
+    let delaySignal: AbortSignal | undefined;
+    const delay = vi.fn((_milliseconds: number, signal?: AbortSignal) => {
+      delaySignal = signal;
+      return new Promise<void>(() => {});
+    });
+    const pollPromise = pollSponsoredUsdcTransfer(transferId, {
+      fetchStatus: vi.fn().mockResolvedValue({
+        ...baseTransfer,
+        status: 'QUEUED' as const,
+      }),
+      delay,
+      timeoutMs: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    const deadlineResult = Promise.race([
+      pollPromise,
+      new Promise<'test-timeout'>((resolve) => {
+        setTimeout(() => resolve('test-timeout'), 101);
+      }),
+    ]);
+    await vi.advanceTimersByTimeAsync(101);
+
+    await expect(deadlineResult).resolves.toMatchObject({ status: 'QUEUED' });
+    expect(delay).toHaveBeenCalledWith(100, expect.any(AbortSignal));
+    expect(delaySignal?.aborted).toBe(true);
+  });
+
   it('exports an error class with the stable sponsored-USDC code', () => {
-    const error = new SponsoredUsdcApiError(
-      'AUTHORIZATION_EXPIRED',
-      sponsoredUsdcErrorMessage('AUTHORIZATION_EXPIRED'),
-    );
+    const error = new SponsoredUsdcApiError('AUTHORIZATION_EXPIRED');
 
     expect(error).toBeInstanceOf(Error);
     expect(error.code).toBe('AUTHORIZATION_EXPIRED');

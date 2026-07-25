@@ -359,8 +359,8 @@ function SendPageContent() {
     }
   };
 
-  const handleSend = async () => {
-    if (!recipient || !amount || !privateKey) return;
+  const handleSend = async (authorizedKey: Uint8Array | null = privateKey) => {
+    if (!recipient || !amount || !authorizedKey) return;
 
     setLoading(true);
     setError('');
@@ -369,7 +369,7 @@ function SendPageContent() {
     try {
       const normalizedRecipient = getEvmAddress(recipient);
       const hash = await sendTransaction(
-        privateKey,
+        authorizedKey,
         normalizedRecipient,
         amount,
         undefined,
@@ -384,9 +384,9 @@ function SendPageContent() {
     }
   };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = (authorizedKey: Uint8Array) => {
     setShowAuthModal(false);
-    handleSend();
+    handleSend(authorizedKey);
   };
 
   if (isCheckingSession) {

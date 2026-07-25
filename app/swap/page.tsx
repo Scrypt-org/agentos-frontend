@@ -275,8 +275,8 @@ export default function SwapPage() {
     }
   };
 
-  const handleSwap = async () => {
-    if (!address || !privateKey) {
+  const handleSwap = async (authorizedKey: Uint8Array | null = privateKey) => {
+    if (!address || !authorizedKey) {
       console.error('[Swap] Wallet not connected');
       return;
     }
@@ -304,7 +304,7 @@ export default function SwapPage() {
 
     try {
       // Convert private key format
-      const pkHex = privateKeyToHex(privateKey);
+      const pkHex = privateKeyToHex(authorizedKey);
       
       // Execute swap
       const hash = await executeSwap({
@@ -341,9 +341,9 @@ export default function SwapPage() {
     }
   };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = (authorizedKey: Uint8Array) => {
     setShowAuthModal(false);
-    handleSwap();
+    handleSwap(authorizedKey);
   };
 
   if (isCheckingSession) {

@@ -194,6 +194,22 @@ describe('sponsored USDC client', () => {
     );
   });
 
+  it.each(['0', '0.01', '10.5', '1000'] as const)(
+    'accepts canonical backend-formatted amount %s from submit and status responses',
+    async (amount) => {
+      const response = { ...baseTransfer, amount };
+      const submitFetch = vi.fn().mockResolvedValue(jsonResponse(response));
+      const statusFetch = vi.fn().mockResolvedValue(jsonResponse(response));
+
+      await expect(
+        submitSponsoredUsdcTransfer(transferId, signature, submitFetch),
+      ).resolves.toEqual(response);
+      await expect(
+        getSponsoredUsdcTransfer(transferId, statusFetch),
+      ).resolves.toEqual(response);
+    },
+  );
+
   it('gets the transfer status with JWT auth and preserves the backend response shape', async () => {
     const response = {
       ...baseTransfer,
@@ -306,6 +322,99 @@ describe('sponsored USDC client', () => {
 
     await expect(
       prepareSponsoredUsdcTransfer(recipient, '10', fetchImpl),
+    ).rejects.toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),
+    });
+  });
+
+  it('validates every typed-data entry and preserves a valid typed-data object unchanged', async () => {
+    const typedData = {
+      ...prepareResponse.typedData,
+      types: {
+        ...prepareResponse.typedData.types,
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+        ],
+      },
+    };
+    const payload = { ...prepareResponse, typedData };
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(payload),
+    } as unknown as Response);
+
+    const result = await prepareSponsoredUsdcTransfer(recipient, '10', fetchImpl);
+
+    expect(result.typedData).toBe(typedData);
+    expect(result).toEqual(payload);
+  });
+
+  it('rejects a malformed extra typed-data entry', async () => {
+    const payload = {
+      ...prepareResponse,
+      typedData: {
+        ...prepareResponse.typedData,
+        types: {
+          ...prepareResponse.typedData.types,
+          EIP712Domain: { name: 'name', type: 'string' },
+        },
+      },
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(payload));
+
+    await expect(
+      prepareSponsoredUsdcTransfer(recipient, '10', fetchImpl),
+    ).rejects.toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),
+    });
+  });
+
+  it('rejects an empty extra typed-data entry', async () => {
+    const payload = {
+      ...prepareResponse,
+      typedData: {
+        ...prepareResponse.typedData,
+        types: {
+          ...prepareResponse.typedData.types,
+          EIP712Domain: [],
+        },
+      },
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(payload));
+
+    await expect(
+      prepareSponsoredUsdcTransfer(recipient, '10', fetchImpl),
+    ).rejects.toMatchObject({
+      code: 'RELAYER_UNAVAILABLE',
+      message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),
+    });
+  });
+
+  it.each([
+    '1e3',
+    '+1',
+    '-1',
+    ' 1',
+    '1 ',
+    '1.0000001',
+    '01',
+    '00',
+    '00.1',
+    '1.',
+    '.1',
+    '1.0',
+    '10.50',
+  ])('rejects non-canonical wire amount %s', async (amount) => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
+      ...baseTransfer,
+      amount,
+    }));
+
+    await expect(
+      getSponsoredUsdcTransfer(transferId, fetchImpl),
     ).rejects.toMatchObject({
       code: 'RELAYER_UNAVAILABLE',
       message: sponsoredUsdcErrorMessage('RELAYER_UNAVAILABLE'),

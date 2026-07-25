@@ -220,6 +220,11 @@ function isUnsignedInteger(value: unknown): value is string {
   return typeof value === 'string' && /^\d+$/.test(value);
 }
 
+function isCanonicalUsdcAmount(value: unknown): value is string {
+  return typeof value === 'string'
+    && /^(?:0|[1-9]\d*)(?:\.\d{0,5}[1-9])?$/.test(value);
+}
+
 function isEvmAddress(value: unknown): value is Address {
   return isNonEmptyString(value) && isAddress(value);
 }
@@ -253,6 +258,7 @@ function isSponsoredUsdcTypedData(value: unknown): value is SponsoredUsdcTypedDa
   }
 
   const authorizationType = value.types.TransferWithAuthorization;
+  const typeEntries = Object.values(value.types);
   return value.domain.name === 'USDC'
     && value.domain.version === '2'
     && Number.isSafeInteger(value.domain.chainId)
@@ -260,6 +266,11 @@ function isSponsoredUsdcTypedData(value: unknown): value is SponsoredUsdcTypedDa
     && isEvmAddress(value.domain.verifyingContract)
     && Array.isArray(authorizationType)
     && authorizationType.every(isTypedDataField)
+    && typeEntries.every(
+      (entry) => Array.isArray(entry)
+        && entry.length > 0
+        && entry.every(isTypedDataField),
+    )
     && value.primaryType === 'TransferWithAuthorization'
     && isEvmAddress(value.message.from)
     && isEvmAddress(value.message.to)
@@ -288,7 +299,7 @@ function isSponsoredUsdcTransfer(value: unknown): value is SponsoredUsdcTransfer
     && isSponsoredUsdcTransferStatus(value.status)
     && isEvmAddress(value.fromAddress)
     && isEvmAddress(value.toAddress)
-    && isUnsignedInteger(value.amount)
+    && isCanonicalUsdcAmount(value.amount)
     && isTimestamp(value.expiresAt)
     && (value.txHash === null || isHashValue(value.txHash))
     && (value.explorerUrl === null || isHttpUrl(value.explorerUrl))

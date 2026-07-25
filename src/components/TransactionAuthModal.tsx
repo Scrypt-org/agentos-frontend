@@ -8,9 +8,20 @@ import { authenticateWalletSession } from '@/services/wallet-auth';
 interface TransactionAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (privateKey: Uint8Array) => void;
   transactionType: 'send' | 'swap' | 'chance';
   variant?: 'modal' | 'inline';
+}
+
+export function finishTransactionAuthorization(
+  key: Uint8Array,
+  rememberKey: (key: Uint8Array) => void,
+  resetActivity: () => void,
+  onSuccess: (key: Uint8Array) => void,
+): void {
+  rememberKey(key);
+  resetActivity();
+  onSuccess(key);
 }
 
 export default function TransactionAuthModal({
@@ -77,8 +88,11 @@ export default function TransactionAuthModal({
     try {
       const isValid = await verifyPin(pin);
       if (isValid) {
+        if (!privateKey) {
+          throw new Error('No signing key is available.');
+        }
         resetActivity();
-        onSuccess();
+        onSuccess(privateKey);
         setPin('');
       } else {
         setError('Incorrect PIN');
@@ -112,9 +126,12 @@ export default function TransactionAuthModal({
           walletName: keystore.walletName,
         });
       }
-      unlock(decryptedPrivateKey, keystore);
-      resetActivity();
-      onSuccess();
+      finishTransactionAuthorization(
+        decryptedPrivateKey,
+        () => unlock(decryptedPrivateKey, keystore),
+        resetActivity,
+        onSuccess,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to verify passkey');
     } finally {

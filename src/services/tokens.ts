@@ -2,6 +2,8 @@
  * Token configuration for Injective EVM
  */
 
+import { NETWORK_CONFIG } from '@/config/network';
+
 export interface TokenInfo {
   symbol: string;
   name: string;
@@ -68,10 +70,18 @@ export const TOKENS_TESTNET: Record<string, TokenInfo> = {
     decimals: 6,
     icon: '/USDT_Logo.png',
   },
+  USDC: {
+    symbol: 'USDC',
+    name: 'USD Coin',
+    address: '0x0C382e685bbeeFE5d3d9C29e29E341fEE8E84C5d',
+    decimals: 6,
+    icon: '/USDC_Logo.png',
+  },
 };
 
-// Use mainnet by default (can be configured)
-export const TOKENS = TOKENS_MAINNET;
+export const TOKENS = NETWORK_CONFIG.isMainnet
+  ? TOKENS_MAINNET
+  : TOKENS_TESTNET;
 
 /**
  * Get token info by symbol

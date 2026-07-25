@@ -9,9 +9,12 @@ describe('transaction authorization consumers', () => {
   it('continues Send with the callback key when the current context key is null', async () => {
     const source = await readPage('../../app/send/page.tsx');
 
-    expect(source).toMatch(/const handleSend = async \(authorizedKey: Uint8Array \| null = privateKey\) => \{/);
-    expect(source).toMatch(/if \(!recipient \|\| !amount \|\| !authorizedKey\) return;/);
-    expect(source).toMatch(/sendTransaction\(\s*authorizedKey,/s);
+    expect(source).toContain("import { resolveTransactionKey } from '@/services/transaction-key';");
+    expect(source).toMatch(
+      /const handleSend = async \(authorizedKey\?: Uint8Array\) => \{\s*const transactionKey = resolveTransactionKey\(authorizedKey, privateKey\);/s,
+    );
+    expect(source).toMatch(/if \(!recipient \|\| !amount \|\| !transactionKey\) return;/);
+    expect(source).toMatch(/sendTransaction\(\s*transactionKey,/s);
     expect(source).toMatch(
       /const handleAuthSuccess = \(authorizedKey: Uint8Array\) => \{\s*setShowAuthModal\(false\);\s*handleSend\(authorizedKey\);\s*\};/s,
     );
@@ -20,9 +23,12 @@ describe('transaction authorization consumers', () => {
   it('continues Swap with the callback key when the current context key is null', async () => {
     const source = await readPage('../../app/swap/page.tsx');
 
-    expect(source).toMatch(/const handleSwap = async \(authorizedKey: Uint8Array \| null = privateKey\) => \{/);
-    expect(source).toMatch(/if \(!address \|\| !authorizedKey\) \{/);
-    expect(source).toMatch(/privateKeyToHex\(authorizedKey\)/);
+    expect(source).toContain("import { resolveTransactionKey } from '@/services/transaction-key';");
+    expect(source).toMatch(
+      /const handleSwap = async \(authorizedKey\?: Uint8Array\) => \{\s*const transactionKey = resolveTransactionKey\(authorizedKey, privateKey\);/s,
+    );
+    expect(source).toMatch(/if \(!address \|\| !transactionKey\) \{/);
+    expect(source).toMatch(/privateKeyToHex\(transactionKey\)/);
     expect(source).toMatch(
       /const handleAuthSuccess = \(authorizedKey: Uint8Array\) => \{\s*setShowAuthModal\(false\);\s*handleSwap\(authorizedKey\);\s*\};/s,
     );

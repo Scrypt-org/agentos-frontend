@@ -7,6 +7,7 @@ import { usePin } from '@/contexts/PinContext';
 import Image from 'next/image';
 import { getSwapQuote, executeSwap, getTokenBalances } from '@/services/dex-swap';
 import { TOKENS } from '@/services/tokens';
+import { resolveTransactionKey } from '@/services/transaction-key';
 import { privateKeyToHex } from '@/utils/wallet';
 import type { Address } from 'viem';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -275,8 +276,9 @@ export default function SwapPage() {
     }
   };
 
-  const handleSwap = async (authorizedKey: Uint8Array | null = privateKey) => {
-    if (!address || !authorizedKey) {
+  const handleSwap = async (authorizedKey?: Uint8Array) => {
+    const transactionKey = resolveTransactionKey(authorizedKey, privateKey);
+    if (!address || !transactionKey) {
       console.error('[Swap] Wallet not connected');
       return;
     }
@@ -304,7 +306,7 @@ export default function SwapPage() {
 
     try {
       // Convert private key format
-      const pkHex = privateKeyToHex(authorizedKey);
+      const pkHex = privateKeyToHex(transactionKey);
       
       // Execute swap
       const hash = await executeSwap({

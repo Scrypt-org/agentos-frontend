@@ -7,6 +7,7 @@ import { usePin } from '@/contexts/PinContext';
 import { estimateGas, getBalance, sendTransaction } from '@/wallet/chain';
 import { INJECTIVE_MAINNET, GasEstimate } from '@/types/chain';
 import { isNFCSupported, readNFCCard } from '@/services/nfc';
+import { resolveTransactionKey } from '@/services/transaction-key';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import TransactionAuthModal from '@/components/TransactionAuthModal';
 import { getInjectiveAddress, getEthereumAddress } from '@injectivelabs/sdk-ts';
@@ -359,8 +360,9 @@ function SendPageContent() {
     }
   };
 
-  const handleSend = async (authorizedKey: Uint8Array | null = privateKey) => {
-    if (!recipient || !amount || !authorizedKey) return;
+  const handleSend = async (authorizedKey?: Uint8Array) => {
+    const transactionKey = resolveTransactionKey(authorizedKey, privateKey);
+    if (!recipient || !amount || !transactionKey) return;
 
     setLoading(true);
     setError('');
@@ -369,7 +371,7 @@ function SendPageContent() {
     try {
       const normalizedRecipient = getEvmAddress(recipient);
       const hash = await sendTransaction(
-        authorizedKey,
+        transactionKey,
         normalizedRecipient,
         amount,
         undefined,

@@ -1126,6 +1126,16 @@ const dappMarketApps: DAppMarketItem[] = [
     aiDriven: true,
   },
   {
+    id: 'inj-batch',
+    name: 'INJ Batch',
+    category: 'Payments',
+    body: 'Send INJ or Injective EVM tokens to many recipients in one batched transaction.',
+    accent: 'from-sky-400 to-indigo-500',
+    icon: getDAppIconUrl('https://inj-batch.yuchangongzhu.workers.dev'),
+    url: 'https://inj-batch.yuchangongzhu.workers.dev',
+    aiDriven: true,
+  },
+  {
     id: 'helix',
     name: 'Helix',
     category: 'Exchange',

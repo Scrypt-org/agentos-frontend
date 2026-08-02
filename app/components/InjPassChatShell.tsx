@@ -130,6 +130,7 @@ import {
   type PrfDetection,
 } from '@/wallet/key-management';
 import { deleteWallet, deleteWalletByAddress, loadWallet, loadWallets, reconcileWalletStorage, setActiveWallet } from '@/wallet/keystore';
+import { requestPersistentStorage } from '@/wallet/storage-persistence';
 import type { LocalKeystore } from '@/types/wallet';
 import { privateKeyToHex } from '@/utils/wallet';
 import { INJECTIVE_MAINNET, type GasEstimate } from '@/types/chain';
@@ -5448,6 +5449,7 @@ function MnemonicBackupModal({
   answers,
   loading,
   error,
+  storageWarning,
   isLight,
   onClose,
   onRecorded,
@@ -5462,6 +5464,7 @@ function MnemonicBackupModal({
   answers: Record<number, string>;
   loading: boolean;
   error: string;
+  storageWarning: string;
   isLight: boolean;
   onClose: () => void;
   onRecorded: () => void;
@@ -5488,6 +5491,10 @@ function MnemonicBackupModal({
           </div>
           <button type="button" onClick={onClose} className={cx('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')} aria-label="Close recovery backup"><CloseIcon /></button>
         </div>
+
+        {storageWarning && step !== 'success' && (
+          <p className={cx('mt-4 rounded-xl border px-3 py-2 text-sm leading-6', isLight ? 'border-amber-500/30 bg-amber-500/8 text-amber-800' : 'border-amber-300/22 bg-amber-300/8 text-amber-200')}>{storageWarning}</p>
+        )}
 
         {loading && <div className={cx('py-12 text-center text-sm', isLight ? 'text-black/48' : 'text-white/48')}>Verifying your Passkey...</div>}
         {!loading && words.length > 0 && step === 'words' && (
@@ -6145,6 +6152,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   const [mnemonicBackupError, setMnemonicBackupError] = useState('');
   const [mnemonicBackupLoading, setMnemonicBackupLoading] = useState(false);
   const [mnemonicBackedUpLocally, setMnemonicBackedUpLocally] = useState(false);
+  const [storageWarning, setStorageWarning] = useState('');
   const [pinAction, setPinAction] = useState<'setup' | 'change' | 'reset' | null>(null);
   const [pinValues, setPinValues] = useState({ current: '', next: '', confirm: '' });
   const [pinActionError, setPinActionError] = useState('');
@@ -6322,6 +6330,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     let active = true;
     void reconcileWalletStorage().then((wallets) => {
       if (active) setLocalWallets(wallets);
+    });
+    // Chrome only grants persistence once site engagement is high enough, so
+    // retry on every visit instead of only when a wallet is created.
+    requestPersistentStorage((warning) => {
+      if (active) setStorageWarning(warning);
     });
     return () => {
       active = false;
@@ -9361,6 +9374,9 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setOrphanWalletAddress(null);
 
     try {
+      // Requested from the click that creates the wallet: Firefox only shows
+      // its persistent-storage prompt with user activation.
+      requestPersistentStorage(setStorageWarning);
       const walletName = newWalletName.trim() || 'My INJ Pass';
       const preparedMnemonic = preparedMnemonicWallet?.mnemonic;
       if (newWalletPassword !== newWalletPasswordConfirm) {
@@ -9421,6 +9437,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setOrphanWalletAddress(null);
 
     try {
+      requestPersistentStorage(setStorageWarning);
       const walletName = newWalletName.trim() || 'My INJ Pass';
       const detection = prfDetection || await detectPrfSupport();
       setPrfDetection(detection);
@@ -11794,6 +11811,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         answers={mnemonicAnswers}
         loading={mnemonicBackupLoading}
         error={mnemonicBackupError}
+        storageWarning={storageWarning}
         isLight={isLight}
         onClose={closeMnemonicBackup}
         onRecorded={startMnemonicVerification}

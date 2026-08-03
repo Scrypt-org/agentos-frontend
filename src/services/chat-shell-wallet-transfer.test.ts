@@ -30,6 +30,17 @@ describe('chat shell wallet transfer panel', () => {
     expect(source).toContain("if (settled.status !== 'CONFIRMED' || !settled.txHash)");
   });
 
+  it('states the sponsored fee the way the Send page does', async () => {
+    const source = await readShell();
+
+    expect(source).toContain("sponsoredByInjPass: 'Sponsored by INJ Pass'");
+    expect(source).toMatch(
+      /transferMode === 'sponsored' && \([\s\S]*?copy\.networkFee[\s\S]*?0 INJ[\s\S]*?copy\.gasSponsor[\s\S]*?copy\.sponsoredByInjPass/,
+    );
+    // A self-paid gas quote must never appear next to a sponsored transfer.
+    expect(source).toContain("{transferMode !== 'sponsored' && (");
+  });
+
   it('clears a stale quote whenever the transfer inputs change', async () => {
     const source = await readShell();
 

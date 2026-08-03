@@ -411,6 +411,9 @@ const shellCopyEn = {
   sending: 'Sending...',
   gasEstimate: 'Estimated network fee',
   gasLimit: 'Gas limit',
+  networkFee: 'Network fee',
+  gasSponsor: 'Gas sponsor',
+  sponsoredByInjPass: 'Sponsored by INJ Pass',
   insufficientBalance: 'Insufficient INJ balance.',
   invalidRecipient: 'Enter a valid EVM or Cosmos address.',
   invalidAmount: 'Enter a valid INJ amount.',
@@ -596,6 +599,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: 'Wird gesendet...',
     gasEstimate: 'Geschätzte Netzwerkgebühr',
     gasLimit: 'Gas-Limit',
+    networkFee: 'Netzwerkgebühr',
+    gasSponsor: 'Gas-Sponsor',
+    sponsoredByInjPass: 'Von INJ Pass gesponsert',
     insufficientBalance: 'INJ-Guthaben reicht nicht aus.',
     invalidRecipient: 'Gib eine gültige EVM- oder Cosmos-Adresse ein.',
     invalidAmount: 'Gib einen gültigen INJ-Betrag ein.',
@@ -649,6 +655,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: '发送中...',
     gasEstimate: '预计网络费',
     gasLimit: 'Gas 上限',
+    networkFee: '网络手续费',
+    gasSponsor: 'Gas 赞助方',
+    sponsoredByInjPass: '由 INJ Pass 代付',
     insufficientBalance: 'INJ 余额不足。',
     invalidRecipient: '请输入有效的 EVM 或 Cosmos 地址。',
     invalidAmount: '请输入有效的 INJ 数量。',
@@ -831,6 +840,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: 'Envoi en cours...',
     gasEstimate: 'Frais réseau estimés',
     gasLimit: 'Limite de gas',
+    networkFee: 'Frais de réseau',
+    gasSponsor: 'Sponsor de gas',
+    sponsoredByInjPass: 'Offert par INJ Pass',
     insufficientBalance: 'Solde INJ insuffisant.',
     invalidRecipient: 'Saisissez une adresse EVM ou Cosmos valide.',
     invalidAmount: 'Saisissez un montant INJ valide.',
@@ -904,6 +916,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: '發送中...',
     gasEstimate: '預計網路費',
     gasLimit: 'Gas 上限',
+    networkFee: '網路手續費',
+    gasSponsor: 'Gas 贊助方',
+    sponsoredByInjPass: '由 INJ Pass 代付',
     insufficientBalance: 'INJ 餘額不足。',
     invalidRecipient: '請輸入有效的 EVM 或 Cosmos 地址。',
     invalidAmount: '請輸入有效的 INJ 數量。',
@@ -982,6 +997,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: '送信中...',
     gasEstimate: '推定ネットワーク手数料',
     gasLimit: 'Gas 上限',
+    networkFee: 'ネットワーク手数料',
+    gasSponsor: 'ガススポンサー',
+    sponsoredByInjPass: 'INJ Pass が負担',
     insufficientBalance: 'INJ 残高が不足しています。',
     invalidRecipient: '有効な EVM または Cosmos アドレスを入力してください。',
     invalidAmount: '有効な INJ 数量を入力してください。',
@@ -1040,6 +1058,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: '전송 중...',
     gasEstimate: '예상 네트워크 수수료',
     gasLimit: 'Gas 한도',
+    networkFee: '네트워크 수수료',
+    gasSponsor: '가스 스폰서',
+    sponsoredByInjPass: 'INJ Pass가 대납',
     insufficientBalance: 'INJ 잔액이 부족합니다.',
     invalidRecipient: '올바른 EVM 또는 Cosmos 주소를 입력하세요.',
     invalidAmount: '올바른 INJ 수량을 입력하세요.',
@@ -3630,13 +3651,29 @@ function WalletTransferPanel({
               <span className="text-xs font-bold">{asset}</span>
             </div>
           </label>
+          {transferMode === 'sponsored' && (
+            // The sponsor covers the gas whether or not the form is filled in,
+            // so this states the cost up front rather than only at review time.
+            <div className={cx('rounded-xl border px-4 py-3 text-sm', isLight ? 'border-black/8 bg-black/[0.025]' : 'border-white/10 bg-white/[0.035]')}>
+              <div className="flex items-center justify-between gap-4">
+                <span className={cx(isLight ? 'text-black/52' : 'text-white/52')}>{copy.networkFee}</span>
+                <span className="font-mono font-bold">0 INJ</span>
+              </div>
+              <div className={cx('mt-3 flex items-center justify-between gap-4 border-t pt-3', isLight ? 'border-black/8' : 'border-white/9')}>
+                <span className={cx(isLight ? 'text-black/52' : 'text-white/52')}>{copy.gasSponsor}</span>
+                <span className="text-right font-bold text-emerald-500">{copy.sponsoredByInjPass}</span>
+              </div>
+            </div>
+          )}
           {reviewing && (
             <div className={cx('border-y px-1 py-4 text-sm', isLight ? 'border-black/8' : 'border-white/9')}>
               <div>Send <strong>{amount || '0'} {asset}</strong> to <span className="font-mono">{truncateAddress(recipient)}</span>.</div>
-              <div className={cx('mt-3 grid grid-cols-2 gap-3 text-xs', isLight ? 'text-black/52' : 'text-white/52')}>
-                <span>{copy.gasLimit}<strong className="mt-1 block font-mono text-current">{transferMode === 'sponsored' ? '--' : estimatingGas ? '...' : gasEstimate?.gasLimit.toString() || '--'}</strong></span>
-                <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{transferMode === 'sponsored' ? (estimatingGas ? '...' : '0 INJ') : estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} INJ` : '--'}</strong></span>
-              </div>
+              {transferMode !== 'sponsored' && (
+                <div className={cx('mt-3 grid grid-cols-2 gap-3 text-xs', isLight ? 'text-black/52' : 'text-white/52')}>
+                  <span>{copy.gasLimit}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate?.gasLimit.toString() || '--'}</strong></span>
+                  <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} INJ` : '--'}</strong></span>
+                </div>
+              )}
             </div>
           )}
           {error && <div className={cx('text-sm leading-6', isLight ? 'text-rose-700' : 'text-rose-200')}>{error}</div>}

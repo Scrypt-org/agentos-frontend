@@ -15,8 +15,9 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: '#000000',
     theme_color: '#000000',
     icons: [
-      { src: '/inj-pass-favicon.png', sizes: '192x192', type: 'image/png' },
-      { src: '/inj-pass-favicon.png', sizes: '512x512', type: 'image/png' },
+      { src: '/logo/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/logo/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/logo/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   };
 }

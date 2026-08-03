@@ -116,6 +116,26 @@ import { getMiniAppFrameKey, getMiniAppSessionAddress } from '@/services/mini-ap
 import { enterExistingPasskey } from '@/services/passkey-entry';
 import { estimateGas, getBalance as getNativeBalance, getGasPrice, sendTransaction, waitForTransaction } from '@/wallet/chain';
 import {
+  DEFAULT_SEND_ASSET,
+  SEND_ASSETS,
+  getSendAssetToken,
+  getSendTransferMode,
+  type SendAsset,
+} from '@/services/send-assets';
+import {
+  encodeErc20Transfer,
+  getErc20Balance,
+  parseErc20Amount,
+} from '@/services/erc20-transfer';
+import {
+  SponsoredUsdcApiError,
+  pollSponsoredUsdcTransfer,
+  prepareSponsoredUsdcTransfer,
+  submitSponsoredUsdcTransfer,
+  type SponsoredUsdcPrepareResponse,
+} from '@/services/sponsored-usdc';
+import { signTypedDataJson } from '@/services/typed-data-signing';
+import {
   completeLocalWalletSetup,
   createPrfWallet,
   detectPrfSupport,
@@ -133,7 +153,7 @@ import { deleteWallet, deleteWalletByAddress, loadWallet, loadWallets, reconcile
 import { requestPersistentStorage } from '@/wallet/storage-persistence';
 import type { LocalKeystore } from '@/types/wallet';
 import { privateKeyToHex } from '@/utils/wallet';
-import { INJECTIVE_MAINNET, type GasEstimate } from '@/types/chain';
+import { DEFAULT_CHAIN, INJECTIVE_MAINNET, type GasEstimate } from '@/types/chain';
 import { QRCodeSVG } from 'qrcode.react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import MobileSidebarFrame from './MobileSidebarFrame';
@@ -3282,15 +3302,40 @@ function WalletTransferPanel({
 }) {
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
+  const [asset, setAsset] = useState<SendAsset>(DEFAULT_SEND_ASSET);
   const [addressType, setAddressType] = useState<'evm' | 'cosmos'>('evm');
   const [reviewing, setReviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [estimatingGas, setEstimatingGas] = useState(false);
   const [gasEstimate, setGasEstimate] = useState<GasEstimate | null>(null);
+  const [preparedUsdc, setPreparedUsdc] = useState<SponsoredUsdcPrepareResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [maxLoading, setMaxLoading] = useState(false);
   const [error, setError] = useState('');
   const [txHash, setTxHash] = useState('');
+
+  const transferMode = getSendTransferMode(asset);
+
+  // Every translation of the transfer copy names INJ literally, so swapping the
+  // symbol keeps the message correct for the other assets without forking all
+  // seven locales.
+  const forAsset = (text: string) => (asset === 'INJ' ? text : text.replace(/INJ/g, asset));
+
+  // Any edit invalidates the quote: a gas estimate for the old numbers, or a
+  // sponsor authorization signed over them, must never survive into the send.
+  const resetQuote = () => {
+    setReviewing(false);
+    setGasEstimate(null);
+    setPreparedUsdc(null);
+    setError('');
+  };
+
+  const changeAsset = (nextAsset: SendAsset) => {
+    if (nextAsset === asset) return;
+    setAsset(nextAsset);
+    setAmount('');
+    resetQuote();
+  };
 
   const isEvmAddress = (value: string) => /^0x[a-fA-F0-9]{40}$/.test(value.trim());
   const isCosmosAddress = (value: string) => /^inj1[0-9a-z]{38,}$/.test(value.trim());
@@ -3308,9 +3353,17 @@ function WalletTransferPanel({
   const receiveAddress = addressType === 'cosmos' ? cosmosAddress : address || '';
 
   const localizeTransferError = (transferError: unknown) => {
+    if (transferError instanceof SponsoredUsdcApiError) {
+      if (transferError.code === 'INSUFFICIENT_USDC') return forAsset(copy.insufficientBalance);
+      if (transferError.code === 'INVALID_RECIPIENT') return copy.invalidRecipient;
+      if (transferError.code === 'INVALID_AMOUNT') return forAsset(copy.invalidAmount);
+      // The remaining codes are sponsor-side conditions with no localized
+      // equivalent; the API message says more than a generic failure would.
+      return transferError.message;
+    }
     const message = transferError instanceof Error ? transferError.message : String(transferError);
     if (/insufficient|exceeds.*balance|funds for gas|balance for transfer/i.test(message)) {
-      return copy.insufficientBalance;
+      return forAsset(copy.insufficientBalance);
     }
     if (/invalid address|checksum|recipient/i.test(message)) return copy.invalidRecipient;
     return copy.agentUnavailable;
@@ -3327,9 +3380,7 @@ function WalletTransferPanel({
         }
       }
       setAddressType(nextType);
-      setReviewing(false);
-      setGasEstimate(null);
-      setError('');
+      resetQuote();
     } catch {
       setError(copy.invalidRecipient);
     }
@@ -3338,7 +3389,16 @@ function WalletTransferPanel({
   const validateTransfer = () => {
     if (!address) return copy.walletLocked;
     if (!isEvmAddress(recipient) && !isCosmosAddress(recipient)) return copy.invalidRecipient;
-    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return copy.invalidAmount;
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return forAsset(copy.invalidAmount);
+    if (transferMode !== 'native') {
+      // Tokens carry far less precision than INJ, and parseUnits would round
+      // the excess away silently, moving a different amount than the one shown.
+      try {
+        parseErc20Amount(amount, getSendAssetToken(asset).decimals);
+      } catch {
+        return forAsset(copy.invalidAmount);
+      }
+    }
     return '';
   };
 
@@ -3350,6 +3410,19 @@ function WalletTransferPanel({
     setMaxLoading(true);
     setError('');
     try {
+      if (transferMode !== 'native') {
+        // Token gas is paid in INJ, so the whole token balance is spendable.
+        const token = getSendAssetToken(asset);
+        const balance = await getErc20Balance(
+          address as Address,
+          token.address as Address,
+          token.decimals,
+        );
+        setAmount(balance.formatted);
+        resetQuote();
+        return;
+      }
+
       const [balance, gasPrice] = await Promise.all([
         getNativeBalance(address, INJECTIVE_MAINNET),
         getGasPrice(INJECTIVE_MAINNET),
@@ -3370,8 +3443,7 @@ function WalletTransferPanel({
       const reserve = (networkCost * 150n) / 100n;
       const spendable = balance.value > reserve ? balance.value - reserve : 0n;
       setAmount(formatEther(spendable));
-      setReviewing(false);
-      setGasEstimate(null);
+      resetQuote();
     } catch (balanceError) {
       setError(localizeTransferError(balanceError));
     } finally {
@@ -3389,19 +3461,38 @@ function WalletTransferPanel({
     setReviewing(true);
     setEstimatingGas(true);
     setGasEstimate(null);
+    setPreparedUsdc(null);
     setError('');
     try {
+      if (transferMode === 'sponsored') {
+        // The sponsor pays the gas, so there is nothing to quote. Ask the
+        // backend to build the authorization the user will sign instead.
+        setPreparedUsdc(await prepareSponsoredUsdcTransfer(
+          normalizeRecipient(recipient) as Address,
+          amount.trim(),
+        ));
+        return;
+      }
+
+      const token = transferMode === 'erc20' ? getSendAssetToken(asset) : null;
       const estimate = await estimateGas(
         address!,
-        normalizeRecipient(recipient),
-        amount.trim(),
-        undefined,
-        INJECTIVE_MAINNET,
+        token ? token.address : normalizeRecipient(recipient),
+        token ? '0' : amount.trim(),
+        token
+          ? encodeErc20Transfer(
+            normalizeRecipient(recipient) as Address,
+            parseErc20Amount(amount, token.decimals),
+          )
+          : undefined,
+        // Token addresses follow the network config, so an ERC-20 call must run
+        // on the matching chain or it would hit an empty account on the other.
+        token ? DEFAULT_CHAIN : INJECTIVE_MAINNET,
       );
       setGasEstimate(estimate);
     } catch (estimateError) {
       const localizedError = localizeTransferError(estimateError);
-      if (localizedError === copy.insufficientBalance) {
+      if (transferMode === 'native' && localizedError === copy.insufficientBalance) {
         try {
           const gasPrice = await getGasPrice(INJECTIVE_MAINNET);
           const gasLimit = 25_200n;
@@ -3432,7 +3523,37 @@ function WalletTransferPanel({
     setError('');
     try {
       const signingKey = privateKey || await onRequirePrivateKey();
-      const hash = await sendTransaction(signingKey, normalizeRecipient(recipient), amount.trim(), undefined, INJECTIVE_MAINNET);
+      let hash: string;
+
+      if (transferMode === 'sponsored') {
+        if (!preparedUsdc) throw new SponsoredUsdcApiError('INVALID_TRANSFER_ID');
+        // The wallet only ever signs the authorization; the sponsor worker
+        // broadcasts and pays for it, so nothing here touches the user's gas.
+        const signature = await signTypedDataJson(signingKey, preparedUsdc.typedData);
+        const queued = await submitSponsoredUsdcTransfer(preparedUsdc.transferId, signature);
+        const settled = await pollSponsoredUsdcTransfer(queued.id);
+        if (settled.status !== 'CONFIRMED' || !settled.txHash) {
+          throw new SponsoredUsdcApiError(settled.failureCode ?? 'RELAYER_UNAVAILABLE');
+        }
+        hash = settled.txHash;
+        setPreparedUsdc(null);
+      } else if (transferMode === 'erc20') {
+        const token = getSendAssetToken(asset);
+        hash = await sendTransaction(
+          signingKey,
+          token.address,
+          '0',
+          encodeErc20Transfer(
+            normalizeRecipient(recipient) as Address,
+            parseErc20Amount(amount, token.decimals),
+          ),
+          // Same chain the token address came from — see reviewTransfer.
+          DEFAULT_CHAIN,
+        );
+      } else {
+        hash = await sendTransaction(signingKey, normalizeRecipient(recipient), amount.trim(), undefined, INJECTIVE_MAINNET);
+      }
+
       setTxHash(hash);
       setReviewing(false);
       onComplete();
@@ -3483,6 +3604,13 @@ function WalletTransferPanel({
         </div>
       ) : (
         <div className="mx-auto mt-8 max-w-xl space-y-4">
+          <div className={cx('grid grid-cols-3 rounded-xl border p-1', isLight ? 'border-black/8 bg-black/[0.025]' : 'border-white/10 bg-white/[0.035]')} role="group" aria-label="Send asset">
+            {SEND_ASSETS.map((option) => (
+              <button key={option} type="button" onClick={() => changeAsset(option)} aria-pressed={asset === option} className={cx('h-9 rounded-lg text-xs font-bold transition', asset === option ? isLight ? 'bg-white text-black shadow-sm' : 'bg-white/12 text-white' : isLight ? 'text-black/45' : 'text-white/45')}>
+                {option}
+              </button>
+            ))}
+          </div>
           <div className={cx('grid grid-cols-2 rounded-xl border p-1', isLight ? 'border-black/8 bg-black/[0.025]' : 'border-white/10 bg-white/[0.035]')}>
             {(['evm', 'cosmos'] as const).map((type) => (
               <button key={type} type="button" onClick={() => changeAddressType(type)} className={cx('h-9 rounded-lg text-xs font-bold transition', addressType === type ? isLight ? 'bg-white text-black shadow-sm' : 'bg-white/12 text-white' : isLight ? 'text-black/45' : 'text-white/45')}>
@@ -3492,22 +3620,22 @@ function WalletTransferPanel({
           </div>
           <label className="block">
             <span className={cx('text-xs font-bold', isLight ? 'text-black/52' : 'text-white/52')}>{copy.recipient}</span>
-            <input value={recipient} onChange={(event) => { setRecipient(event.target.value); setReviewing(false); setGasEstimate(null); setError(''); }} placeholder={addressType === 'evm' ? '0x...' : 'inj1...'} className={cx('mt-2 h-12 w-full rounded-xl border bg-transparent px-4 font-mono text-sm outline-none transition focus:border-violet-400', isLight ? 'border-black/10' : 'border-white/12')} />
+            <input value={recipient} onChange={(event) => { setRecipient(event.target.value); resetQuote(); }} placeholder={addressType === 'evm' ? '0x...' : 'inj1...'} className={cx('mt-2 h-12 w-full rounded-xl border bg-transparent px-4 font-mono text-sm outline-none transition focus:border-violet-400', isLight ? 'border-black/10' : 'border-white/12')} />
           </label>
           <label className="block">
             <span className={cx('text-xs font-bold', isLight ? 'text-black/52' : 'text-white/52')}>{copy.amount}</span>
             <div className={cx('mt-2 flex h-12 items-center rounded-xl border px-4', isLight ? 'border-black/10' : 'border-white/12')}>
-              <input value={amount} onChange={(event) => { setAmount(event.target.value); setReviewing(false); setGasEstimate(null); setError(''); }} inputMode="decimal" placeholder="0.00" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+              <input value={amount} onChange={(event) => { setAmount(event.target.value); resetQuote(); }} inputMode="decimal" placeholder="0.00" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
               <button type="button" onClick={() => void fillMaximumAmount()} disabled={maxLoading} className={cx('mr-3 rounded-md px-2 py-1 text-[10px] font-bold transition', isLight ? 'bg-black/5 text-black/60 hover:bg-black/9' : 'bg-white/8 text-white/62 hover:bg-white/12')}>{maxLoading ? '...' : 'MAX'}</button>
-              <span className="text-xs font-bold">INJ</span>
+              <span className="text-xs font-bold">{asset}</span>
             </div>
           </label>
           {reviewing && (
             <div className={cx('border-y px-1 py-4 text-sm', isLight ? 'border-black/8' : 'border-white/9')}>
-              <div>Send <strong>{amount || '0'} INJ</strong> to <span className="font-mono">{truncateAddress(recipient)}</span>.</div>
+              <div>Send <strong>{amount || '0'} {asset}</strong> to <span className="font-mono">{truncateAddress(recipient)}</span>.</div>
               <div className={cx('mt-3 grid grid-cols-2 gap-3 text-xs', isLight ? 'text-black/52' : 'text-white/52')}>
-                <span>{copy.gasLimit}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate?.gasLimit.toString() || '--'}</strong></span>
-                <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} INJ` : '--'}</strong></span>
+                <span>{copy.gasLimit}<strong className="mt-1 block font-mono text-current">{transferMode === 'sponsored' ? '--' : estimatingGas ? '...' : gasEstimate?.gasLimit.toString() || '--'}</strong></span>
+                <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{transferMode === 'sponsored' ? (estimatingGas ? '...' : '0 INJ') : estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} INJ` : '--'}</strong></span>
               </div>
             </div>
           )}
@@ -3518,7 +3646,7 @@ function WalletTransferPanel({
           <button
             type="button"
             onClick={() => reviewing ? void submitTransfer() : void reviewTransfer()}
-            disabled={submitting || estimatingGas || (reviewing && Boolean(error))}
+            disabled={submitting || estimatingGas || (reviewing && Boolean(error)) || (reviewing && transferMode === 'sponsored' && !preparedUsdc)}
             className={cx('h-11 w-full rounded-xl text-sm font-bold transition disabled:opacity-45', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}
           >
             {submitting ? copy.sending : estimatingGas ? copy.loading : reviewing ? copy.confirmAndSend : copy.reviewTransfer}

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useWallet } from '@/contexts/WalletContext';
 import { usePin } from '@/contexts/PinContext';
 import { estimateGas, getBalance, sendTransaction } from '@/wallet/chain';
-import { INJECTIVE_MAINNET, GasEstimate } from '@/types/chain';
+import { DEFAULT_CHAIN, INJECTIVE_MAINNET, GasEstimate } from '@/types/chain';
 import { isNFCSupported, readNFCCard } from '@/services/nfc';
 import { resolveTransactionKey } from '@/services/transaction-key';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -34,13 +34,26 @@ import {
   isCurrentSponsoredUsdcIntent,
   type SponsoredUsdcIntent,
 } from '@/services/send-page-sponsored-usdc';
+import {
+  DEFAULT_SEND_ASSET,
+  SEND_ASSETS,
+  getSendAssetToken,
+  getSendTransferMode,
+  parseSendAsset,
+  type SendAsset,
+} from '@/services/send-assets';
+import {
+  ZERO_ERC20_BALANCE,
+  encodeErc20Transfer,
+  getErc20Balance,
+  parseErc20Amount,
+  type Erc20Balance,
+} from '@/services/erc20-transfer';
 
 interface AddressBookEntry {
   name: string;
   address: string;
 }
-
-type SendAsset = 'INJ' | 'USDC';
 
 function toSponsoredUsdcMessage(cause: unknown): string {
   if (cause instanceof SponsoredUsdcApiError) {
@@ -62,10 +75,10 @@ function SendPageContent() {
   const intentVersionRef = useRef(0);
   const sponsoredPrepareGuardRef = useRef(createOperationGuard());
   const gasEstimateGuardRef = useRef(createOperationGuard());
-  const selectedAssetRef = useRef<SendAsset>('INJ');
+  const selectedAssetRef = useRef<SendAsset>(DEFAULT_SEND_ASSET);
   const preparedUsdcIntentRef = useRef<SponsoredUsdcIntent | null>(null);
   const [isEmbedded, setIsEmbedded] = useState(false);
-  const [asset, setAsset] = useState<SendAsset>('INJ');
+  const [asset, setAsset] = useState<SendAsset>(DEFAULT_SEND_ASSET);
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [gasEstimate, setGasEstimate] = useState<GasEstimate | null>(null);
@@ -95,11 +108,19 @@ function SendPageContent() {
     decimals: 6,
     symbol: 'USDC',
   });
+  const [erc20Balances, setErc20Balances] =
+    useState<Partial<Record<SendAsset, Erc20Balance>>>({});
   const [preparedUsdc, setPreparedUsdc] =
     useState<SponsoredUsdcPrepareResponse | null>(null);
   const [sponsoredTransfer, setSponsoredTransfer] =
     useState<SponsoredUsdcTransfer | null>(null);
-  const transferControlsLocked = asset === 'USDC' && sponsoredTransfer !== null;
+  const transferMode = getSendTransferMode(asset);
+  const transferControlsLocked = transferMode === 'sponsored' && sponsoredTransfer !== null;
+  const assetBalance = transferMode === 'sponsored'
+    ? usdcBalance.formatted
+    : transferMode === 'erc20'
+      ? (erc20Balances[asset] ?? ZERO_ERC20_BALANCE).formatted
+      : injBalance;
 
   // Load address book from localStorage
   useEffect(() => {
@@ -123,6 +144,14 @@ function SendPageContent() {
       console.log('[Send] Setting address from URL:', addressParam);
       setRecipient(addressParam);
     }
+
+    // Deep links from the asset list arrive as ?asset=USDT. Unknown symbols are
+    // ignored so a link can never land on a coin Send cannot actually move.
+    const assetParam = parseSendAsset(params.get('asset'));
+    if (assetParam) {
+      selectedAssetRef.current = assetParam;
+      setAsset(assetParam);
+    }
   }, []);
 
   useEffect(() => {
@@ -136,6 +165,22 @@ function SendPageContent() {
       .then(setUsdcBalance)
       .catch((error) => {
         console.error('[Send] Failed to load USDC balance:', error);
+      });
+    SEND_ASSETS
+      .filter((option) => getSendTransferMode(option) === 'erc20')
+      .forEach((option) => {
+        const token = getSendAssetToken(option);
+        getErc20Balance(
+          address as Address,
+          token.address as Address,
+          token.decimals,
+        )
+          .then((balance) => {
+            setErc20Balances((current) => ({ ...current, [option]: balance }));
+          })
+          .catch((error) => {
+            console.error(`[Send] Failed to load ${option} balance:`, error);
+          });
       });
   }, [address]);
 
@@ -272,17 +317,18 @@ function SendPageContent() {
     return isEvmAddress(nextAddress) || isCosmosAddress(nextAddress);
   }, []);
 
-  const isInjInsufficientBalance = (): boolean => {
+  // Applies to every self-paid asset; sponsored USDC has its own validator.
+  const isSelfPaidInsufficientBalance = (): boolean => {
     if (!amount || !recipient) return false;
     const nextAmount = parseFloat(amount);
-    const nextBalance = parseFloat(injBalance);
+    const nextBalance = parseFloat(assetBalance);
     return !Number.isNaN(nextAmount) && nextAmount > 0 && nextAmount > nextBalance;
   };
 
   const getButtonState = (): { label: string; isError: boolean; disabled: boolean } => {
     if (loading) {
       return {
-        label: asset === 'USDC' ? 'Processing...' : 'Sending...',
+        label: transferMode === 'sponsored' ? 'Processing...' : 'Sending...',
         isError: false,
         disabled: true,
       };
@@ -309,21 +355,26 @@ function SendPageContent() {
         return { label: 'Insufficient Balance', isError: true, disabled: true };
       }
     }
-    if (asset === 'INJ' && recipient && amount && isInjInsufficientBalance()) {
+    if (
+      transferMode !== 'sponsored'
+      && recipient
+      && amount
+      && isSelfPaidInsufficientBalance()
+    ) {
       return { label: 'Insufficient Balance', isError: true, disabled: true };
     }
     if (error) {
       return {
-        label: asset === 'USDC' ? 'Transfer unavailable' : error,
+        label: transferMode === 'sponsored' ? 'Transfer unavailable' : error,
         isError: true,
         disabled: true,
       };
     }
-    if (!recipient || !amount || (asset === 'INJ' && !gasEstimate)) {
+    if (!recipient || !amount || (transferMode !== 'sponsored' && !gasEstimate)) {
       return { label: 'Send Transaction', isError: false, disabled: true };
     }
     return {
-      label: asset === 'USDC' ? 'Send USDC' : 'Send Transaction',
+      label: asset === 'INJ' ? 'Send Transaction' : `Send ${asset}`,
       isError: false,
       disabled: false,
     };
@@ -384,9 +435,16 @@ function SendPageContent() {
   }, []);
 
   const handleEstimate = useCallback(async (useDefaults = false) => {
-    if (asset !== 'INJ' || selectedAssetRef.current !== 'INJ') return;
-    console.log('[Send] handleEstimate called:', { useDefaults, recipient, amount, address, hasPrivateKey: !!privateKey });
-    
+    const estimateAsset = asset;
+    const estimateMode = getSendTransferMode(estimateAsset);
+    // Sponsored transfers cost the user nothing, so there is nothing to quote.
+    if (estimateMode === 'sponsored') return;
+    if (selectedAssetRef.current !== estimateAsset) return;
+    // Placeholder inputs only work for the native asset: an ERC-20 `transfer`
+    // to the zero address reverts, so a default probe would just error out.
+    if (useDefaults && estimateMode !== 'native') return;
+    console.log('[Send] handleEstimate called:', { useDefaults, asset: estimateAsset, recipient, amount, address, hasPrivateKey: !!privateKey });
+
     // Use default values if requested or use actual values
     let estimateRecipient = useDefaults ? '0x0000000000000000000000000000000000000000' : recipient;
     const estimateAmount = useDefaults ? '0.001' : amount;
@@ -407,7 +465,7 @@ function SendPageContent() {
 
     const estimateToken = gasEstimateGuardRef.current.begin();
     const isCurrentEstimate = () => (
-      selectedAssetRef.current === 'INJ'
+      selectedAssetRef.current === estimateAsset
       && gasEstimateGuardRef.current.isCurrent(estimateToken)
     );
 
@@ -416,22 +474,43 @@ function SendPageContent() {
     setCostFlashing(true);
     
     try {
-      console.log('[Send] Calling estimateGas with:', { 
-        from: address, 
-        to: estimateRecipient, 
+      // An ERC-20 transfer is a call to the token contract carrying zero value;
+      // only the native asset puts the amount in the transaction value.
+      let estimateTo = estimateRecipient;
+      let estimateValue = estimateAmount;
+      let estimateData: `0x${string}` | undefined;
+      let estimateChain = INJECTIVE_MAINNET;
+      if (estimateMode === 'erc20') {
+        const token = getSendAssetToken(estimateAsset);
+        estimateData = encodeErc20Transfer(
+          estimateRecipient as Address,
+          parseErc20Amount(estimateAmount, token.decimals),
+        );
+        estimateTo = token.address;
+        estimateValue = '0';
+        // Token addresses come from the network-aware registry. Calling a
+        // testnet address over the mainnet RPC would hit an empty account and
+        // "succeed" without moving anything, so keep the two in step.
+        estimateChain = DEFAULT_CHAIN;
+      }
+
+      console.log('[Send] Calling estimateGas with:', {
+        from: address,
+        to: estimateTo,
         amount: estimateAmount,
-        chain: INJECTIVE_MAINNET.name,
-        rpcUrl: INJECTIVE_MAINNET.rpcUrl
+        asset: estimateAsset,
+        chain: estimateChain.name,
+        rpcUrl: estimateChain.rpcUrl
       });
-      
+
       const estimate = await estimateGas(
         address, // Use actual user address
-        estimateRecipient,
-        estimateAmount,
-        undefined,
-        INJECTIVE_MAINNET
+        estimateTo,
+        estimateValue,
+        estimateData,
+        estimateChain
       );
-      
+
       console.log('[Send] Gas estimate successful:', {
         gasLimit: estimate.gasLimit.toString(),
         maxFeePerGas: estimate.maxFeePerGas.toString(),
@@ -451,7 +530,15 @@ function SendPageContent() {
       // Ignore transient validation issues while the user is still typing
       if (!useDefaults) {
         const msg = err instanceof Error ? err.message : 'Failed to estimate gas';
-        if (!msg.includes('invalid') && !msg.includes('Invalid') && !msg.includes('checksum')) {
+        // "0." and other half-typed amounts fail parseErc20Amount; that is not
+        // an error worth surfacing until the field settles.
+        const isHalfTypedAmount = msg.startsWith('Amount must be a positive number');
+        if (
+          !isHalfTypedAmount
+          && !msg.includes('invalid')
+          && !msg.includes('Invalid')
+          && !msg.includes('checksum')
+        ) {
           setError(msg);
         }
       }
@@ -474,7 +561,7 @@ function SendPageContent() {
   // Auto-estimate gas when recipient and amount are filled
   useEffect(() => {
     if (
-      asset === 'INJ'
+      getSendTransferMode(asset) !== 'sponsored'
       && recipient
       && amount
       && address
@@ -486,12 +573,14 @@ function SendPageContent() {
 
   // Auto-refresh every 3 seconds
   useEffect(() => {
-    if (asset !== 'INJ') return;
-    const shouldEstimate = (recipient && amount && isValidRecipientAddress(recipient)) || (!recipient && !amount);
-    if (!address || !shouldEstimate) return;
+    if (getSendTransferMode(asset) === 'sponsored') return;
+    const hasRealInput = Boolean(recipient && amount && isValidRecipientAddress(recipient));
+    // Only the native asset can be quoted before the form is filled in.
+    const useDefaults = asset === 'INJ' && !recipient && !amount;
+    if (!address || (!hasRealInput && !useDefaults)) return;
 
     const interval = setInterval(() => {
-      handleEstimate(!recipient || !amount);
+      handleEstimate(useDefaults);
     }, 3000);
 
     return () => clearInterval(interval);
@@ -507,14 +596,30 @@ function SendPageContent() {
     
     try {
       const normalizedRecipient = getEvmAddress(recipient);
-      const hash = await sendTransaction(
-        transactionKey,
-        normalizedRecipient,
-        amount,
-        undefined,
-        INJECTIVE_MAINNET
-      );
-      
+      let hash: string;
+      if (transferMode === 'erc20') {
+        const token = getSendAssetToken(asset);
+        hash = await sendTransaction(
+          transactionKey,
+          token.address,
+          '0',
+          encodeErc20Transfer(
+            normalizedRecipient as Address,
+            parseErc20Amount(amount, token.decimals),
+          ),
+          // Same chain the address came from — see handleEstimate.
+          DEFAULT_CHAIN
+        );
+      } else {
+        hash = await sendTransaction(
+          transactionKey,
+          normalizedRecipient,
+          amount,
+          undefined,
+          INJECTIVE_MAINNET
+        );
+      }
+
       setTxHash(hash);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send transaction');
@@ -524,7 +629,7 @@ function SendPageContent() {
   };
 
   const handleSendClick = async () => {
-    if (asset === 'USDC') {
+    if (transferMode === 'sponsored') {
       if (loading || preparedUsdc || sponsoredTransfer) return;
       const prepareToken = sponsoredPrepareGuardRef.current.tryBegin();
       if (prepareToken === null) return;
@@ -674,7 +779,7 @@ function SendPageContent() {
   };
 
   const handleAuthSuccess = async (authorizedKey: Uint8Array) => {
-    if (asset === 'INJ') {
+    if (transferMode !== 'sponsored') {
       setShowAuthModal(false);
       await handleSend(authorizedKey);
       return;
@@ -698,7 +803,7 @@ function SendPageContent() {
   };
 
   const handleAuthModalClose = () => {
-    if (asset === 'USDC') {
+    if (transferMode === 'sponsored') {
       cancelSponsoredUsdcIntent(
         sponsoredPrepareGuardRef.current,
         () => {
@@ -716,7 +821,7 @@ function SendPageContent() {
   const sponsoredPrimaryAction = sponsoredTransfer
     ? getSponsoredUsdcPrimaryAction(sponsoredTransfer)
     : null;
-  const successExplorerUrl = asset === 'USDC'
+  const successExplorerUrl = transferMode === 'sponsored'
     ? sponsoredTransfer?.explorerUrl
     : txHash
       ? `${INJECTIVE_MAINNET.explorerUrl}/tx/${txHash}`
@@ -934,11 +1039,11 @@ function SendPageContent() {
               Asset
             </label>
             <div
-              className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-white/5 p-1"
+              className="grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/5 p-1"
               role="group"
               aria-label="Send asset"
             >
-              {(['INJ', 'USDC'] as const).map((option) => (
+              {SEND_ASSETS.map((option) => (
                 <button
                   key={option}
                   type="button"
@@ -1094,7 +1199,7 @@ function SendPageContent() {
               <span className="min-w-0 truncate text-right text-xs text-gray-500">
                 Balance:{' '}
                 <span className="font-mono text-gray-300">
-                  {asset === 'USDC' ? usdcBalance.formatted : injBalance} {asset}
+                  {assetBalance} {asset}
                 </span>
               </span>
             </div>
@@ -1108,7 +1213,7 @@ function SendPageContent() {
                   clearTransferIntent();
                   setAmount(e.target.value);
                 }}
-                placeholder={asset === 'USDC' ? '0.00' : '0.001'}
+                placeholder={asset === 'INJ' ? '0.001' : '0.00'}
                 className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 pl-4 pr-20 font-mono text-sm text-white placeholder-gray-500 transition-all focus:border-white/30 focus:outline-none"
               />
               <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-300">
@@ -1117,7 +1222,7 @@ function SendPageContent() {
             </div>
           </div>
 
-          {asset === 'INJ' ? (
+          {transferMode !== 'sponsored' ? (
             <div className="p-5 rounded-2xl bg-black border border-white/10 space-y-3">
               <div className="flex items-center gap-2 mb-4">
                 <svg className={`w-4 h-4 text-gray-400 ${estimating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

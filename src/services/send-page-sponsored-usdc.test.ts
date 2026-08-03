@@ -231,7 +231,10 @@ describe('Send page sponsored USDC contract', () => {
       'utf8',
     );
 
-    expect(source).toContain("type SendAsset = 'INJ' | 'USDC'");
+    // The asset list lives in send-assets.ts now; the page must derive how each
+    // one is paid for from there rather than special-casing symbols inline.
+    expect(source).toContain("from '@/services/send-assets'");
+    expect(source).toContain('const transferMode = getSendTransferMode(asset)');
     expect(source).toContain('sendTransaction(');
     expect(source).toContain('prepareSponsoredUsdcTransfer(');
     expect(source).toContain('signTypedDataJson(authorizedKey');
@@ -242,13 +245,13 @@ describe('Send page sponsored USDC contract', () => {
     expect(source).toContain('onClose={handleAuthModalClose}');
     expect(source).toContain('sponsoredTransfer?.explorerUrl');
     expect(source).toContain(
-      "const transferControlsLocked = asset === 'USDC' && sponsoredTransfer !== null",
+      "const transferControlsLocked = transferMode === 'sponsored' && sponsoredTransfer !== null",
     );
     expect(source).toContain('if (loading || preparedUsdc || sponsoredTransfer) return;');
     expect(source).toContain('disabled={transferControlsLocked}');
     expect(source).toContain('const gasEstimateGuardRef = useRef(createOperationGuard())');
     expect(source).toContain('gasEstimateGuardRef.current.invalidate()');
-    expect(source).toContain("selectedAssetRef.current === 'INJ'");
+    expect(source).toContain('selectedAssetRef.current === estimateAsset');
     expect(source).toContain('Network fee');
     expect(source).toContain('0 INJ');
     expect(source).toContain('Sponsored by INJ Pass');

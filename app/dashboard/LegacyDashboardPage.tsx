@@ -25,6 +25,7 @@ import NinjaMinerGame from '@/components/NinjaMinerGame';
 import EditableAccountIdentity from '@/components/EditableAccountIdentity';
 import { useTheme } from '@/contexts/ThemeContext';
 import { TOKENS_MAINNET, TOKENS_TESTNET } from '@/services/tokens';
+import { buildSendHref, parseSendAsset } from '@/services/send-assets';
 import { ERC20_ABI } from '@/services/dex-abi';
 import { FAUCET_NETWORKS } from '@/config/faucet';
 import SettingsPage from '../settings/page';
@@ -530,6 +531,40 @@ function DashboardSurfaceFrame({
       className={`h-full w-full border-0 ${className ?? 'bg-black'}`}
       loading={loadingStrategy}
     />
+  );
+}
+
+/**
+ * Jumps from an asset row straight into Send with that coin preselected.
+ * Renders nothing for balances Send has no transfer path for (LAM, XAUT).
+ */
+function TokenSendButton({
+  symbol,
+  onSend,
+  className = '',
+}: {
+  symbol: string;
+  onSend: (symbol: string) => void;
+  className?: string;
+}) {
+  if (!parseSendAsset(symbol)) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onSend(symbol);
+      }}
+      title={`Send ${symbol}`}
+      aria-label={`Send ${symbol}`}
+      className={`flex h-8 w-8 flex-none items-center justify-center rounded-full border border-white/10 bg-white/5 text-gray-300 transition-all hover:bg-white/15 hover:text-white ${className}`}
+    >
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <line x1="12" y1="19" x2="12" y2="5" strokeWidth={2.2} strokeLinecap="round" />
+        <polyline points="5 12 12 5 19 12" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
   );
 }
 
@@ -2040,6 +2075,11 @@ export default function DashboardPage() {
       contractValue: 'UI only',
     },
   ] as const;
+  const openSendForToken = (symbol: string) => {
+    const sendAsset = parseSendAsset(symbol);
+    if (!sendAsset) return;
+    router.push(buildSendHref(sendAsset));
+  };
   const compactAssetCardHeight = 64;
   const compactAssetCardGap = 6;
   const renderCompactAssetSurface = (surface: 'left' | 'right') => {
@@ -2096,6 +2136,7 @@ export default function DashboardPage() {
               />
             </div>
             <div className="min-w-0 flex-1 text-[13px] font-mono text-gray-300">{token.balance}</div>
+            <TokenSendButton symbol={token.symbol} onSend={openSendForToken} />
           </div>
         ))}
       </div>
@@ -3506,6 +3547,7 @@ export default function DashboardPage() {
                           <div className="font-bold font-mono text-[12px] sm:text-[13px]">{token.usdValue}</div>
                           <div className={`text-[12px] sm:text-[13px] ${token.changeClass}`}>{token.change}</div>
                         </div>
+                        <TokenSendButton symbol={token.symbol} onSend={openSendForToken} />
                       </div>
                     </div>
 

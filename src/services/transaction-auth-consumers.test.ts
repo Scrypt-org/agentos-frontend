@@ -16,7 +16,7 @@ describe('transaction authorization consumers', () => {
     expect(source).toMatch(/if \(!recipient \|\| !amount \|\| !transactionKey\) return;/);
     expect(source).toMatch(/sendTransaction\(\s*transactionKey,/s);
     expect(source).toMatch(
-      /const handleAuthSuccess = async \(authorizedKey: Uint8Array\) => \{\s*if \(asset === 'INJ'\) \{\s*setShowAuthModal\(false\);\s*await handleSend\(authorizedKey\);\s*return;/s,
+      /const handleAuthSuccess = async \(authorizedKey: Uint8Array\) => \{\s*if \(transferMode !== 'sponsored'\) \{\s*setShowAuthModal\(false\);\s*await handleSend\(authorizedKey\);\s*return;/s,
     );
     expect(source).toMatch(
       /handleSponsoredUsdcAuthorization\(authorizedKey, intent, prepared\)/,

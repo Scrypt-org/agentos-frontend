@@ -1,4 +1,5 @@
 import type { GasEstimate } from '@/types/chain';
+import type { SendAsset } from './send-assets';
 import {
   parseUsdcUnits,
   sponsoredUsdcErrorMessage,
@@ -184,7 +185,7 @@ export function createOperationGuard(): OperationGuard {
 export function isCurrentSponsoredUsdcIntent(
   guard: OperationGuard,
   intent: SponsoredUsdcIntent,
-  asset: 'INJ' | 'USDC',
+  asset: SendAsset,
   preparedTransferId: string | null,
 ): boolean {
   return asset === 'USDC'

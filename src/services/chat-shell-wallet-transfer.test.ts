@@ -16,8 +16,20 @@ describe('chat shell wallet transfer panel', () => {
     // surfaces read the supported assets from one registry.
     expect(source).toContain("from '@/services/send-assets'");
     expect(source).toContain('const transferMode = getSendTransferMode(asset)');
-    expect(source).toContain('SEND_ASSETS.map((option) => (');
+    expect(source).toContain('SEND_ASSETS.map((option) => {');
     expect(source).toContain('const changeAsset = (nextAsset: SendAsset)');
+  });
+
+  it('picks the asset from a dropdown, not a second row of segmented tabs', async () => {
+    const source = await readShell();
+
+    // A tab strip here sat directly above the EVM/Cosmos one and read as a
+    // duplicate of it.
+    expect(source).toContain('aria-haspopup="listbox"');
+    expect(source).toContain('aria-expanded={assetMenuOpen}');
+    expect(source).toContain('role="option"');
+    // Dismissing the menu must not require hitting the trigger again.
+    expect(source).toContain('onClick={() => setAssetMenuOpen(false)}');
   });
 
   it('routes USDC through the gas sponsor rather than a browser-paid transaction', async () => {

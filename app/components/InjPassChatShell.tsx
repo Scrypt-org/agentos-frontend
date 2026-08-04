@@ -3324,6 +3324,7 @@ function WalletTransferPanel({
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [asset, setAsset] = useState<SendAsset>(DEFAULT_SEND_ASSET);
+  const [assetMenuOpen, setAssetMenuOpen] = useState(false);
   const [addressType, setAddressType] = useState<'evm' | 'cosmos'>('evm');
   const [reviewing, setReviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -3352,6 +3353,7 @@ function WalletTransferPanel({
   };
 
   const changeAsset = (nextAsset: SendAsset) => {
+    setAssetMenuOpen(false);
     if (nextAsset === asset) return;
     setAsset(nextAsset);
     setAmount('');
@@ -3625,13 +3627,6 @@ function WalletTransferPanel({
         </div>
       ) : (
         <div className="mx-auto mt-8 max-w-xl space-y-4">
-          <div className={cx('grid grid-cols-3 rounded-xl border p-1', isLight ? 'border-black/8 bg-black/[0.025]' : 'border-white/10 bg-white/[0.035]')} role="group" aria-label="Send asset">
-            {SEND_ASSETS.map((option) => (
-              <button key={option} type="button" onClick={() => changeAsset(option)} aria-pressed={asset === option} className={cx('h-9 rounded-lg text-xs font-bold transition', asset === option ? isLight ? 'bg-white text-black shadow-sm' : 'bg-white/12 text-white' : isLight ? 'text-black/45' : 'text-white/45')}>
-                {option}
-              </button>
-            ))}
-          </div>
           <div className={cx('grid grid-cols-2 rounded-xl border p-1', isLight ? 'border-black/8 bg-black/[0.025]' : 'border-white/10 bg-white/[0.035]')}>
             {(['evm', 'cosmos'] as const).map((type) => (
               <button key={type} type="button" onClick={() => changeAddressType(type)} className={cx('h-9 rounded-lg text-xs font-bold transition', addressType === type ? isLight ? 'bg-white text-black shadow-sm' : 'bg-white/12 text-white' : isLight ? 'text-black/45' : 'text-white/45')}>
@@ -3648,7 +3643,49 @@ function WalletTransferPanel({
             <div className={cx('mt-2 flex h-12 items-center rounded-xl border px-4', isLight ? 'border-black/10' : 'border-white/12')}>
               <input value={amount} onChange={(event) => { setAmount(event.target.value); resetQuote(); }} inputMode="decimal" placeholder="0.00" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
               <button type="button" onClick={() => void fillMaximumAmount()} disabled={maxLoading} className={cx('mr-3 rounded-md px-2 py-1 text-[10px] font-bold transition', isLight ? 'bg-black/5 text-black/60 hover:bg-black/9' : 'bg-white/8 text-white/62 hover:bg-white/12')}>{maxLoading ? '...' : 'MAX'}</button>
-              <span className="text-xs font-bold">{asset}</span>
+              <div className="relative flex-none">
+                <button
+                  type="button"
+                  onClick={() => setAssetMenuOpen((open) => !open)}
+                  aria-haspopup="listbox"
+                  aria-expanded={assetMenuOpen}
+                  className={cx('flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold transition', isLight ? 'hover:bg-black/6' : 'hover:bg-white/10')}
+                >
+                  <Image src={getSendAssetToken(asset).icon} alt="" width={18} height={18} className="h-[18px] w-[18px] flex-none rounded-full object-contain" />
+                  {asset}
+                  <svg className="h-3.5 w-3.5 opacity-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <polyline points="6 9 12 15 18 9" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {assetMenuOpen && (
+                  <>
+                    {/* Catches the click that dismisses the menu, including one
+                        aimed at the amount field behind it. */}
+                    <div className="fixed inset-0 z-[100]" onClick={() => setAssetMenuOpen(false)} />
+                    <div role="listbox" aria-label="Send asset" className={cx('absolute right-0 top-full z-[101] mt-2 w-48 rounded-xl border p-1 shadow-2xl', isLight ? 'border-black/10 bg-white' : 'border-white/12 bg-black')}>
+                      {SEND_ASSETS.map((option) => {
+                        const token = getSendAssetToken(option);
+                        return (
+                          <button
+                            key={option}
+                            type="button"
+                            role="option"
+                            aria-selected={option === asset}
+                            onClick={() => changeAsset(option)}
+                            className={cx('flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition', option === asset ? isLight ? 'bg-black/6' : 'bg-white/10' : isLight ? 'hover:bg-black/4' : 'hover:bg-white/6')}
+                          >
+                            <Image src={token.icon} alt="" width={24} height={24} className="h-6 w-6 flex-none rounded-full object-contain" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-xs font-bold">{option}</span>
+                              <span className={cx('block truncate text-[10px]', isLight ? 'text-black/45' : 'text-white/45')}>{token.name}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </label>
           {transferMode === 'sponsored' && (

@@ -38,9 +38,9 @@ export function isWebKitBrowser(): boolean {
 export function describeStoragePersistence(state: StoragePersistence): string {
   if (state === 'persisted') return '';
   if (isWebKitBrowser() && !isHomeScreenApp()) {
-    return 'Safari erases site data after 7 days without a visit, which removes this wallet from the device. Add INJ Pass to your Home Screen (Share → Add to Home Screen) to keep it, and store the 24 words offline as the only other copy.';
+    return 'Safari erases site data after 7 days without a visit, which removes this wallet from the device. Add AgentOS to your Home Screen (Share → Add to Home Screen) to keep it, and store the 24 words offline as the only other copy.';
   }
-  return 'This browser has not granted INJ Pass persistent storage, so it may clear the wallet record when disk space runs low or site data is cleared. Store the 24 words offline as the only other copy.';
+  return 'This browser has not granted AgentOS persistent storage, so it may clear the wallet record when disk space runs low or site data is cleared. Store the 24 words offline as the only other copy.';
 }
 
 /**

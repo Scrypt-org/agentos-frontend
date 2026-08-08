@@ -81,7 +81,7 @@ async function deriveCloudDriveKey(
       name: 'HKDF',
       hash: 'SHA-256',
       salt,
-      info: new TextEncoder().encode('INJ Pass Cloud Drive encryption v1'),
+      info: new TextEncoder().encode('AgentOS Cloud Drive encryption v1'),
     },
     material,
     { name: 'AES-GCM', length: 256 },

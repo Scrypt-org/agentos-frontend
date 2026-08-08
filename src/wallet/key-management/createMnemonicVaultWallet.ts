@@ -62,7 +62,7 @@ async function persistMnemonicWallet(params: {
     encryptedMnemonicVault: JSON.stringify(vault),
     mnemonicBackupConfirmed: false,
     createdAt: now,
-    walletName: params.walletName || 'My INJ Pass',
+    walletName: params.walletName || 'My AgentOS',
   };
   try {
     saveWallet(keystore);

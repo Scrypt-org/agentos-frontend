@@ -1,7 +1,7 @@
 /**
- * NFT Service for Injective EVM
+ * NFT Service for Monad
  * 
- * This service fetches NFT data from ERC-721 contracts on Injective EVM.
+ * This service fetches NFT data from ERC-721 contracts on Monad.
  */
 
 import { 
@@ -13,7 +13,7 @@ import {
 import { NETWORK_CONFIG } from '@/config/network';
 import { DEFAULT_CHAIN_VIEM } from '@/types/chain';
 
-// N1NJ4 NFT Contract Address on Injective EVM
+// N1NJ4 NFT Contract Address on Monad
 export const N1NJ4_CONTRACT_ADDRESS = '0x816070929010a3d202d8a6b89f92bee33b7e8769' as Address;
 export const N1NJ4_COLLECTION_NAME = 'N1NJ4:Origin';
 

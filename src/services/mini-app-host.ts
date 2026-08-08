@@ -38,8 +38,8 @@ function toBigInt(value: unknown): bigint | undefined {
 function chainFromManifest(manifest: MiniAppManifest): Chain {
   return {
     id: manifest.chainId,
-    name: `${manifest.name} Injective network`,
-    nativeCurrency: { name: 'Injective', symbol: 'INJ', decimals: 18 },
+    name: `${manifest.name} Monad network`,
+    nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
     rpcUrls: { default: { http: [manifest.rpcUrl] } },
   };
 }
@@ -59,7 +59,7 @@ async function forwardRpc(manifest: MiniAppManifest, method: string, params: unk
   });
   const payload = await response.json() as { result?: unknown; error?: { code?: number; message?: string; data?: unknown } };
   if (payload.error) {
-    throw new MiniAppHostError(payload.error.code ?? -32603, payload.error.message || 'Injective RPC error', payload.error.data);
+    throw new MiniAppHostError(payload.error.code ?? -32603, payload.error.message || 'Monad RPC error', payload.error.data);
   }
   return payload.result;
 }
@@ -76,7 +76,7 @@ export async function handleMiniAppRpc(
   }
   if (method === 'eth_requestAccounts') {
     requirePermission(manifest, 'accounts');
-    if (!context.address) throw new MiniAppHostError(4100, 'Log in to INJ Pass first.');
+    if (!context.address) throw new MiniAppHostError(4100, 'Log in to AgentOS first.');
     return [context.address];
   }
   if (method === 'eth_chainId') return `0x${manifest.chainId.toString(16)}`;
@@ -94,12 +94,12 @@ export async function handleMiniAppRpc(
 
   if (method === 'eth_sendTransaction') {
     requirePermission(manifest, 'transactions');
-    if (!context.address) throw new MiniAppHostError(4100, 'Log in to INJ Pass first.');
+    if (!context.address) throw new MiniAppHostError(4100, 'Log in to AgentOS first.');
     const tx = params[0] as Record<string, unknown> | undefined;
     if (!tx?.to) throw new MiniAppHostError(-32602, 'A transaction recipient is required.');
     const requestedFrom = String(tx.from || '');
     if (requestedFrom && requestedFrom.toLowerCase() !== context.address.toLowerCase()) {
-      throw new MiniAppHostError(4100, 'The transaction sender is not the authenticated INJ Pass wallet.');
+      throw new MiniAppHostError(4100, 'The transaction sender is not the authenticated AgentOS wallet.');
     }
     const to = String(tx.to) as Address;
     if (
@@ -127,10 +127,10 @@ export async function handleMiniAppRpc(
 
   if (method === 'personal_sign' || method === 'eth_sign') {
     requirePermission(manifest, 'sign');
-    if (!context.address) throw new MiniAppHostError(4100, 'Log in to INJ Pass first.');
+    if (!context.address) throw new MiniAppHostError(4100, 'Log in to AgentOS first.');
     const requestedAddress = String(method === 'personal_sign' ? params[1] || '' : params[0] || '');
     if (requestedAddress && requestedAddress.toLowerCase() !== context.address.toLowerCase()) {
-      throw new MiniAppHostError(4100, 'The requested signing account is not the authenticated INJ Pass wallet.');
+      throw new MiniAppHostError(4100, 'The requested signing account is not the authenticated AgentOS wallet.');
     }
     const privateKey = await context.getPrivateKey();
     const account = privateKeyToAccount(privateKeyHex(privateKey));
@@ -140,10 +140,10 @@ export async function handleMiniAppRpc(
 
   if (method === 'eth_signTypedData_v4') {
     requirePermission(manifest, 'sign');
-    if (!context.address) throw new MiniAppHostError(4100, 'Log in to INJ Pass first.');
+    if (!context.address) throw new MiniAppHostError(4100, 'Log in to AgentOS first.');
     const requestedAddress = String(params[0] || '');
     if (requestedAddress.toLowerCase() !== context.address.toLowerCase()) {
-      throw new MiniAppHostError(4100, 'The requested signing account is not the authenticated INJ Pass wallet.');
+      throw new MiniAppHostError(4100, 'The requested signing account is not the authenticated AgentOS wallet.');
     }
     const typedData = JSON.parse(String(params[1] || '{}')) as {
       domain?: { chainId?: number | string; verifyingContract?: Address };
@@ -169,7 +169,7 @@ export async function handleMiniAppRpc(
       typeof claimer === 'string'
       && claimer.toLowerCase() !== context.address.toLowerCase()
     ) {
-      throw new MiniAppHostError(4100, 'The claim beneficiary is not the authenticated INJ Pass wallet.');
+      throw new MiniAppHostError(4100, 'The claim beneficiary is not the authenticated AgentOS wallet.');
     }
     const privateKey = await context.getPrivateKey();
     const account = privateKeyToAccount(privateKeyHex(privateKey));

@@ -24,7 +24,7 @@ export default function SwapPage() {
   const router = useRouter();
   const { isUnlocked, isCheckingSession, address, privateKey } = useWallet();
   const { isPinLocked, autoLockMinutes } = usePin();
-  const [fromToken, setFromToken] = useState<Token>({ symbol: 'INJ', name: 'Injective', icon: '/injswap.png', balance: '0.0000' });
+  const [fromToken, setFromToken] = useState<Token>({ symbol: 'MON', name: 'Monad', icon: '/injswap.png', balance: '0.0000' });
   const [toToken, setToToken] = useState<Token>({ symbol: 'USDT', name: 'Tether USD', icon: '/USDT_Logo.png', balance: '0.00' });
   const [fromAmount, setFromAmount] = useState('');
   const [toAmount, setToAmount] = useState('');
@@ -124,7 +124,7 @@ export default function SwapPage() {
 
   // Token list with real balances
   const [tokens, setTokens] = useState<Token[]>([
-    { symbol: 'INJ', name: 'Injective', icon: '/injswap.png', balance: '0.0000' },
+    { symbol: 'MON', name: 'Monad', icon: '/injswap.png', balance: '0.0000' },
     { symbol: 'USDT', name: 'Tether USD', icon: '/USDT_Logo.png', balance: '0.00' },
     { symbol: 'USDC', name: 'USD Coin', icon: '/USDC_Logo.png', balance: '0.00' },
   ]);
@@ -143,7 +143,7 @@ export default function SwapPage() {
       const balances = await getTokenBalances(['INJ', 'USDT', 'USDC'], address as Address);
       
       setTokens([
-        { symbol: 'INJ', name: 'Injective', icon: '/injswap.png', balance: parseFloat(balances.INJ).toFixed(4) },
+        { symbol: 'MON', name: 'Monad', icon: '/injswap.png', balance: parseFloat(balances.INJ).toFixed(4) },
         { symbol: 'USDT', name: 'Tether USD', icon: '/USDT_Logo.png', balance: parseFloat(balances.USDT).toFixed(2) },
         { symbol: 'USDC', name: 'USD Coin', icon: '/USDC_Logo.png', balance: parseFloat(balances.USDC).toFixed(2) },
       ]);
@@ -479,7 +479,7 @@ export default function SwapPage() {
             </div>
             <div className="flex justify-between items-center py-2 border-t border-white/5">
               <span className="text-sm text-gray-400">Network</span>
-              <span className="text-sm font-bold text-white">Injective Mainnet</span>
+              <span className="text-sm font-bold text-white">Monad Testnet</span>
             </div>
             <div className="flex justify-between items-center py-2 border-t border-white/5">
               <span className="text-sm text-gray-400">Timestamp</span>

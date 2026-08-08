@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useTheme } from '@/contexts/ThemeContext';
 
 function getDestinationLabel(pathname: string | null) {
-  if (!pathname || pathname === '/') return 'INJ Pass';
+  if (!pathname || pathname === '/') return 'AgentOS';
 
   const routeLabels: Record<string, string> = {
     '/dashboard': 'Wallet',
@@ -19,8 +19,8 @@ function getDestinationLabel(pathname: string | null) {
     '/receive': 'Receive',
     '/swap': 'Swap',
     '/cards': 'Cards',
-    '/welcome': 'INJ Pass',
-    '/unlock': 'INJ Pass',
+    '/welcome': 'AgentOS',
+    '/unlock': 'AgentOS',
   };
 
   if (routeLabels[pathname]) {
@@ -28,7 +28,7 @@ function getDestinationLabel(pathname: string | null) {
   }
 
   const fallback = pathname.split('/').filter(Boolean).pop();
-  if (!fallback) return 'INJ Pass';
+  if (!fallback) return 'AgentOS';
 
   return fallback
     .split('-')
@@ -49,7 +49,7 @@ function getDefaultStatus(pathname: string | null) {
     '/receive': 'Loading receive surface',
     '/swap': 'Loading swap surface',
     '/cards': 'Loading card center',
-    '/welcome': 'Preparing INJ Pass',
+    '/welcome': 'Preparing AgentOS',
     '/unlock': 'Loading wallet relay',
   };
 
@@ -160,7 +160,7 @@ export default function LoadingSpinner({ ready = false, children, progress, stat
                   : 'border-white/10 bg-white/[0.04] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_44px_rgba(0,0,0,0.42)]'
               }`}
             >
-              <Image src="/lambdalogo.png" alt="INJ Pass" width={30} height={30} className="h-[30px] w-[30px] object-contain opacity-95" />
+              <Image src="/lambdalogo.png" alt="AgentOS" width={30} height={30} className="h-[30px] w-[30px] object-contain opacity-95" />
             </div>
 
             <div className={`text-[10px] font-semibold uppercase tracking-[0.34em] ${isLight ? 'text-slate-500' : 'text-gray-500'}`}>

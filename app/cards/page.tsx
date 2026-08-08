@@ -949,7 +949,7 @@ export default function CardsPage() {
         <div className={aboutCardClass}>
           <h3 className="text-lg font-bold text-white mb-3">About Cards</h3>
           <p className="text-gray-400 text-sm leading-relaxed mb-4">
-            NFC-enabled cards that can be bound to your Injective wallet. 
+            NFC-enabled cards that can be bound to your Monad wallet. 
             Each card acts as a physical key to access your funds quickly and securely.
           </p>
           <ul className="space-y-2 text-sm text-gray-400">

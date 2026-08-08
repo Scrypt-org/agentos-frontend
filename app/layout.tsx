@@ -8,8 +8,8 @@ import { SidebarOverlay, GeometricShapes } from "./components/LayoutClient";
 import SupportChat from "./components/SupportChat";
 
 export const metadata: Metadata = {
-  title: "INJ Pass",
-  description: "Passkey-powered wallet for Injective",
+  title: "AgentOS",
+  description: "Passkey-powered wallet for Monad",
   icons: {
     icon: [
       { url: "/logo/icon-16.png", sizes: "16x16", type: "image/png" },

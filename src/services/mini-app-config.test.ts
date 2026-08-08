@@ -22,7 +22,7 @@ describe('mini app URL resolution', () => {
     });
   });
 
-  it('keeps eric mfer on the active INJ Pass origin', () => {
+  it('keeps eric mfer on the active AgentOS origin', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubGlobal('window', { location: { origin: 'http://localhost:3001' } });
     const manifest = getMiniAppManifest('eric-mfer');

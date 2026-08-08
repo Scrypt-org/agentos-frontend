@@ -262,7 +262,7 @@ export default function ConnectPage() {
         encryptedPrivateKey,
         source: 'import',
         createdAt: Date.now(),
-        walletName: 'INJ Pass',
+        walletName: 'AgentOS',
       });
 
       afterAuth(privateKey, nextAddress);
@@ -336,19 +336,19 @@ export default function ConnectPage() {
       ? 'Opening secure session'
       : step === 'unlock'
         ? walletSource === 'passkey'
-          ? 'Enter your INJ Pass'
+          ? 'Enter your AgentOS'
           : 'Unlock local session'
         : step === 'import'
           ? importStep === 'key'
             ? 'Bring an existing wallet'
             : 'Set a local password'
           : step === 'connected'
-            ? 'INJ Pass is ready'
+            ? 'AgentOS is ready'
             : 'Approve transaction';
 
   const description =
     step === 'loading'
-      ? 'Preparing the secure connector window and restoring your INJ Pass context.'
+      ? 'Preparing the secure connector window and restoring your AgentOS context.'
       : step === 'unlock'
         ? walletSource === 'passkey'
           ? 'Approve the passkey request to reopen the paired wallet in this browser session.'
@@ -400,10 +400,10 @@ export default function ConnectPage() {
       <header className="relative z-10 mx-auto flex w-full max-w-5xl items-center justify-between px-4 pt-4 sm:px-6 sm:pt-6">
         <div className="min-w-0">
           <div className={`text-[0.96rem] font-medium tracking-[-0.02em] ${isLightMode ? 'text-[#263144]' : 'text-white/[0.92]'}`}>
-            INJ Pass Authorization
+            AgentOS Authorization
           </div>
           <div className={`mt-1 text-xs ${headerTone}`}>
-            Agent Wallet for Injective
+            Agent Wallet for Monad
           </div>
         </div>
 
@@ -474,7 +474,7 @@ export default function ConnectPage() {
                         }`}
                       />
                       <div>
-                        <p className="text-sm font-semibold">Preparing INJ Pass</p>
+                        <p className="text-sm font-semibold">Preparing AgentOS</p>
                         <p className={`mt-1 text-xs leading-5 ${headerTone}`}>
                           Restoring wallet state and connector permissions.
                         </p>
@@ -759,7 +759,7 @@ export default function ConnectPage() {
                     </div>
 
                     <p className={`text-center text-xs leading-5 ${headerTone}`}>
-                      Your private key remains inside this secure INJ Pass window.
+                      Your private key remains inside this secure AgentOS window.
                     </p>
                   </div>
                 ) : null}

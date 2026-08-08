@@ -56,8 +56,8 @@ export async function createByPasskey(
         rp: { id: rpId, name: rpName },
         user: {
           id: userId,
-          name: walletName || 'INJ Pass Wallet',
-          displayName: walletName || 'INJ Pass Wallet',
+          name: walletName || 'AgentOS Wallet',
+          displayName: walletName || 'AgentOS Wallet',
         },
         pubKeyCredParams: [
           { type: 'public-key', alg: -7 }, // ES256

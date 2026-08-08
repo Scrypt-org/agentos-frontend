@@ -55,7 +55,7 @@ function installFakeBrowser() {
   };
 }
 
-describe('INJ Pass connector connection lifecycle', () => {
+describe('AgentOS connector connection lifecycle', () => {
   afterEach(() => {
     vi.useRealTimers();
     Reflect.deleteProperty(globalThis, 'window');

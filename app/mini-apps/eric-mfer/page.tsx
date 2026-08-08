@@ -66,7 +66,7 @@ const collectionStatusCopy: Record<EricMferLanguage, CollectionStatusCopy> = {
     readingChain: 'Reading chain',
     unavailable: 'Unavailable',
     notConnected: 'Not connected',
-    sponsored: 'Sponsored by INJ Pass',
+    sponsored: 'Sponsored by AgentOS',
   },
   de: {
     supply: 'Angebot',
@@ -76,7 +76,7 @@ const collectionStatusCopy: Record<EricMferLanguage, CollectionStatusCopy> = {
     readingChain: 'Blockchain wird gelesen',
     unavailable: 'Nicht verfügbar',
     notConnected: 'Nicht verbunden',
-    sponsored: 'Von INJ Pass gesponsert',
+    sponsored: 'Von AgentOS gesponsert',
   },
   fr: {
     supply: 'Offre',
@@ -86,7 +86,7 @@ const collectionStatusCopy: Record<EricMferLanguage, CollectionStatusCopy> = {
     readingChain: 'Lecture de la blockchain',
     unavailable: 'Indisponible',
     notConnected: 'Non connecté',
-    sponsored: 'Sponsorisé par INJ Pass',
+    sponsored: 'Sponsorisé par AgentOS',
   },
   ko: {
     supply: '공급량',
@@ -96,7 +96,7 @@ const collectionStatusCopy: Record<EricMferLanguage, CollectionStatusCopy> = {
     readingChain: '체인 조회 중',
     unavailable: '사용할 수 없음',
     notConnected: '연결되지 않음',
-    sponsored: 'INJ Pass 지원',
+    sponsored: 'AgentOS 지원',
   },
   ja: {
     supply: '発行数',
@@ -106,7 +106,7 @@ const collectionStatusCopy: Record<EricMferLanguage, CollectionStatusCopy> = {
     readingChain: 'チェーンを確認中',
     unavailable: '利用できません',
     notConnected: '未接続',
-    sponsored: 'INJ Pass が負担',
+    sponsored: 'AgentOS が負担',
   },
   'zh-Hans': {
     supply: '已 Mint',
@@ -116,7 +116,7 @@ const collectionStatusCopy: Record<EricMferLanguage, CollectionStatusCopy> = {
     readingChain: '正在读取链上数据',
     unavailable: '暂不可用',
     notConnected: '未连接',
-    sponsored: '由 INJ Pass 赞助',
+    sponsored: '由 AgentOS 赞助',
   },
   'zh-Hant': {
     supply: '已 Mint',
@@ -126,7 +126,7 @@ const collectionStatusCopy: Record<EricMferLanguage, CollectionStatusCopy> = {
     readingChain: '正在讀取鏈上資料',
     unavailable: '暫不可用',
     notConnected: '未連接',
-    sponsored: '由 INJ Pass 贊助',
+    sponsored: '由 AgentOS 贊助',
   },
 };
 
@@ -150,10 +150,10 @@ function shortAddress(value: string) {
 function friendlyError(error: unknown) {
   const message = error instanceof Error ? error.message : 'Mint failed. Please try again.';
   if (/insufficient mint credits|complimentary mint|already.*mint|only one eric mfer/i.test(message)) {
-    return 'This INJ Pass account has already minted its eric mfer.';
+    return 'This AgentOS account has already minted its eric mfer.';
   }
   if (/unlock|locked/i.test(message)) {
-    return 'Unlock this INJ Pass wallet to approve the mint.';
+    return 'Unlock this AgentOS wallet to approve the mint.';
   }
   return message;
 }
@@ -285,17 +285,17 @@ export default function EricMferMiniAppPage() {
   const handleMint = async () => {
     const connector = connectorRef.current;
     if (!connector) {
-      setNotice('Open eric mfer from INJ Pass Apps to mint with your wallet.');
+      setNotice('Open eric mfer from AgentOS Apps to mint with your wallet.');
       return;
     }
     if (!session?.authenticated || !session.address) {
-      setNotice('Choose an INJ Pass wallet, then return here to mint.');
+      setNotice('Choose an AgentOS wallet, then return here to mint.');
       await connector.requestLogin();
       return;
     }
 
     setMintPhase('submitting');
-    setNotice('INJ Pass is sponsoring gas and preparing your mint.');
+    setNotice('AgentOS is sponsoring gas and preparing your mint.');
     setMintResult(null);
     setMintCelebration(null);
     try {
@@ -326,7 +326,7 @@ export default function EricMferMiniAppPage() {
         setNotice(`Mint confirmed. The NFT artwork is still synchronizing; use the transaction link as proof.${syncWarning}`);
       } else {
         setMintPhase('complete');
-        setNotice(`${result.gasSponsored ? 'Mint complete. INJ Pass sponsored the network fee.' : 'Mint complete.'}${syncWarning}`);
+        setNotice(`${result.gasSponsored ? 'Mint complete. AgentOS sponsored the network fee.' : 'Mint complete.'}${syncWarning}`);
       }
       setMintCelebration({ result, nft: discovery.nft, timedOut: discovery.timedOut });
     } catch (error) {
@@ -350,7 +350,7 @@ export default function EricMferMiniAppPage() {
     : minting
       ? 'Minting...'
       : !session?.authenticated
-        ? 'Connect INJ Pass'
+        ? 'Connect AgentOS'
         : ownedNFTs.length > 0
           ? 'Mint another'
           : 'Mint with sponsored gas';
@@ -422,7 +422,7 @@ export default function EricMferMiniAppPage() {
           <div>
             <h1 className="mt-3 max-w-xl text-4xl font-semibold leading-[1.05] sm:text-5xl">Mint an eric mfer collectible.</h1>
             <p className={isLight ? 'mt-5 max-w-lg text-sm leading-7 text-black/58' : 'mt-5 max-w-lg text-sm leading-7 text-white/58'}>
-              One complimentary mint is available per INJ Pass wallet. The artwork and ownership record are stored through the collection contract.
+              One complimentary mint is available per AgentOS wallet. The artwork and ownership record are stored through the collection contract.
             </p>
 
             <dl className={isLight ? 'mt-10 divide-y divide-black/8 border-y border-black/8' : 'mt-10 divide-y divide-white/9 border-y border-white/9'}>
@@ -528,7 +528,7 @@ export default function EricMferMiniAppPage() {
             <p className={isLight ? 'mt-2 text-sm text-black/52' : 'mt-2 text-sm text-white/52'}>
               {mintCelebration.timedOut
                 ? 'Ownership is confirmed on-chain. The NFT artwork is still synchronizing.'
-                : 'This eric mfer now belongs to your INJ Pass wallet.'}
+                : 'This eric mfer now belongs to your AgentOS wallet.'}
             </p>
 
             <div className={isLight ? 'mx-auto mt-6 w-full max-w-[280px] rounded-lg border border-black/8 bg-white p-3' : 'mx-auto mt-6 w-full max-w-[280px] rounded-lg border border-white/10 bg-white/[0.035] p-3'}>

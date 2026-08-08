@@ -16,7 +16,7 @@ export default function ReceivePage() {
   const [copied, setCopied] = useState(false);
   const [addressType, setAddressType] = useState<AddressType>('evm');
 
-  // Convert EVM address to Cosmos (Bech32) format for Injective
+  // Convert EVM address to Cosmos (Bech32) format for Monad
   // Uses official Injective SDK for proper address conversion
   const getCosmosAddress = (evmAddr: string): string => {
     if (!evmAddr) return '';
@@ -153,7 +153,7 @@ export default function ReceivePage() {
         <div className="w-full space-y-6">
           <div className="text-center">
             <p className="text-gray-400 text-sm mb-4">
-              Your Injective {addressType === 'evm' ? 'EVM' : 'Cosmos'} Address
+              Your Monad {addressType === 'evm' ? 'EVM' : 'Cosmos'} Address
             </p>
             <div className="p-4 rounded-2xl bg-white/5 border border-white/10 font-mono text-xs overflow-hidden relative group flex items-center gap-3">
               <div className="overflow-x-auto scrollbar-hide flex-1">
@@ -194,7 +194,7 @@ export default function ReceivePage() {
               </div>
               <p className="text-gray-300 text-sm leading-relaxed flex-1">
                 {addressType === 'evm' 
-                  ? 'All kinds of Injective EVM Activities'
+                  ? 'All kinds of Monad Activities'
                   : 'Withdraw from Binance and OKX'
                 }
               </p>
@@ -209,7 +209,7 @@ export default function ReceivePage() {
               </div>
               <p className="text-gray-300 text-sm leading-relaxed flex-1">
                 {addressType === 'evm' 
-                  ? 'Receive Injective EVM Assets only'
+                  ? 'Receive Monad Assets only'
                   : 'Swap Assets through Injective Bridge'
                 }
               </p>

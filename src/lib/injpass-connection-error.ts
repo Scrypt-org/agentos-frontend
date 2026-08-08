@@ -27,22 +27,22 @@ export function connectionErrorPayload(error: InjPassConnectionError): {
 
 const MESSAGES = {
   en: {
-    USER_CANCELLED: 'INJ Pass connection was cancelled.',
-    POPUP_BLOCKED: 'The INJ Pass authorization window was blocked.',
-    CONNECTION_TIMEOUT: 'INJ Pass connection timed out. Please try again.',
-    WALLET_NOT_FOUND: 'No compatible INJ Pass wallet was found.',
+    USER_CANCELLED: 'AgentOS connection was cancelled.',
+    POPUP_BLOCKED: 'The AgentOS authorization window was blocked.',
+    CONNECTION_TIMEOUT: 'AgentOS connection timed out. Please try again.',
+    WALLET_NOT_FOUND: 'No compatible AgentOS wallet was found.',
     WALLET_MIGRATION_REQUIRED: 'This wallet must be migrated before it can connect.',
-    WALLET_UNLOCK_FAILED: 'Unable to unlock this INJ Pass wallet.',
-    PROTOCOL_ERROR: 'INJ Pass could not complete the connection.',
+    WALLET_UNLOCK_FAILED: 'Unable to unlock this AgentOS wallet.',
+    PROTOCOL_ERROR: 'AgentOS could not complete the connection.',
   },
   zh: {
-    USER_CANCELLED: '你已取消 INJ Pass 连接。',
-    POPUP_BLOCKED: '浏览器阻止了 INJ Pass 授权窗口。',
-    CONNECTION_TIMEOUT: 'INJ Pass 连接超时，请重试。',
-    WALLET_NOT_FOUND: '没有找到可用的 INJ Pass 钱包。',
+    USER_CANCELLED: '你已取消 AgentOS 连接。',
+    POPUP_BLOCKED: '浏览器阻止了 AgentOS 授权窗口。',
+    CONNECTION_TIMEOUT: 'AgentOS 连接超时，请重试。',
+    WALLET_NOT_FOUND: '没有找到可用的 AgentOS 钱包。',
     WALLET_MIGRATION_REQUIRED: '此钱包需要迁移后才能连接。',
-    WALLET_UNLOCK_FAILED: '无法解锁此 INJ Pass 钱包。',
-    PROTOCOL_ERROR: 'INJ Pass 无法完成连接。',
+    WALLET_UNLOCK_FAILED: '无法解锁此 AgentOS 钱包。',
+    PROTOCOL_ERROR: 'AgentOS 无法完成连接。',
   },
 } satisfies Record<'en' | 'zh', Record<InjPassConnectionErrorCode, string>>;
 
@@ -56,7 +56,7 @@ export function normalizeConnectionError(
 ): InjPassConnectionError {
   if (error instanceof InjPassConnectionError) return error;
   const candidate = error as { code?: unknown; message?: unknown } | null;
-  const message = typeof candidate?.message === 'string' ? candidate.message : 'INJ Pass connection failed.';
+  const message = typeof candidate?.message === 'string' ? candidate.message : 'AgentOS connection failed.';
   const code = typeof candidate?.code === 'string' && candidate.code in MESSAGES.en
     ? candidate.code as InjPassConnectionErrorCode
     : fallbackCode;

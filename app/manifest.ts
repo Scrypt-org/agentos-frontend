@@ -7,13 +7,13 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'INJ Pass',
-    short_name: 'INJ Pass',
-    description: 'Passkey-powered wallet for Injective',
+    name: 'AgentOS',
+    short_name: 'AgentOS',
+    description: 'Passkey-powered wallet for Monad',
     start_url: '/',
     display: 'standalone',
     background_color: '#000000',
-    theme_color: '#000000',
+    theme_color: '#836EF9',
     icons: [
       { src: '/logo/icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/logo/icon-512.png', sizes: '512x512', type: 'image/png' },

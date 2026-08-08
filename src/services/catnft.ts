@@ -283,7 +283,7 @@ export async function syncCatMintRecord(
 
   return {
     recordSynced: false,
-    recordSyncWarning: `The NFT was minted on-chain, but its INJ Pass record is still syncing: ${lastError}`,
+    recordSyncWarning: `The NFT was minted on-chain, but its AgentOS record is still syncing: ${lastError}`,
   };
 }
 

@@ -1,5 +1,5 @@
 /**
- * Token configuration for Injective EVM
+ * Token configuration for Monad
  */
 
 import { NETWORK_CONFIG } from '@/config/network';
@@ -13,11 +13,11 @@ export interface TokenInfo {
   isNative?: boolean;
 }
 
-// Injective EVM Mainnet Token Addresses
+// Monad Testnet Token Addresses
 export const TOKENS_MAINNET: Record<string, TokenInfo> = {
   INJ: {
     symbol: 'INJ',
-    name: 'Injective',
+    name: 'Monad',
     address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE', // Special address for native token
     decimals: 18,
     icon: '/injswap.png',
@@ -46,11 +46,11 @@ export const TOKENS_MAINNET: Record<string, TokenInfo> = {
   },
 };
 
-// Injective EVM Testnet Token Addresses
+// Monad Testnet Token Addresses
 export const TOKENS_TESTNET: Record<string, TokenInfo> = {
   INJ: {
     symbol: 'INJ',
-    name: 'Injective',
+    name: 'Monad',
     address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
     decimals: 18,
     icon: '/injswap.png',

@@ -362,7 +362,7 @@ function AuthPageContent() {
       throw new Error('The wallet connection request has expired. Please try again.');
     }
     if (!canUseWalletWithDapps(wallet)) {
-      throw new Error('This legacy wallet must be migrated in INJ Pass before it can connect to apps.');
+      throw new Error('This legacy wallet must be migrated in AgentOS before it can connect to apps.');
     }
 
     setErrorMessage('');
@@ -390,7 +390,7 @@ function AuthPageContent() {
         type: 'WALLET_CONNECT_RESPONSE',
         requestId: pending.requestId,
         address: activeWallet.address,
-        walletName: activeWallet.walletName || 'INJ Pass Wallet',
+        walletName: activeWallet.walletName || 'AgentOS Wallet',
         walletType: isTraditionalWallet(activeWallet) ? 'traditional' : 'passkey',
       };
       window.opener?.postMessage(response, pending.targetOrigin);
@@ -427,7 +427,7 @@ function AuthPageContent() {
     dismissErrorToast(true);
     setErrorMessage('');
     setStatus('recovering_wallet');
-    setMessage('Choose an existing INJ Pass Passkey...');
+    setMessage('Choose an existing AgentOS Passkey...');
 
     try {
       const wallet = await recoverPasskeyForAuthorization({
@@ -476,7 +476,7 @@ function AuthPageContent() {
 
     setErrorMessage('');
     setStatus('processing');
-    setMessage('Unlocking your INJ Pass...');
+    setMessage('Unlocking your AgentOS...');
 
     try {
       dismissErrorToast(true);
@@ -536,7 +536,7 @@ function AuthPageContent() {
     } catch (err) {
       const rawMsg = err instanceof Error ? err.message : 'Signing failed';
       const friendlyMsg = friendlyErrorMessage(rawMsg);
-      console.error('[INJ Pass /auth] Sign failed:', rawMsg);
+      console.error('[AgentOS /auth] Sign failed:', rawMsg);
       showErrorToast(friendlyMsg);
       window.opener?.postMessage(
         {
@@ -583,7 +583,7 @@ function AuthPageContent() {
 
     setErrorMessage('');
     setStatus('processing');
-    setMessage('Unlocking your INJ Pass...');
+    setMessage('Unlocking your AgentOS...');
 
     try {
       dismissErrorToast(true);
@@ -597,7 +597,7 @@ function AuthPageContent() {
         if (authorization.ephemeral) authorization.privateKey.fill(0);
       }
 
-      console.log('[INJ Pass /auth] TX broadcast success, txHash:', txHash);
+      console.log('[AgentOS /auth] TX broadcast success, txHash:', txHash);
 
       // Send response via both channels:
       // 1. window.opener → embed page → dApp (may fail if opener is cross-origin)
@@ -611,14 +611,14 @@ function AuthPageContent() {
         },
         reqOrigin
       );
-      console.log('[INJ Pass /auth] TX_RESPONSE sent via postMessage to opener, requestId:', reqId);
+      console.log('[AgentOS /auth] TX_RESPONSE sent via postMessage to opener, requestId:', reqId);
       try {
         const bc = new BroadcastChannel('injpass_tx');
         bc.postMessage({ type: 'TX_RESPONSE', requestId: reqId, txHash });
-        console.log('[INJ Pass /auth] TX_RESPONSE sent via BroadcastChannel, requestId:', reqId);
+        console.log('[AgentOS /auth] TX_RESPONSE sent via BroadcastChannel, requestId:', reqId);
         bc.close();
       } catch (bcErr) {
-        console.error('[INJ Pass /auth] BroadcastChannel send failed:', bcErr);
+        console.error('[AgentOS /auth] BroadcastChannel send failed:', bcErr);
       }
 
       setCurrentTxRequest(null);
@@ -628,7 +628,7 @@ function AuthPageContent() {
     } catch (err) {
       const rawMsg = err instanceof Error ? err.message : 'Transaction failed';
       const friendlyMsg = friendlyErrorMessage(rawMsg);
-      console.error('[INJ Pass /auth] TX failed:', rawMsg);
+      console.error('[AgentOS /auth] TX failed:', rawMsg);
       showErrorToast(friendlyMsg);
       window.opener?.postMessage(
         {
@@ -682,8 +682,8 @@ function AuthPageContent() {
     const requestedAppOrigin = appOriginParam
       || (originParam !== window.location.origin ? originParam : null);
     if (requestedAppOrigin && !isValidOrigin(requestedAppOrigin)) {
-      showErrorToast('This app is not authorized to use INJ Pass.');
-      setErrorMessage('This app origin is not on the INJ Pass authorization allowlist.');
+      showErrorToast('This app is not authorized to use AgentOS.');
+      setErrorMessage('This app origin is not on the AgentOS authorization allowlist.');
       setStatus('error');
       return;
     }
@@ -715,7 +715,7 @@ function AuthPageContent() {
         }
         const effectiveAppOrigin = request.appOrigin || requestedAppOrigin;
         if (effectiveAppOrigin && !isValidOrigin(effectiveAppOrigin)) {
-          throw new Error('This app is not authorized to use INJ Pass.');
+          throw new Error('This app is not authorized to use AgentOS.');
         }
         const wallets = await reconcileWalletStorage();
         if (wallets.length === 0) {
@@ -737,7 +737,7 @@ function AuthPageContent() {
       } catch (err) {
         const rawMsg = err instanceof Error ? err.message : 'Connection failed';
         const friendlyMsg = friendlyErrorMessage(rawMsg);
-        console.error('[INJ Pass /auth] Connect failed:', rawMsg);
+        console.error('[AgentOS /auth] Connect failed:', rawMsg);
         showErrorToast(friendlyMsg);
         setErrorMessage(friendlyMsg);
         setStatus('error');
@@ -775,7 +775,7 @@ function AuthPageContent() {
           throw new Error('Wallet not found');
         }
 
-        setMessage('Unlocking your INJ Pass...');
+        setMessage('Unlocking your AgentOS...');
         const privateKey = await unlockWalletKey(keystore);
 
         setMessage('Signing message...');
@@ -810,7 +810,7 @@ function AuthPageContent() {
         const rawMsg =
           err instanceof Error ? err.message : 'Authentication failed';
         const friendlyMsg = friendlyErrorMessage(rawMsg);
-        console.error('[INJ Pass /auth] Auth failed:', rawMsg);
+        console.error('[AgentOS /auth] Auth failed:', rawMsg);
         showErrorToast(friendlyMsg);
         setErrorMessage(friendlyMsg);
         setStatus('error');
@@ -831,7 +831,7 @@ function AuthPageContent() {
       }
 
       if (event.source !== window.opener || event.origin !== originParam) {
-        console.warn('[INJ Pass /auth] Ignored protocol message with invalid origin', {
+        console.warn('[AgentOS /auth] Ignored protocol message with invalid origin', {
           type: event.data.type,
           actualOrigin: event.origin,
           expectedOrigin: originParam,
@@ -933,7 +933,7 @@ function AuthPageContent() {
 
   const title =
     status === 'select_wallet'
-      ? 'Choose an INJ Pass wallet'
+      ? 'Choose an AgentOS wallet'
       : status === 'recovering_wallet'
         ? 'Recover an existing Passkey wallet'
       : status === 'unlock_wallet'
@@ -949,16 +949,16 @@ function AuthPageContent() {
           : status === 'error'
             ? 'Authorization failed'
             : action === 'connect'
-              ? 'Connect your INJ Pass'
+              ? 'Connect your AgentOS'
               : 'Authorize secure action';
 
   const description =
     status === 'select_wallet'
-      ? `${callerLabel} is requesting an INJ Pass connection. Choose the wallet for this app session.`
+      ? `${callerLabel} is requesting an AgentOS connection. Choose the wallet for this app session.`
       : status === 'recovering_wallet'
-        ? 'Choose a Passkey already associated with your INJ Pass account.'
+        ? 'Choose a Passkey already associated with your AgentOS account.'
       : status === 'unlock_wallet'
-        ? 'Enter this wallet\'s local password. It stays inside this secure INJ Pass window.'
+        ? 'Enter this wallet\'s local password. It stays inside this secure AgentOS window.'
       : status === 'sign_pending'
       ? `Review the request from ${callerLabel} before approving it.`
       : status === 'tx_pending'
@@ -970,8 +970,8 @@ function AuthPageContent() {
       : status === 'error'
             ? errorMessage || 'An unexpected error occurred. Please try again.'
             : action === 'connect'
-              ? 'Your selected wallet stays self-custodial while INJ Pass opens the secure session.'
-              : 'INJ Pass is preparing the next authorization flow.';
+              ? 'Your selected wallet stays self-custodial while AgentOS opens the secure session.'
+              : 'AgentOS is preparing the next authorization flow.';
 
   return (
     <div
@@ -1016,10 +1016,10 @@ function AuthPageContent() {
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className={`text-[0.96rem] font-medium tracking-[-0.02em] ${isLightMode ? 'text-[#263144]' : 'text-white/[0.92]'}`}>
-              INJ Pass Authorization
+              AgentOS Authorization
             </div>
             <div className={`mt-1 text-xs ${headerTone}`}>
-              Agent Wallet for Injective
+              Agent Wallet for Monad
             </div>
           </div>
           <WelcomeThemeIconButton />
@@ -1096,7 +1096,7 @@ function AuthPageContent() {
                           {isTraditionalWallet(wallet) ? '24' : 'P'}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">{wallet.walletName || 'INJ Pass Wallet'}</span>
+                          <span className="block truncate text-sm font-semibold">{wallet.walletName || 'AgentOS Wallet'}</span>
                           <span className={`mt-1 block font-mono text-[10px] ${headerTone}`}>{truncateWalletAddress(wallet.address)}</span>
                         </span>
                         <span className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${isLightMode ? 'border-[#d5deed] text-[#59657a]' : 'border-white/10 text-white/58'}`}>
@@ -1132,7 +1132,7 @@ function AuthPageContent() {
                 }}
               >
                 <div className={`rounded-[22px] border px-4 py-4 ${surfaceTone}`}>
-                  <p className="text-sm font-semibold">{selectedWallet.walletName || 'INJ Pass Wallet'}</p>
+                  <p className="text-sm font-semibold">{selectedWallet.walletName || 'AgentOS Wallet'}</p>
                   <p className={`mt-1 font-mono text-[11px] ${headerTone}`}>{selectedWallet.address}</p>
                 </div>
 
@@ -1152,7 +1152,7 @@ function AuthPageContent() {
                   />
                 </label>
 
-                <p className={`mt-3 text-xs leading-5 ${headerTone}`}>The password decrypts this wallet only inside the INJ Pass authorization window. It is never shared with {callerLabel}.</p>
+                <p className={`mt-3 text-xs leading-5 ${headerTone}`}>The password decrypts this wallet only inside the AgentOS authorization window. It is never shared with {callerLabel}.</p>
                 {errorMessage ? <p className={`mt-3 text-xs leading-5 ${isLightMode ? 'text-rose-700' : 'text-rose-200'}`}>{errorMessage}</p> : null}
 
                 <div className="mt-auto grid grid-cols-2 gap-2.5 pt-5">
@@ -1200,7 +1200,7 @@ function AuthPageContent() {
                 </div>
 
                 <div className={`rounded-[22px] border px-4 py-3 text-sm ${isLightMode ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-amber-400/20 bg-amber-500/10 text-amber-100'}`}>
-                  Your approval is required. The selected wallet&apos;s private key never leaves this INJ Pass window.
+                  Your approval is required. The selected wallet&apos;s private key never leaves this AgentOS window.
                 </div>
 
                 <div className="mt-auto grid grid-cols-2 gap-2.5 pt-1">
@@ -1329,7 +1329,7 @@ function AuthPageContent() {
                     Security notice
                   </p>
                   <p className="mt-2 text-sm leading-6">
-                    INJ Pass authorizes from the wallet you selected. Passkey and traditional wallet secrets remain inside this secure window.
+                    AgentOS authorizes from the wallet you selected. Passkey and traditional wallet secrets remain inside this secure window.
                   </p>
                   {appOriginParam || originParam ? (
                     <p className={`mt-2 text-xs ${headerTone}`}>

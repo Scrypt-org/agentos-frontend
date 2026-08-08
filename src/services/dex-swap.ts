@@ -1,5 +1,5 @@
 /**
- * DEX Swap Service for Injective EVM
+ * DEX Swap Service for Monad
  * 
  * This service provides swap functionality using a Uniswap V2 compatible DEX.
  * 
@@ -24,11 +24,11 @@ import { DEFAULT_CHAIN_VIEM } from '@/types/chain';
 import { ROUTER_ABI, ERC20_ABI } from './dex-abi';
 import { getTokenInfo, getTokenAddress, isNativeToken, getWrappedToken, getTokenInfoByAddress } from './tokens';
 
-// ✅ CONFIGURED: Pumex RouterV2 address on Injective EVM Mainnet (Chain ID: 1776)
+// ✅ CONFIGURED: Pumex RouterV2 address on Monad Testnet (Chain ID: 1776)
 // Contract: https://blockscout.injective.network/address/0xC7247df0e97353D676d78f1cc55D3CE39eE32bE1
 // Verified: Yes
 // Name: RouterV2 (Uniswap V2 compatible)
-// Network: Injective EVM Mainnet
+// Network: Monad Testnet
 export const ROUTER_ADDRESS = '0xC7247df0e97353D676d78f1cc55D3CE39eE32bE1' as Address;
 
 // Router address configuration check

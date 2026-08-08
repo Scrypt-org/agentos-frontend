@@ -67,7 +67,7 @@ export default function PasskeyCreatePage() {
           <div style={styles.header}>
             <div style={styles.icon}>🔐</div>
             <h2 style={styles.title}>Passkey Login</h2>
-            <p style={styles.subtitle}>Access the Injective ecosystem</p>
+            <p style={styles.subtitle}>Access the Monad ecosystem</p>
           </div>
 
           {error && (
@@ -123,7 +123,7 @@ export default function PasskeyCreatePage() {
 
       <div style={styles.poweredBy}>
         <span style={styles.poweredByText}>Powered by</span>
-        <span style={styles.poweredByBrand}>Injective</span>
+        <span style={styles.poweredByBrand}>Monad</span>
       </div>
     </div>
   );

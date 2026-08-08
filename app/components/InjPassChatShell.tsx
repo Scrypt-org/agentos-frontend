@@ -381,7 +381,7 @@ const rewardBalanceLabels: Record<LanguageCode, {
 const shellCopyEn = {
   modeChat: 'Interact',
   modeCreate: 'Build',
-  brandSubtitle: 'AI wallet for Injective',
+  brandSubtitle: 'AI wallet for Monad',
   newChat: 'New chat',
   searchChats: 'Search chats',
   wallet: 'Wallet',
@@ -405,8 +405,8 @@ const shellCopyEn = {
   invalidRecipient: 'Enter a valid EVM or Cosmos address.',
   invalidAmount: 'Enter a valid INJ amount.',
   walletLocked: 'Unlock your wallet before sending assets.',
-  receiveEvmNote: 'Receive assets on Injective EVM. Always verify the network before transferring.',
-  receiveCosmosNote: 'Use this Injective Cosmos address for compatible Cosmos transfers.',
+  receiveEvmNote: 'Receive assets on Monad. Always verify the network before transferring.',
+  receiveCosmosNote: 'Use this Monad-compatible address for compatible Cosmos transfers.',
   open: 'Open',
   closed: 'Closed',
   view: 'view',
@@ -417,24 +417,24 @@ const shellCopyEn = {
   campaignBody: 'Start with $50B in simulated capital, trade global markets, use leverage, and see whether you can bankrupt Elon before the market bankrupts you.',
   joinCampaign: 'Start playing',
   skills: 'Skills',
-  skillsCaption: 'Reusable AgentOS capabilities for common Injective work.',
+  skillsCaption: 'Reusable AgentOS capabilities for common Monad work.',
   useSkill: 'Use skill',
   createSpace: 'Cloud Drive',
-  cloudDriveCaption: '100 MB of private, client-encrypted storage with Injective proof.',
+  cloudDriveCaption: '100 MB of private, client-encrypted storage with Monad proof.',
   cloudDriveOpen: 'Open drive',
   cloudDriveUpload: 'Upload',
   cloudDriveEmpty: 'This drive is empty.',
   cloudDriveLogin: 'Log in to open your private Cloud Drive.',
-  cloudDriveRoot: 'My INJ Pass Drive',
+  cloudDriveRoot: 'My AgentOS Drive',
   cloudDriveStored: 'Encrypted',
-  cloudDriveAnchored: 'On Injective',
+  cloudDriveAnchored: 'On Monad',
   cloudDriveAnchor: 'Anchor proof',
   cloudDriveDownload: 'Download',
   cloudDriveDelete: 'Delete',
   cloudDriveBack: 'This PC',
   cloudDriveEncrypting: 'Encrypting in this browser...',
   cloudDriveUploading: 'Uploading encrypted file...',
-  cloudDriveAnchoring: 'Writing proof to Injective...',
+  cloudDriveAnchoring: 'Writing proof to Monad...',
   searchAllMessages: 'Search every message in your conversations',
   searchNoResults: 'No matching conversation found.',
   searchLogin: 'Log in to search your saved conversations.',
@@ -452,11 +452,11 @@ const shellCopyEn = {
   preferences: 'General',
   preferencesCaption: 'Display, security, wallet, and account',
   account: 'Account',
-  accountLogin: 'Log in to manage or delete this INJ Pass account.',
+  accountLogin: 'Log in to manage or delete this AgentOS account.',
   deleteAccount: 'Delete account',
-  deleteAccountBody: 'Permanently remove this INJ Pass account, its server Passkey credential, conversations, skills, and encrypted Cloud Drive files.',
+  deleteAccountBody: 'Permanently remove this AgentOS account, its server Passkey credential, conversations, skills, and encrypted Cloud Drive files.',
   checkAssets: 'Check assets',
-  checkingAssets: 'Checking Injective assets...',
+  checkingAssets: 'Checking Monad assets...',
   assetsMustBeCleared: 'Clear every asset before deleting this account.',
   noAssetsRemain: 'No wallet assets remain. This account can be deleted.',
   sweepDestination: 'Destination EVM address',
@@ -466,7 +466,7 @@ const shellCopyEn = {
   deleteConfirmation: 'Type DELETE to confirm',
   irreversible: 'This cannot be undone.',
   deleteRequiresPasskey: 'A fresh system Passkey verification is required for final deletion.',
-  passkeyRemovalNote: 'INJ Pass removes the server credential and asks supported passkey providers to remove the system entry. You may still need to remove it manually from your password manager.',
+  passkeyRemovalNote: 'AgentOS removes the server credential and asks supported passkey providers to remove the system entry. You may still need to remove it manually from your password manager.',
   passkeyRemovalComplete: 'The passkey provider was notified that this credential is no longer valid.',
   accountDeleted: 'Account deleted',
   accountDeletedBody: 'The server account and local wallet were removed. On-chain transactions and file proofs remain public and immutable.',
@@ -475,9 +475,9 @@ const shellCopyEn = {
   community: 'Community',
   communityCaption: 'Telegram · t.me/injpass',
   support: 'Support',
-  supportCaption: 'Ask Eric about INJ Pass',
+  supportCaption: 'Ask Eric about AgentOS',
   searchPlaceholder: 'Search saved conversations',
-  history: 'Injective history',
+  history: 'Monad history',
   historyCaption: 'Transactions and approvals',
   back: 'Back',
   selected: 'Selected',
@@ -503,27 +503,27 @@ const shellCopyEn = {
   checkingSession: 'Checking session',
   walletConnected: 'Wallet connected',
   lightAccess: 'Light access',
-  placeholderChat: 'Ask INJ Pass or drop assets / dApps here',
-  placeholderCreate: 'Describe the dApp you want to build on Injective',
+  placeholderChat: 'Ask AgentOS or drop assets / dApps here',
+  placeholderCreate: 'Describe the dApp you want to build on Monad',
   titleDAppMarket: 'Apps',
-  titleAuthed: 'What should we do on Injective today?',
-  titleGuest: 'Start with an Injective task',
-  titleCreativeGuide: 'What do you want to create on Injective?',
+  titleAuthed: 'What should we do on Monad today?',
+  titleGuest: 'Start with an Monad task',
+  titleCreativeGuide: 'What do you want to create on Monad?',
   titleCreativePlan: 'AgentOS mapped the build',
-  titleCreativeBuilding: 'Building your Injective app',
+  titleCreativeBuilding: 'Building your Monad app',
   titleCreativePublished: 'Your source workspace is ready',
   securityTitle: 'Passkey security',
-  securityBody: 'Wallet access and sensitive Injective actions use your system Passkey for approval.',
+  securityBody: 'Wallet access and sensitive Monad actions use your system Passkey for approval.',
   upgradeWallet: 'Security settings',
-  guideActionTitle: 'Say what to do on Injective',
+  guideActionTitle: 'Say what to do on Monad',
   guideActionBody: 'Send, receive, swap, stake, claim, or ask for your wallet address in one sentence.',
   guideDropTitle: 'Drop assets into chat',
   guideDropBody: 'Bring a token, NFT, transaction, or portfolio item here and let AI explain or act on it.',
   guideDappTitle: 'Hand off a dApp',
-  guideDappBody: 'Drop a dApp into the composer and INJ Pass can inspect screens, prepare steps, and route wallet actions.',
+  guideDappBody: 'Drop a dApp into the composer and AgentOS can inspect screens, prepare steps, and route wallet actions.',
   guideReviewTitle: 'Review before signing',
   guideReviewBody: 'The AI prepares the operation; you still approve sensitive wallet actions before anything reaches chain.',
-  creativeGuideBody: 'Turn one idea into a working Injective product with architecture, contracts, source, testnet checks, and a live preview.',
+  creativeGuideBody: 'Turn one idea into a working Monad product with architecture, contracts, source, testnet checks, and a live preview.',
   pinnedEmpty: 'Pin apps from the market.',
   noSavedChats: 'No saved chats yet',
   confirmAction: 'Confirm agent action',
@@ -544,7 +544,7 @@ const shellCopyEn = {
   checkInReward: 'Claim 1 free LAM today',
   checkedIn: 'Checked in today',
   buyLam: 'Buy LAM with INJ',
-  buyLamBody: 'Injective payment, credited after confirmation',
+  buyLamBody: 'Monad payment, credited after confirmation',
   purchasing: 'Purchasing',
   purchaseComplete: 'LAM credited',
   refresh: 'Refresh',
@@ -571,7 +571,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
   de: {
     modeChat: 'Interaktion',
     modeCreate: 'Build',
-    brandSubtitle: 'Injective KI-Wallet',
+    brandSubtitle: 'Monad KI-Wallet',
     newChat: 'Neuer Chat',
     searchChats: 'Chats durchsuchen',
     wallet: 'Wallet',
@@ -590,11 +590,11 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     invalidRecipient: 'Gib eine gültige EVM- oder Cosmos-Adresse ein.',
     invalidAmount: 'Gib einen gültigen INJ-Betrag ein.',
     walletLocked: 'Entsperre zuerst deine Wallet.',
-    receiveEvmNote: 'Empfange Assets über Injective EVM und prüfe vor dem Transfer das Netzwerk.',
-    receiveCosmosNote: 'Diese Injective-Cosmos-Adresse ist für kompatible Cosmos-Transfers bestimmt.',
+    receiveEvmNote: 'Empfange Assets über Monad und prüfe vor dem Transfer das Netzwerk.',
+    receiveCosmosNote: 'Diese Monad-Adresse ist für kompatible Cosmos-Transfers bestimmt.',
     dappMarket: 'Apps',
     skills: 'Skills',
-    skillsCaption: 'Wiederverwendbare AgentOS-Fähigkeiten für Injective.',
+    skillsCaption: 'Wiederverwendbare AgentOS-Fähigkeiten für Monad.',
     useSkill: 'Skill verwenden',
     createSpace: 'Cloud-Speicher',
     recent: 'Zuletzt',
@@ -607,13 +607,13 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: 'Community',
     communityCaption: 'Telegram · t.me/injpass',
     support: 'Support',
-    supportCaption: 'Eric zu INJ Pass fragen',
+    supportCaption: 'Eric zu AgentOS fragen',
     searchPlaceholder: 'Gespeicherte Chats durchsuchen',
-    placeholderChat: 'INJ Pass fragen oder Assets / DApps ablegen',
-    placeholderCreate: 'Beschreibe die DApp, die du auf Injective bauen willst',
-    titleAuthed: 'Was möchtest du heute auf Injective erledigen?',
-    titleGuest: 'Starte mit einer Injective-Aufgabe',
-    titleCreativeGuide: 'Was möchtest du auf Injective bauen?',
+    placeholderChat: 'AgentOS fragen oder Assets / DApps ablegen',
+    placeholderCreate: 'Beschreibe die DApp, die du auf Monad bauen willst',
+    titleAuthed: 'Was möchtest du heute auf Monad erledigen?',
+    titleGuest: 'Starte mit einer Monad-Aufgabe',
+    titleCreativeGuide: 'Was möchtest du auf Monad bauen?',
     titleCreativePlan: 'AgentOS hat den Build geplant',
     agentThinking: 'Thinking...',
     poweredBy: 'Powered by',
@@ -621,7 +621,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
   'zh-Hans': {
     modeChat: '交互',
     modeCreate: '创造',
-    brandSubtitle: 'Injective AI 钱包',
+    brandSubtitle: 'Monad AI 钱包',
     newChat: '新建对话',
     searchChats: '搜索对话',
     wallet: '钱包',
@@ -643,8 +643,8 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     invalidRecipient: '请输入有效的 EVM 或 Cosmos 地址。',
     invalidAmount: '请输入有效的 INJ 数量。',
     walletLocked: '请先解锁钱包再发送资产。',
-    receiveEvmNote: '通过 Injective EVM 接收资产，转账前请确认网络。',
-    receiveCosmosNote: '此 Injective Cosmos 地址可用于兼容的 Cosmos 转账。',
+    receiveEvmNote: '通过 Monad 接收资产，转账前请确认网络。',
+    receiveCosmosNote: '此 Monad 兼容地址可用于兼容的 转账。',
     open: '已展开',
     closed: '已折叠',
     view: '查看',
@@ -655,24 +655,24 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     campaignBody: '带着 500 亿美元模拟资金进入全球市场，买卖资产、使用杠杆，看看是你先让马斯克倾家荡产，还是市场先让你爆仓。',
     joinCampaign: '开始挑战',
     skills: '技能',
-    skillsCaption: '用于常见 Injective 操作的可复用 AgentOS 能力。',
+    skillsCaption: '用于常见 Monad 操作的可复用 AgentOS 能力。',
     useSkill: '使用技能',
     createSpace: '云盘',
-    cloudDriveCaption: '100 MB 私密空间：文件只在本机加密，并将完整性凭证写入 Injective。',
+    cloudDriveCaption: '100 MB 私密空间：文件只在本机加密，并将完整性凭证写入 Monad。',
     cloudDriveOpen: '打开云盘',
     cloudDriveUpload: '上传文件',
     cloudDriveEmpty: '云盘还是空的。',
     cloudDriveLogin: '登录后即可打开你的私密云盘。',
-    cloudDriveRoot: '我的 INJ Pass 云盘',
+    cloudDriveRoot: '我的 AgentOS 云盘',
     cloudDriveStored: '已加密',
-    cloudDriveAnchored: '已上 Injective',
+    cloudDriveAnchored: '已上 Monad',
     cloudDriveAnchor: '写入链上凭证',
     cloudDriveDownload: '下载',
     cloudDriveDelete: '删除',
     cloudDriveBack: '此电脑',
     cloudDriveEncrypting: '正在本机加密...',
     cloudDriveUploading: '正在上传密文...',
-    cloudDriveAnchoring: '正在写入 Injective 凭证...',
+    cloudDriveAnchoring: '正在写入 Monad 凭证...',
     recent: '最近',
     loading: '加载中',
     totalBalance: '总余额',
@@ -687,11 +687,11 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     preferences: '通用',
     preferencesCaption: '显示、安全、钱包与账户',
     account: '账户',
-    accountLogin: '登录后即可管理或删除此 INJ Pass 账户。',
+    accountLogin: '登录后即可管理或删除此 AgentOS 账户。',
     deleteAccount: '删除账户',
-    deleteAccountBody: '永久删除此 INJ Pass 账户、服务端 Passkey 凭据、对话、技能和云盘密文。',
+    deleteAccountBody: '永久删除此 AgentOS 账户、服务端 Passkey 凭据、对话、技能和云盘密文。',
     checkAssets: '检查资产',
-    checkingAssets: '正在检查 Injective 资产...',
+    checkingAssets: '正在检查 Monad 资产...',
     assetsMustBeCleared: '删除前必须清空您的全部资产。',
     noAssetsRemain: '钱包资产已清空，可以删除账户。',
     sweepDestination: '目标 EVM 地址',
@@ -701,7 +701,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     deleteConfirmation: '输入 DELETE 确认',
     irreversible: '此操作不可恢复。',
     deleteRequiresPasskey: '最终删除前需要重新进行一次系统 Passkey 验证。',
-    passkeyRemovalNote: 'INJ Pass 会删除服务端凭据，并通知支持该能力的 Passkey 管理器移除系统凭据；部分系统仍需在密码管理器中手动删除。',
+    passkeyRemovalNote: 'AgentOS 会删除服务端凭据，并通知支持该能力的 Passkey 管理器移除系统凭据；部分系统仍需在密码管理器中手动删除。',
     passkeyRemovalComplete: '已通知系统 Passkey 管理器此凭据不再有效。',
     accountDeleted: '账户已删除',
     accountDeletedBody: '服务端账户和本地钱包已经移除。链上交易和文件存证属于公开且不可更改的数据，无法删除。',
@@ -710,12 +710,12 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: '社群',
     communityCaption: 'Telegram · t.me/injpass',
     support: '支持',
-    supportCaption: '向 Eric 咨询 INJ Pass',
+    supportCaption: '向 Eric 咨询 AgentOS',
     searchPlaceholder: '搜索已保存的对话',
     searchAllMessages: '搜索所有对话正文',
     searchNoResults: '没有找到包含该内容的对话。',
     searchLogin: '登录后即可搜索已保存的对话。',
-    history: 'Injective 历史',
+    history: 'Monad 历史',
     historyCaption: '交易与授权记录',
     back: '返回',
     selected: '已选择',
@@ -741,24 +741,24 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     checkingSession: '检查会话中',
     walletConnected: '钱包已连接',
     lightAccess: '轻量访问',
-    placeholderChat: '询问 INJ Pass，或拖入资产 / DApp',
-    placeholderCreate: '描述你想在 Injective 上构建的 DApp',
+    placeholderChat: '询问 AgentOS，或拖入资产 / DApp',
+    placeholderCreate: '描述你想在 Monad 上构建的 DApp',
     titleDAppMarket: '应用',
-    titleAuthed: '今天想在 Injective 做什么？',
-    titleGuest: '从一个 Injective 任务开始',
-    titleCreativeGuide: '你想在 Injective 上创造什么？',
+    titleAuthed: '今天想在 Monad 做什么？',
+    titleGuest: '从一个 Monad 任务开始',
+    titleCreativeGuide: '你想在 Monad 上创造什么？',
     titleCreativePlan: 'AgentOS 已生成构建图谱',
-    titleCreativeBuilding: '正在构建你的 Injective 应用',
+    titleCreativeBuilding: '正在构建你的 Monad 应用',
     titleCreativePublished: '你的应用可以预览了',
     securityTitle: 'Passkey 安全',
-    securityBody: '钱包访问和敏感 Injective 操作会调用系统 Passkey，由你本人确认后执行。',
+    securityBody: '钱包访问和敏感 Monad 操作会调用系统 Passkey，由你本人确认后执行。',
     upgradeWallet: '安全设置',
-    guideActionTitle: '直接说 Injective 操作',
+    guideActionTitle: '直接说 Monad 操作',
     guideActionBody: '发送、接收、兑换、质押、领取，或者一句话查询自己的钱包地址。',
     guideDropTitle: '把资产拖进聊天框',
     guideDropBody: '把 Token、NFT、交易或资产组合拖进来，让 AI 解释、检查或接手下一步。',
     guideDappTitle: '把 DApp 交给 AI',
-    guideDappBody: '拖入 DApp 后，INJ Pass 可以检查页面、准备步骤，并路由钱包操作。',
+    guideDappBody: '拖入 DApp 后，AgentOS 可以检查页面、准备步骤，并路由钱包操作。',
     guideReviewTitle: '签名前确认',
     guideReviewBody: 'AI 会准备操作，但敏感钱包行为仍由你确认后才会上链。',
     creativeGuideBody: '从一个想法开始，AgentOS 会梳理产品架构、合约、前后端源码、测试网检查与实时预览。',
@@ -782,7 +782,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     checkInReward: '今天免费领取 1 LAM',
     checkedIn: '今日已签到',
     buyLam: '使用 INJ 购买 LAM',
-    buyLamBody: 'Injective 支付，确认后自动到账',
+    buyLamBody: 'Monad 支付，确认后自动到账',
     purchasing: '购买中',
     purchaseComplete: 'LAM 已到账',
     refresh: '刷新',
@@ -803,7 +803,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
   fr: {
     modeChat: 'Interagir',
     modeCreate: 'Créer',
-    brandSubtitle: 'Portefeuille IA pour Injective',
+    brandSubtitle: 'Portefeuille IA pour Monad',
     newChat: 'Nouvelle conversation',
     searchChats: 'Rechercher',
     wallet: 'Portefeuille',
@@ -825,20 +825,20 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     invalidRecipient: 'Saisissez une adresse EVM ou Cosmos valide.',
     invalidAmount: 'Saisissez un montant INJ valide.',
     walletLocked: 'Déverrouillez votre portefeuille avant l’envoi.',
-    receiveEvmNote: 'Recevez des actifs sur Injective EVM. Vérifiez toujours le réseau avant le transfert.',
-    receiveCosmosNote: 'Utilisez cette adresse Injective Cosmos pour les transferts Cosmos compatibles.',
+    receiveEvmNote: 'Recevez des actifs sur Monad. Vérifiez toujours le réseau avant le transfert.',
+    receiveCosmosNote: 'Utilisez cette adresse compatible Monad pour les transferts Cosmos compatibles.',
     dappMarket: 'Applications',
     campaign: 'Campagne',
     skills: 'Compétences',
     createSpace: 'Cloud Drive',
-    cloudDriveCaption: '100 Mo de stockage privé, chiffré côté client, avec preuve Injective.',
+    cloudDriveCaption: '100 Mo de stockage privé, chiffré côté client, avec preuve Monad.',
     cloudDriveOpen: 'Ouvrir le disque',
     cloudDriveUpload: 'Importer',
     cloudDriveEmpty: 'Ce disque est vide.',
     cloudDriveLogin: 'Connectez-vous pour ouvrir votre Cloud Drive privé.',
-    cloudDriveRoot: 'Mon disque INJ Pass',
+    cloudDriveRoot: 'Mon disque AgentOS',
     cloudDriveStored: 'Chiffré',
-    cloudDriveAnchored: 'Sur Injective',
+    cloudDriveAnchored: 'Sur Monad',
     cloudDriveAnchor: 'Ancrer la preuve',
     cloudDriveDownload: 'Télécharger',
     cloudDriveDelete: 'Supprimer',
@@ -864,11 +864,11 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     theme: 'Thème',
     light: 'Clair',
     dark: 'Sombre',
-    placeholderChat: 'Demandez à INJ Pass ou déposez des actifs / DApps',
-    placeholderCreate: 'Décrivez la DApp à créer sur Injective',
-    titleAuthed: 'Que voulez-vous faire sur Injective aujourd’hui ?',
-    titleGuest: 'Commencez par une tâche Injective',
-    titleCreativeGuide: 'Que voulez-vous créer sur Injective ?',
+    placeholderChat: 'Demandez à AgentOS ou déposez des actifs / DApps',
+    placeholderCreate: 'Décrivez la DApp à créer sur Monad',
+    titleAuthed: 'Que voulez-vous faire sur Monad aujourd’hui ?',
+    titleGuest: 'Commencez par une tâche Monad',
+    titleCreativeGuide: 'Que voulez-vous créer sur Monad ?',
     titleCreativePlan: 'AgentOS a préparé le plan de création',
     agentThinking: 'Thinking...',
     close: 'Fermer',
@@ -879,7 +879,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
   'zh-Hant': {
     modeChat: '互動',
     modeCreate: '創造',
-    brandSubtitle: 'Injective AI 錢包',
+    brandSubtitle: 'Monad AI 錢包',
     newChat: '新增對話',
     searchChats: '搜尋對話',
     wallet: '錢包',
@@ -898,30 +898,30 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     invalidRecipient: '請輸入有效的 EVM 或 Cosmos 地址。',
     invalidAmount: '請輸入有效的 INJ 數量。',
     walletLocked: '請先解鎖錢包。',
-    receiveEvmNote: '透過 Injective EVM 接收資產，轉帳前請確認網路。',
-    receiveCosmosNote: '此 Injective Cosmos 地址可用於相容的 Cosmos 轉帳。',
+    receiveEvmNote: '透過 Monad 接收資產，轉帳前請確認網路。',
+    receiveCosmosNote: '此 Monad 相容地址可用於相容的 轉帳。',
     open: '已展開',
     closed: '已折疊',
     dappMarket: '應用',
     skills: '技能',
-    skillsCaption: '用於常見 Injective 操作的可重用 AgentOS 能力。',
+    skillsCaption: '用於常見 Monad 操作的可重用 AgentOS 能力。',
     useSkill: '使用技能',
     createSpace: '雲端硬碟',
-    cloudDriveCaption: '100 MB 私密空間：檔案只在本機加密，並將完整性憑證寫入 Injective。',
+    cloudDriveCaption: '100 MB 私密空間：檔案只在本機加密，並將完整性憑證寫入 Monad。',
     cloudDriveOpen: '開啟雲端硬碟',
     cloudDriveUpload: '上傳檔案',
     cloudDriveEmpty: '雲端硬碟還是空的。',
     cloudDriveLogin: '登入後即可開啟你的私密雲端硬碟。',
-    cloudDriveRoot: '我的 INJ Pass 雲端硬碟',
+    cloudDriveRoot: '我的 AgentOS 雲端硬碟',
     cloudDriveStored: '已加密',
-    cloudDriveAnchored: '已上 Injective',
+    cloudDriveAnchored: '已上 Monad',
     cloudDriveAnchor: '寫入鏈上憑證',
     cloudDriveDownload: '下載',
     cloudDriveDelete: '刪除',
     cloudDriveBack: '此電腦',
     cloudDriveEncrypting: '正在本機加密...',
     cloudDriveUploading: '正在上傳密文...',
-    cloudDriveAnchoring: '正在寫入 Injective 憑證...',
+    cloudDriveAnchoring: '正在寫入 Monad 憑證...',
     preferences: '一般',
     preferencesCaption: '顯示、安全、錢包與帳戶',
     account: '帳戶',
@@ -931,7 +931,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: '社群',
     communityCaption: 'Telegram · t.me/injpass',
     support: '支援',
-    supportCaption: '向 Eric 諮詢 INJ Pass',
+    supportCaption: '向 Eric 諮詢 AgentOS',
     searchPlaceholder: '搜尋已儲存的對話',
     searchAllMessages: '搜尋所有對話正文',
     searchNoResults: '沒有找到包含該內容的對話。',
@@ -940,11 +940,11 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     totalBalance: '總餘額',
     logIn: '登入',
     settings: '設定',
-    placeholderChat: '詢問 INJ Pass，或拖入資產 / DApp',
-    placeholderCreate: '描述你想在 Injective 上構建的 DApp',
-    titleAuthed: '今天想在 Injective 做什麼？',
-    titleGuest: '從一個 Injective 任務開始',
-    titleCreativeGuide: '你想在 Injective 上創造什麼？',
+    placeholderChat: '詢問 AgentOS，或拖入資產 / DApp',
+    placeholderCreate: '描述你想在 Monad 上構建的 DApp',
+    titleAuthed: '今天想在 Monad 做什麼？',
+    titleGuest: '從一個 Monad 任務開始',
+    titleCreativeGuide: '你想在 Monad 上創造什麼？',
     titleCreativePlan: 'AgentOS 已生成構建圖譜',
     agentThinking: 'Thinking...',
     poweredBy: 'Powered by',
@@ -957,7 +957,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
   ja: {
     modeChat: '操作',
     modeCreate: 'Build',
-    brandSubtitle: 'Injective の AI ウォレット',
+    brandSubtitle: 'Monad の AI ウォレット',
     newChat: '新規チャット',
     searchChats: 'チャット検索',
     wallet: 'ウォレット',
@@ -976,13 +976,13 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     invalidRecipient: '有効な EVM または Cosmos アドレスを入力してください。',
     invalidAmount: '有効な INJ 数量を入力してください。',
     walletLocked: '先にウォレットをロック解除してください。',
-    receiveEvmNote: 'Injective EVM で資産を受け取ります。送金前にネットワークを確認してください。',
-    receiveCosmosNote: 'この Injective Cosmos アドレスは対応する Cosmos 送金に使用できます。',
+    receiveEvmNote: 'Monad で資産を受け取ります。送金前にネットワークを確認してください。',
+    receiveCosmosNote: 'この Monad 互換アドレスは対応する Cosmos 送金に使用できます。',
     open: '展開中',
     closed: '折りたたみ',
     dappMarket: 'アプリ',
     skills: 'スキル',
-    skillsCaption: 'Injective の作業に使える再利用可能な AgentOS 機能。',
+    skillsCaption: 'Monad の作業に使える再利用可能な AgentOS 機能。',
     useSkill: 'スキルを使う',
     createSpace: 'クラウドドライブ',
     recent: '最近',
@@ -998,13 +998,13 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: 'コミュニティ',
     communityCaption: 'Telegram · t.me/injpass',
     support: 'サポート',
-    supportCaption: 'Eric に INJ Pass を相談',
+    supportCaption: 'Eric に AgentOS を相談',
     searchPlaceholder: '保存したチャットを検索',
-    placeholderChat: 'INJ Pass に聞く、または資産 / DApp をドロップ',
-    placeholderCreate: 'Injective で作りたい DApp を説明',
-    titleAuthed: '今日は Injective で何をしますか？',
-    titleGuest: 'Injective のタスクから始める',
-    titleCreativeGuide: 'Injective で何を作りますか？',
+    placeholderChat: 'AgentOS に聞く、または資産 / DApp をドロップ',
+    placeholderCreate: 'Monad で作りたい DApp を説明',
+    titleAuthed: '今日は Monad で何をしますか？',
+    titleGuest: 'Monad のタスクから始める',
+    titleCreativeGuide: 'Monad で何を作りますか？',
     titleCreativePlan: 'AgentOS がビルド図を作成しました',
     agentThinking: 'Thinking...',
     poweredBy: 'Powered by',
@@ -1015,7 +1015,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
   ko: {
     modeChat: '상호작용',
     modeCreate: 'Build',
-    brandSubtitle: 'Injective AI 지갑',
+    brandSubtitle: 'Monad AI 지갑',
     newChat: '새 채팅',
     searchChats: '채팅 검색',
     wallet: '지갑',
@@ -1034,13 +1034,13 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     invalidRecipient: '올바른 EVM 또는 Cosmos 주소를 입력하세요.',
     invalidAmount: '올바른 INJ 수량을 입력하세요.',
     walletLocked: '먼저 지갑 잠금을 해제하세요.',
-    receiveEvmNote: 'Injective EVM으로 자산을 받습니다. 전송 전에 네트워크를 확인하세요.',
-    receiveCosmosNote: '이 Injective Cosmos 주소는 호환되는 Cosmos 전송에 사용할 수 있습니다.',
+    receiveEvmNote: 'Monad으로 자산을 받습니다. 전송 전에 네트워크를 확인하세요.',
+    receiveCosmosNote: '이 Monad 호환 주소는 호환되는 Cosmos 전송에 사용할 수 있습니다.',
     open: '열림',
     closed: '닫힘',
     dappMarket: '앱',
     skills: '스킬',
-    skillsCaption: 'Injective 작업에 재사용할 수 있는 AgentOS 기능입니다.',
+    skillsCaption: 'Monad 작업에 재사용할 수 있는 AgentOS 기능입니다.',
     useSkill: '스킬 사용',
     createSpace: '클라우드 드라이브',
     recent: '최근',
@@ -1056,13 +1056,13 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: '커뮤니티',
     communityCaption: 'Telegram · t.me/injpass',
     support: '지원',
-    supportCaption: 'Eric에게 INJ Pass 문의',
+    supportCaption: 'Eric에게 AgentOS 문의',
     searchPlaceholder: '저장된 채팅 검색',
-    placeholderChat: 'INJ Pass에 묻거나 자산 / DApp을 드롭',
-    placeholderCreate: 'Injective에서 만들 DApp을 설명',
-    titleAuthed: '오늘 Injective에서 무엇을 할까요?',
-    titleGuest: 'Injective 작업으로 시작하기',
-    titleCreativeGuide: 'Injective에서 무엇을 만들까요?',
+    placeholderChat: 'AgentOS에 묻거나 자산 / DApp을 드롭',
+    placeholderCreate: 'Monad에서 만들 DApp을 설명',
+    titleAuthed: '오늘 Monad에서 무엇을 할까요?',
+    titleGuest: 'Monad 작업으로 시작하기',
+    titleCreativeGuide: 'Monad에서 무엇을 만들까요?',
     titleCreativePlan: 'AgentOS가 빌드 그래프를 만들었습니다',
     agentThinking: 'Thinking...',
     poweredBy: 'Powered by',
@@ -1093,7 +1093,7 @@ const dappMarketApps: DAppMarketItem[] = [
     id: 'ai-token-lottery',
     name: 'AI Token Lucky Draw',
     category: 'Campaign',
-    body: 'One guaranteed reward for newly registered INJ Pass wallets, usable in AI Chat for 30 days.',
+    body: 'One guaranteed reward for newly registered AgentOS wallets, usable in AI Chat for 30 days.',
     accent: 'from-violet-400 via-fuchsia-400 to-amber-300',
     icon: '/ai-token-lottery.svg',
     aiDriven: true,
@@ -1119,186 +1119,55 @@ const dappMarketApps: DAppMarketItem[] = [
     aiDriven: true,
   },
   {
-    id: 'helix',
-    name: 'Helix',
-    category: 'Exchange',
-    body: 'Spot, perpetuals, portfolio review, and trading workflows.',
-    accent: 'from-cyan-400 to-blue-500',
-    url: 'https://helixapp.com',
-    icon: getDAppIconUrl('https://helixapp.com'),
-    aiDriven: false,
-  },
-  {
-    id: 'injective-hub',
-    name: 'Injective Hub',
-    category: 'Governance & Staking',
-    body: 'Governance, staking, portfolio routes, and core Injective account actions.',
-    accent: 'from-indigo-400 to-sky-500',
-    url: 'https://hub.injective.network',
-    icon: '/injlogo.png',
-    aiDriven: false,
-  },
-  {
-    id: 'n1nj4',
-    name: 'N1nj4',
-    category: 'NFT Marketplace',
-    body: 'Discover Injective NFT collections, ownership, listings, and marketplace activity.',
-    accent: 'from-zinc-600 to-black',
-    url: 'https://n1nj4.com',
-    icon: '/N1NJ4.png',
-    aiDriven: false,
-  },
-  {
-    id: 'rarible',
-    name: 'Rarible',
-    category: 'Multichain NFT Marketplace',
-    body: 'Browse multichain NFT collections, listings, ownership, and offers.',
-    accent: 'from-yellow-300 to-lime-400',
-    url: 'https://rarible.com',
-    icon: getDAppIconUrl('https://rarible.com'),
-    aiDriven: false,
-  },
-  {
-    id: 'talis',
-    name: 'Talis',
-    category: 'NFTs',
-    body: 'NFT collection browsing, listing review, ownership checks, and offers.',
-    accent: 'from-pink-400 to-rose-500',
-    url: 'https://talis.art',
-    icon: getDAppIconUrl('https://talis.art'),
-    aiDriven: false,
-  },
-  {
-    id: 'choice',
-    name: 'Choice',
-    category: 'DEX Aggregator & Vaults',
-    body: 'Compare swap routes, vault positions, liquidity, and execution options.',
-    accent: 'from-cyan-400 to-violet-500',
-    url: 'https://choice.exchange',
-    icon: getDAppIconUrl('https://choice.exchange'),
-    aiDriven: false,
-  },
-  {
-    id: 'paradyze',
-    name: 'Paradyze',
-    category: 'Yield & Structured Products',
-    body: 'Explore structured yield strategies, positions, rewards, and risk.',
-    accent: 'from-fuchsia-400 to-indigo-500',
-    url: 'https://paradyze.io',
-    icon: getDAppIconUrl('https://paradyze.io'),
-    aiDriven: false,
-  },
-  {
-    id: 'name-service',
-    name: 'Name Service',
-    category: '.inj Domain Names',
-    body: 'Search, register, and manage human-readable Injective domain names.',
-    accent: 'from-blue-400 to-indigo-500',
-    url: 'https://injective.name',
-    icon: getDAppIconUrl('https://injective.name'),
-    aiDriven: false,
-  },
-  {
-    id: 'hydro',
-    name: 'Hydro',
-    category: 'Staking',
-    body: 'Liquid staking, yield routes, reward checks, and position actions.',
-    accent: 'from-emerald-400 to-teal-500',
-    url: 'https://hydro.injective.network',
-    icon: getDAppIconUrl('https://hydro.injective.network'),
-    aiDriven: false,
-  },
-  {
-    id: 'dojoswap',
-    name: 'DojoSwap',
-    category: 'AMM',
-    body: 'Swap routes, liquidity pools, token discovery, and fee review.',
-    accent: 'from-amber-300 to-orange-500',
-    url: 'https://dojo.trading',
-    icon: getDAppIconUrl('https://dojo.trading'),
-    aiDriven: false,
-  },
-  {
-    id: 'injscan',
-    name: 'InjScan',
+    id: 'monad-explorer',
+    name: 'Monad Explorer',
     category: 'Explorer',
-    body: 'Transactions, address history, approvals, and contract inspection.',
+    body: 'Transactions, address history, approvals, and contract inspection on Monad Testnet.',
     accent: 'from-slate-400 to-zinc-700',
-    url: 'https://injscan.com',
-    icon: getDAppIconUrl('https://injscan.com'),
-    aiDriven: false,
-  },
-  {
-    id: 'blockscout',
-    name: 'Blockscout',
-    category: 'Explorer',
-    body: 'Injective EVM contracts, transactions, token transfers, and verification checks.',
-    accent: 'from-lime-400 to-emerald-500',
-    url: 'https://blockscout.injective.network',
-    icon: getDAppIconUrl('https://blockscout.injective.network'),
+    url: 'https://testnet.monadexplorer.com',
+    icon: getDAppIconUrl('https://testnet.monadexplorer.com'),
     aiDriven: false,
   },
 ];
 
-const comingSoonDAppOrder = [
-  'Helix',
-  'Injective Hub',
-  'N1nj4',
-  'Rarible',
-  'Talis',
-  'Choice',
-  'Paradyze',
-  'Name Service',
-  'Hydro',
-  'DojoSwap',
-  'InjScan',
-  'Blockscout',
-] as const;
+const comingSoonDAppOrder: readonly string[] = [];
 
 const composerSkills: AgentSkill[] = [
   {
-    id: 'injective-portfolio-lens',
+    id: 'monad-portfolio-lens',
     name: 'Portfolio Lens',
-    body: 'Inspect Injective assets, positions, exposure, and recent changes.',
-    prompt: 'Analyze my complete Injective portfolio and highlight the most important changes and risks.',
-    app: 'Injective',
+    body: 'Inspect Monad assets, positions, exposure, and recent changes.',
+    prompt: 'Analyze my complete Monad portfolio and highlight the most important changes and risks.',
+    app: 'Monad',
     popularity: 9820,
     official: true,
   },
   {
-    id: 'injective-transaction-guard',
+    id: 'monad-transaction-guard',
     name: 'Transaction Guard',
     body: 'Review approvals and transaction intent before wallet confirmation.',
     prompt: 'Review my recent approvals and explain which permissions I should revoke or keep.',
-    app: 'Injective',
+    app: 'Monad',
     popularity: 8740,
     official: true,
   },
   {
-    id: 'injective-research',
-    name: 'Injective Research',
+    id: 'monad-research',
+    name: 'Monad Research',
     body: 'Turn ecosystem activity and protocol data into a concise research brief.',
-    prompt: 'Prepare a concise research brief on the most important recent Injective ecosystem activity.',
-    app: 'Injective',
+    prompt: 'Prepare a concise research brief on the most important recent Monad ecosystem activity.',
+    app: 'Monad',
     popularity: 8120,
     official: true,
   },
   {
-    id: 'injective-contract-studio',
+    id: 'monad-contract-studio',
     name: 'Contract Studio',
     body: 'Shape a contract idea into requirements, architecture, and a build plan.',
-    prompt: 'Help me turn my smart contract idea into clear requirements and an Injective build plan.',
-    app: 'Injective EVM',
+    prompt: 'Help me turn my smart contract idea into clear requirements and a Monad build plan.',
+    app: 'Monad',
     popularity: 7650,
     official: true,
-  },
-  {
-    id: 'helix-swap-route',
-    name: 'Swap Route Guard',
-    body: 'Compare route, slippage, price impact, and approvals before a swap.',
-    prompt: 'Use Helix to prepare the safest swap route and explain slippage and approvals before signing.',
-    app: 'Helix',
-    popularity: 6410,
   },
   {
     id: 'bankrupt-elon-market-order',
@@ -1319,13 +1188,13 @@ const composerSkills: AgentSkill[] = [
 ];
 
 const chatShortcutsByLanguage: Record<LanguageCode, string[]> = {
-  en: ['Show my wallet address', 'Send 5 INJ to a contact', 'Swap USDT to INJ', 'Open this dApp and claim rewards', 'Review my approvals', 'Show all my assets', 'Check my recent activity', 'Receive INJ into Main'],
-  de: ['Meine Wallet-Adresse anzeigen', '5 INJ an einen Kontakt senden', 'USDT in INJ tauschen', 'Diese dApp öffnen und Belohnungen abholen', 'Meine Freigaben prüfen', 'Alle Assets anzeigen', 'Letzte Aktivitäten prüfen', 'INJ in Main empfangen'],
-  fr: ['Afficher mon adresse', 'Envoyer 5 INJ à un contact', 'Échanger USDT contre INJ', 'Ouvrir cette DApp et réclamer les récompenses', 'Vérifier mes autorisations', 'Afficher tous mes actifs', 'Voir mon activité récente', 'Recevoir des INJ dans Main'],
-  ko: ['내 지갑 주소 보기', '연락처에 5 INJ 보내기', 'USDT를 INJ로 스왑', '이 dApp을 열고 보상 받기', '내 승인 내역 검토', '모든 자산 보기', '최근 활동 확인', 'Main으로 INJ 받기'],
-  ja: ['ウォレットアドレスを表示', '連絡先に 5 INJ を送る', 'USDT を INJ にスワップ', 'この dApp を開いて報酬を受け取る', '承認履歴を確認', 'すべての資産を表示', '最近の履歴を確認', 'Main で INJ を受け取る'],
-  'zh-Hans': ['显示我的钱包地址', '向联系人发送 5 INJ', '将 USDT 兑换为 INJ', '打开这个 DApp 并领取奖励', '检查我的授权', '查看我的全部资产', '检查最近的操作记录', '用 Main 接收 INJ'],
-  'zh-Hant': ['顯示我的錢包地址', '向聯絡人發送 5 INJ', '將 USDT 兌換為 INJ', '開啟這個 DApp 並領取獎勵', '檢查我的授權', '查看我的全部資產', '檢查最近的操作紀錄', '用 Main 接收 INJ'],
+  en: ['Show my wallet address', 'Send 5 MON to a contact', 'Claim testnet MON from the faucet', 'Open this dApp and claim rewards', 'Review my approvals', 'Show all my assets', 'Check my recent activity', 'Receive MON into Main'],
+  de: ['Meine Wallet-Adresse anzeigen', '5 MON an einen Kontakt senden', 'Testnet-MON aus dem Faucet holen', 'Diese dApp öffnen und Belohnungen abholen', 'Meine Freigaben prüfen', 'Alle Assets anzeigen', 'Letzte Aktivitäten prüfen', 'MON in Main empfangen'],
+  fr: ['Afficher mon adresse', 'Envoyer 5 MON à un contact', 'Réclamer du MON testnet via le faucet', 'Ouvrir cette DApp et réclamer les récompenses', 'Vérifier mes autorisations', 'Afficher tous mes actifs', 'Voir mon activité récente', 'Recevoir des MON dans Main'],
+  ko: ['내 지갑 주소 보기', '연락처에 5 MON 보내기', '수도꼭지에서 테스트넷 MON 받기', '이 dApp을 열고 보상 받기', '내 승인 내역 검토', '모든 자산 보기', '최근 활동 확인', 'Main으로 MON 받기'],
+  ja: ['ウォレットアドレスを表示', '連絡先に 5 MON を送る', 'フォーセットでテストネット MON を受け取る', 'この dApp を開いて報酬を受け取る', '承認履歴を確認', 'すべての資産を表示', '最近の履歴を確認', 'Main で MON を受け取る'],
+  'zh-Hans': ['显示我的钱包地址', '向联系人发送 5 MON', '从水龙头领取测试网 MON', '打开这个 DApp 并领取奖励', '检查我的授权', '查看我的全部资产', '检查最近的操作记录', '用 Main 接收 MON'],
+  'zh-Hant': ['顯示我的錢包地址', '向聯絡人發送 5 MON', '從水龍頭領取測試網 MON', '開啟這個 DApp 並領取獎勵', '檢查我的授權', '查看我的全部資產', '檢查最近的操作紀錄', '用 Main 接收 MON'],
 };
 
 const newUserGuideLabelByLanguage: Record<LanguageCode, string> = {
@@ -1384,18 +1253,18 @@ function formatCreativeSkillDemoSegments(
 }
 
 const guestSlogansByLanguage: Record<LanguageCode, string[]> = {
-  en: ['Start with an Injective task', 'What will you do on Injective today?', 'Onchain finance is happening on Injective', 'Make Injective Great Again', 'In Eric We Trust', 'Put your next idea on Injective'],
-  de: ['Starte mit einer Injective-Aufgabe', 'Was machst du heute auf Injective?', 'Onchain-Finanzwelt entsteht auf Injective', 'Make Injective Great Again', 'In Eric We Trust', 'Bring deine nächste Idee auf Injective'],
-  fr: ['Commencez par une tâche Injective', 'Que ferez-vous sur Injective aujourd’hui ?', 'La finance on-chain se construit sur Injective', 'Make Injective Great Again', 'In Eric We Trust', 'Placez votre prochaine idée sur Injective'],
-  ko: ['Injective 작업으로 시작하기', '오늘 Injective에서 무엇을 할까요?', '온체인 금융은 Injective에서 일어나고 있습니다', 'Make Injective Great Again', 'In Eric We Trust', '다음 아이디어를 Injective에 올리세요'],
-  ja: ['Injective のタスクから始める', '今日は Injective で何をしますか？', 'オンチェーン金融は Injective で動いている', 'Make Injective Great Again', 'In Eric We Trust', '次のアイデアを Injective へ'],
-  'zh-Hans': ['从一个 Injective 任务开始', '今天想在 Injective 做点什么？', '链上金融正在 Injective 上发生', 'Make Injective Great Again', 'In Eric We Trust', '把下一个好点子放到 Injective'],
-  'zh-Hant': ['從一個 Injective 任務開始', '今天想在 Injective 做點什麼？', '鏈上金融正在 Injective 上發生', 'Make Injective Great Again', 'In Eric We Trust', '把下一個好點子放到 Injective'],
+  en: ['Start with a Monad task', 'What will you do on Monad today?', 'Onchain finance is happening on Monad', 'Make Monad Great Again', 'In Eric We Trust', 'Put your next idea on Monad'],
+  de: ['Starte mit einer Monad-Aufgabe', 'Was machst du heute auf Monad?', 'Onchain-Finanzwelt entsteht auf Monad', 'Make Monad Great Again', 'In Eric We Trust', 'Bring deine nächste Idee auf Monad'],
+  fr: ['Commencez par une tâche Monad', 'Que ferez-vous sur Monad aujourd’hui ?', 'La finance on-chain se construit sur Monad', 'Make Monad Great Again', 'In Eric We Trust', 'Placez votre prochaine idée sur Monad'],
+  ko: ['Monad 작업으로 시작하기', '오늘 Monad에서 무엇을 할까요?', '온체인 금융은 Monad에서 일어나고 있습니다', 'Make Monad Great Again', 'In Eric We Trust', '다음 아이디어를 Monad에 올리세요'],
+  ja: ['Monad のタスクから始める', '今日は Monad で何をしますか？', 'オンチェーン金融は Monad で動いている', 'Make Monad Great Again', 'In Eric We Trust', '次のアイデアを Monad へ'],
+  'zh-Hans': ['从一个 Monad 任务开始', '今天想在 Monad 做点什么？', '链上金融正在 Monad 上发生', 'Make Monad Great Again', 'In Eric We Trust', '把下一个好点子放到 Monad'],
+  'zh-Hant': ['從一個 Monad 任務開始', '今天想在 Monad 做點什麼？', '鏈上金融正在 Monad 上發生', 'Make Monad Great Again', 'In Eric We Trust', '把下一個好點子放到 Monad'],
 };
 
 const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{ title: string; body: string }> }> = {
   en: {
-    intro: 'Create more than apps: describe an NFT, Solidity protocol, game, automation, workflow, or reusable AgentOS skill and build it on Injective Testnet.',
+    intro: 'Create more than apps: describe an NFT, Solidity protocol, game, automation, workflow, or reusable AgentOS skill and build it on Monad Testnet.',
     cards: [
       { title: 'Create an app', body: 'Turn a product or game idea into a previewable interface and working source.' },
       { title: 'Create on-chain assets', body: 'Generate NFT, token, marketplace, and protocol contracts in Solidity.' },
@@ -1404,7 +1273,7 @@ const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{
     ],
   },
   de: {
-    intro: 'Erstelle mehr als Apps: NFT, Solidity-Protokolle, Spiele, Automationen, Workflows oder wiederverwendbare AgentOS-Skills auf Injective Testnet.',
+    intro: 'Erstelle mehr als Apps: NFT, Solidity-Protokolle, Spiele, Automationen, Workflows oder wiederverwendbare AgentOS-Skills auf Monad Testnet.',
     cards: [
       { title: 'App erstellen', body: 'Produkt- oder Spielideen in Vorschau und funktionierenden Quellcode verwandeln.' },
       { title: 'Onchain-Assets erstellen', body: 'NFT-, Token-, Marktplatz- und Protokollverträge in Solidity generieren.' },
@@ -1413,7 +1282,7 @@ const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{
     ],
   },
   fr: {
-    intro: 'Créez plus que des applications : NFT, protocoles Solidity, jeux, automatisations, workflows ou compétences AgentOS réutilisables sur Injective Testnet.',
+    intro: 'Créez plus que des applications : NFT, protocoles Solidity, jeux, automatisations, workflows ou compétences AgentOS réutilisables sur Monad Testnet.',
     cards: [
       { title: 'Créer une application', body: 'Transformez une idée de produit ou de jeu en interface prévisualisable et en code fonctionnel.' },
       { title: 'Créer des actifs on-chain', body: 'Générez les contrats Solidity pour NFT, jetons, marketplaces et protocoles.' },
@@ -1422,7 +1291,7 @@ const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{
     ],
   },
   ko: {
-    intro: '앱뿐 아니라 NFT, Solidity 프로토콜, 게임, 자동화, 워크플로와 재사용 가능한 AgentOS 스킬을 Injective Testnet에서 만드세요.',
+    intro: '앱뿐 아니라 NFT, Solidity 프로토콜, 게임, 자동화, 워크플로와 재사용 가능한 AgentOS 스킬을 Monad Testnet에서 만드세요.',
     cards: [
       { title: '앱 만들기', body: '제품과 게임 아이디어를 미리보기 가능한 화면과 소스로 만듭니다.' },
       { title: '온체인 자산 만들기', body: 'NFT, 토큰, 마켓과 프로토콜 Solidity 컨트랙트를 생성합니다.' },
@@ -1431,7 +1300,7 @@ const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{
     ],
   },
   ja: {
-    intro: 'アプリだけでなく、NFT、Solidity プロトコル、ゲーム、自動化、ワークフロー、再利用可能な AgentOS スキルを Injective Testnet 上で作れます。',
+    intro: 'アプリだけでなく、NFT、Solidity プロトコル、ゲーム、自動化、ワークフロー、再利用可能な AgentOS スキルを Monad Testnet 上で作れます。',
     cards: [
       { title: 'アプリを作る', body: 'プロダクトやゲームをプレビュー可能な画面とソースにします。' },
       { title: 'オンチェーン資産を作る', body: 'NFT、トークン、市場、プロトコルの Solidity を生成します。' },
@@ -1440,7 +1309,7 @@ const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{
     ],
   },
   'zh-Hans': {
-    intro: '创造的不只是应用：你可以制作 NFT、Solidity 协议、游戏、自动化工作流，或一个可复用的 AgentOS 技能，并在 Injective Testnet 上验证。',
+    intro: '创造的不只是应用：你可以制作 NFT、Solidity 协议、游戏、自动化工作流，或一个可复用的 AgentOS 技能，并在 Monad Testnet 上验证。',
     cards: [
       { title: '创造一个应用', body: '把产品或游戏想法变成可以预览的界面和真实源码。' },
       { title: '创造链上资产', body: '生成 NFT、Token、市场和协议需要的 Solidity 合约。' },
@@ -1449,7 +1318,7 @@ const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{
     ],
   },
   'zh-Hant': {
-    intro: '創造的不只是應用：你可以製作 NFT、Solidity 協議、遊戲、自動化工作流程，或可重用的 AgentOS 技能，並在 Injective Testnet 驗證。',
+    intro: '創造的不只是應用：你可以製作 NFT、Solidity 協議、遊戲、自動化工作流程，或可重用的 AgentOS 技能，並在 Monad Testnet 驗證。',
     cards: [
       { title: '創造一個應用', body: '把產品或遊戲想法變成可預覽的介面與真實原始碼。' },
       { title: '創造鏈上資產', body: '生成 NFT、Token、市場和協議需要的 Solidity 合約。' },
@@ -1462,37 +1331,37 @@ const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{
 const creativeIntroByLanguage: Record<LanguageCode, Array<{ title: string; body: string }>> = {
   en: [
     { title: 'Create complete applications', body: 'Describe a product or game and AgentOS will map its interface, Solidity contracts, services, and preview.' },
-    { title: 'Create on-chain objects', body: 'Build NFTs, tokens, marketplaces, protocols, and other programmable assets for Injective EVM Testnet.' },
+    { title: 'Create on-chain objects', body: 'Build NFTs, tokens, marketplaces, protocols, and other programmable assets for Monad Testnet.' },
     { title: 'Create reusable skills', body: 'Mention an @application, then package a new action or automation as an AgentOS skill for that app.' },
   ],
   de: [
     { title: 'Komplette Anwendungen erstellen', body: 'AgentOS plant Oberfläche, Solidity-Verträge, Dienste und Vorschau für Produkt- oder Spielideen.' },
-    { title: 'Onchain-Objekte erstellen', body: 'NFTs, Token, Marktplätze und Protokolle für Injective EVM Testnet bauen.' },
+    { title: 'Onchain-Objekte erstellen', body: 'NFTs, Token, Marktplätze und Protokolle für Monad Testnet bauen.' },
     { title: 'Wiederverwendbare Skills erstellen', body: 'Eine @App nennen und eine neue Aktion oder Automation als AgentOS-Skill dafür erstellen.' },
   ],
   fr: [
     { title: 'Créer des applications complètes', body: 'Décrivez un produit ou un jeu : AgentOS structure son interface, ses contrats Solidity, ses services et sa prévisualisation.' },
-    { title: 'Créer des objets on-chain', body: 'Créez des NFT, jetons, marketplaces, protocoles et autres actifs programmables sur Injective EVM Testnet.' },
+    { title: 'Créer des objets on-chain', body: 'Créez des NFT, jetons, marketplaces, protocoles et autres actifs programmables sur Monad Testnet.' },
     { title: 'Créer des compétences réutilisables', body: 'Mentionnez une @application, puis transformez une action ou une automatisation en compétence AgentOS.' },
   ],
   ko: [
     { title: '완전한 애플리케이션 만들기', body: '아이디어를 설명하면 AgentOS가 UI, Solidity, 서비스와 미리보기를 설계합니다.' },
-    { title: '온체인 객체 만들기', body: 'Injective EVM Testnet용 NFT, 토큰, 마켓과 프로토콜을 만듭니다.' },
+    { title: '온체인 객체 만들기', body: 'Monad Testnet용 NFT, 토큰, 마켓과 프로토콜을 만듭니다.' },
     { title: '재사용 가능한 스킬 만들기', body: '@앱을 지정하고 그 앱을 위한 새 작업이나 자동화를 AgentOS 스킬로 만듭니다.' },
   ],
   ja: [
     { title: '完全なアプリを作る', body: 'アイデアから UI、Solidity、サービス、プレビューまで AgentOS が設計します。' },
-    { title: 'オンチェーンオブジェクトを作る', body: 'Injective EVM Testnet 向けの NFT、トークン、市場、プロトコルを作れます。' },
+    { title: 'オンチェーンオブジェクトを作る', body: 'Monad Testnet 向けの NFT、トークン、市場、プロトコルを作れます。' },
     { title: '再利用可能なスキルを作る', body: '@アプリを指定し、そのアプリ向けの操作や自動化を AgentOS スキルにします。' },
   ],
   'zh-Hans': [
     { title: '创造完整应用', body: '描述产品或游戏，AgentOS 会规划界面、Solidity 合约、服务和可交互预览。' },
-    { title: '创造链上对象', body: '在 Injective EVM Testnet 创建 NFT、Token、市场、协议和其他可编程资产。' },
+    { title: '创造链上对象', body: '在 Monad Testnet 创建 NFT、Token、市场、协议和其他可编程资产。' },
     { title: '创造可复用技能', body: '先用 @ 指定一个应用，再为它创作新的操作、分析或自动化 AgentOS 技能。' },
   ],
   'zh-Hant': [
     { title: '創造完整應用', body: '描述產品或遊戲，AgentOS 會規劃介面、Solidity 合約、服務和互動預覽。' },
-    { title: '創造鏈上物件', body: '在 Injective EVM Testnet 建立 NFT、Token、市場、協議和其他可程式資產。' },
+    { title: '創造鏈上物件', body: '在 Monad Testnet 建立 NFT、Token、市場、協議和其他可程式資產。' },
     { title: '創造可重用技能', body: '先用 @ 指定一個應用，再為它創作新的操作、分析或自動化 AgentOS 技能。' },
   ],
 };
@@ -1557,37 +1426,37 @@ const sandboxIntroControls: Record<LanguageCode, { skip: string; back: string; n
 
 const composerIntroByLanguage: Record<LanguageCode, Array<{ title: string; body: string }>> = {
   en: [
-    { title: 'Mention an application with @', body: 'Type @ to find an Injective application and give AgentOS the right application context.' },
+    { title: 'Mention an application with @', body: 'Type @ to find a Monad application and give AgentOS the right application context.' },
     { title: 'Choose a skill with #', body: 'Type # to add a reusable AgentOS skill such as portfolio analysis or transaction review.' },
     { title: 'Reference an asset with $', body: 'Type $ to select a current wallet asset and include its live balance in the task.' },
   ],
   de: [
-    { title: 'App mit @ erwähnen', body: 'Mit @ findest du eine Injective-App und gibst AgentOS den passenden Kontext.' },
+    { title: 'App mit @ erwähnen', body: 'Mit @ findest du eine Monad-App und gibst AgentOS den passenden Kontext.' },
     { title: 'Skill mit # wählen', body: 'Mit # fügst du einen wiederverwendbaren AgentOS-Skill hinzu.' },
     { title: 'Asset mit $ referenzieren', body: 'Mit $ wählst du ein aktuelles Wallet-Asset samt Kontostand.' },
   ],
   fr: [
-    { title: 'Mentionner une application avec @', body: 'Saisissez @ pour trouver une application Injective et transmettre le bon contexte à AgentOS.' },
+    { title: 'Mentionner une application avec @', body: 'Saisissez @ pour trouver une application Monad et transmettre le bon contexte à AgentOS.' },
     { title: 'Choisir une compétence avec #', body: 'Saisissez # pour ajouter une compétence AgentOS réutilisable.' },
     { title: 'Référencer un actif avec $', body: 'Saisissez $ pour choisir un actif du portefeuille et inclure son solde en direct.' },
   ],
   ko: [
-    { title: '@로 앱 호출', body: '@를 입력해 Injective 앱을 찾고 AgentOS에 앱 컨텍스트를 전달합니다.' },
+    { title: '@로 앱 호출', body: '@를 입력해 Monad 앱을 찾고 AgentOS에 앱 컨텍스트를 전달합니다.' },
     { title: '#으로 스킬 선택', body: '#을 입력해 포트폴리오 분석 같은 AgentOS 스킬을 추가합니다.' },
     { title: '$로 자산 참조', body: '$를 입력해 현재 지갑 자산과 잔액을 작업에 포함합니다.' },
   ],
   ja: [
-    { title: '@ でアプリを指定', body: '@ を入力して Injective アプリを検索し、AgentOS にコンテキストを渡します。' },
+    { title: '@ でアプリを指定', body: '@ を入力して Monad アプリを検索し、AgentOS にコンテキストを渡します。' },
     { title: '# でスキルを選択', body: '# を入力して分析や取引確認などの AgentOS スキルを追加します。' },
     { title: '$ で資産を参照', body: '$ を入力して現在のウォレット資産と残高をタスクに含めます。' },
   ],
   'zh-Hans': [
-    { title: '用 @ 提及应用', body: '输入 @ 搜索 Injective 应用，把正确的应用上下文交给 AgentOS。' },
+    { title: '用 @ 提及应用', body: '输入 @ 搜索 Monad 应用，把正确的应用上下文交给 AgentOS。' },
     { title: '用 # 选择技能', body: '输入 # 添加资产分析、交易检查等可复用的 AgentOS 技能。' },
     { title: '用 $ 引用资产', body: '输入 $ 选择当前钱包资产，并把实时余额带入任务。' },
   ],
   'zh-Hant': [
-    { title: '用 @ 提及應用', body: '輸入 @ 搜尋 Injective 應用，把正確的應用上下文交給 AgentOS。' },
+    { title: '用 @ 提及應用', body: '輸入 @ 搜尋 Monad 應用，把正確的應用上下文交給 AgentOS。' },
     { title: '用 # 選擇技能', body: '輸入 # 加入資產分析、交易檢查等可重用的 AgentOS 技能。' },
     { title: '用 $ 引用資產', body: '輸入 $ 選擇目前錢包資產，並把即時餘額帶入任務。' },
   ],
@@ -1891,64 +1760,64 @@ interface EricMferMintCopy {
 const ericMferMintCopy: Record<LanguageCode, EricMferMintCopy> = {
   en: {
     complete: 'Mint complete. You received',
-    sponsored: 'INJ Pass sponsored the network fee for this mint.',
+    sponsored: 'AgentOS sponsored the network fee for this mint.',
     transaction: 'View transaction',
-    login: 'Log in to INJ Pass and unlock a wallet before minting an eric mfer.',
-    noCredits: 'This INJ Pass account has already minted its eric mfer.',
+    login: 'Log in to AgentOS and unlock a wallet before minting an eric mfer.',
+    noCredits: 'This AgentOS account has already minted its eric mfer.',
     failed: 'The eric mfer mint could not be completed. Please try again.',
     rarity: 'Rarity',
   },
   de: {
     complete: 'Mint abgeschlossen. Du hast erhalten:',
-    sponsored: 'INJ Pass hat die Netzwerkgebühr für diesen Mint übernommen.',
+    sponsored: 'AgentOS hat die Netzwerkgebühr für diesen Mint übernommen.',
     transaction: 'Transaktion ansehen',
-    login: 'Melde dich bei INJ Pass an und entsperre eine Wallet, bevor du einen eric mfer mintest.',
-    noCredits: 'Dieses INJ Pass Konto hat bereits einen eric mfer gemintet.',
+    login: 'Melde dich bei AgentOS an und entsperre eine Wallet, bevor du einen eric mfer mintest.',
+    noCredits: 'Dieses AgentOS Konto hat bereits einen eric mfer gemintet.',
     failed: 'Der eric mfer Mint konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
     rarity: 'Seltenheit',
   },
   fr: {
     complete: 'Mint terminé. Vous avez reçu',
-    sponsored: 'INJ Pass a pris en charge les frais réseau de ce mint.',
+    sponsored: 'AgentOS a pris en charge les frais réseau de ce mint.',
     transaction: 'Voir la transaction',
-    login: 'Connectez-vous à INJ Pass et déverrouillez un portefeuille avant de minter un eric mfer.',
-    noCredits: 'Ce compte INJ Pass a déjà minté son eric mfer.',
+    login: 'Connectez-vous à AgentOS et déverrouillez un portefeuille avant de minter un eric mfer.',
+    noCredits: 'Ce compte AgentOS a déjà minté son eric mfer.',
     failed: 'Le mint eric mfer n’a pas pu être terminé. Réessayez.',
     rarity: 'Rareté',
   },
   ko: {
     complete: '민팅이 완료되었습니다. 받은 NFT:',
-    sponsored: '이번 민팅의 네트워크 수수료는 INJ Pass가 지원했습니다.',
+    sponsored: '이번 민팅의 네트워크 수수료는 AgentOS가 지원했습니다.',
     transaction: '트랜잭션 보기',
-    login: 'eric mfer를 민팅하려면 INJ Pass에 로그인하고 지갑 잠금을 해제하세요.',
-    noCredits: '이 INJ Pass 계정은 이미 eric mfer를 민팅했습니다.',
+    login: 'eric mfer를 민팅하려면 AgentOS에 로그인하고 지갑 잠금을 해제하세요.',
+    noCredits: '이 AgentOS 계정은 이미 eric mfer를 민팅했습니다.',
     failed: 'eric mfer 민팅을 완료하지 못했습니다. 다시 시도하세요.',
     rarity: '희귀도',
   },
   ja: {
     complete: 'ミントが完了しました。獲得したNFT:',
-    sponsored: '今回のミントのネットワーク手数料はINJ Passが負担しました。',
+    sponsored: '今回のミントのネットワーク手数料はAgentOSが負担しました。',
     transaction: 'トランザクションを見る',
-    login: 'eric mferをミントする前にINJ Passへログインし、ウォレットを解除してください。',
-    noCredits: 'このINJ Passアカウントはすでにeric mferをミントしています。',
+    login: 'eric mferをミントする前にAgentOSへログインし、ウォレットを解除してください。',
+    noCredits: 'このAgentOSアカウントはすでにeric mferをミントしています。',
     failed: 'eric mferのミントを完了できませんでした。もう一度お試しください。',
     rarity: 'レア度',
   },
   'zh-Hans': {
     complete: 'Mint 完成，你获得了',
-    sponsored: '本次 Mint 的网络费由 INJ Pass 赞助。',
+    sponsored: '本次 Mint 的网络费由 AgentOS 赞助。',
     transaction: '查看交易',
-    login: '请先登录 INJ Pass 并解锁钱包，再 Mint eric mfer。',
-    noCredits: '这个 INJ Pass 账户已经 Mint 过一个 eric mfer。',
+    login: '请先登录 AgentOS 并解锁钱包，再 Mint eric mfer。',
+    noCredits: '这个 AgentOS 账户已经 Mint 过一个 eric mfer。',
     failed: 'eric mfer Mint 未能完成，请稍后重试。',
     rarity: '稀有度',
   },
   'zh-Hant': {
     complete: 'Mint 完成，你獲得了',
-    sponsored: '本次 Mint 的網路費由 INJ Pass 贊助。',
+    sponsored: '本次 Mint 的網路費由 AgentOS 贊助。',
     transaction: '查看交易',
-    login: '請先登入 INJ Pass 並解鎖錢包，再 Mint eric mfer。',
-    noCredits: '這個 INJ Pass 帳戶已經 Mint 過一個 eric mfer。',
+    login: '請先登入 AgentOS 並解鎖錢包，再 Mint eric mfer。',
+    noCredits: '這個 AgentOS 帳戶已經 Mint 過一個 eric mfer。',
     failed: 'eric mfer Mint 未能完成，請稍後重試。',
     rarity: '稀有度',
   },
@@ -2053,37 +1922,37 @@ function getGuestChatQuotaMessage(languageCode: LanguageCode, remaining: number)
 const thinkingFallbacks: Record<LanguageCode, Record<ThinkingMode | 'mint', string[]>> = {
   en: {
     chat: ['Understand the request', 'Identify the relevant context', 'Check wallet requirements', 'Prepare the next action', 'Review safety constraints', 'Assemble the response'],
-    build: ['Clarify the product scope', 'Map Injective components', 'Design the contract surface', 'Shape the interface flow', 'Plan tests and deployment', 'Assemble the build roadmap'],
+    build: ['Clarify the product scope', 'Map Monad components', 'Design the contract surface', 'Shape the interface flow', 'Plan tests and deployment', 'Assemble the build roadmap'],
     mint: ['Parse the mint request', 'Verify wallet access', 'Check mint eligibility', 'Prepare the sponsored voucher', 'Submit the mint transaction', 'Read NFT metadata'],
   },
   de: {
     chat: ['Anfrage verstehen', 'Relevanten Kontext erkennen', 'Wallet-Anforderungen prüfen', 'Nächste Aktion vorbereiten', 'Sicherheitsregeln prüfen', 'Antwort zusammenstellen'],
-    build: ['Produktumfang klären', 'Injective-Komponenten abbilden', 'Vertragsschnittstelle entwerfen', 'Oberflächenablauf gestalten', 'Tests und Deployment planen', 'Build-Roadmap erstellen'],
+    build: ['Produktumfang klären', 'Monad-Komponenten abbilden', 'Vertragsschnittstelle entwerfen', 'Oberflächenablauf gestalten', 'Tests und Deployment planen', 'Build-Roadmap erstellen'],
     mint: ['Mint-Anfrage analysieren', 'Wallet-Zugriff prüfen', 'Mint-Berechtigung prüfen', 'Gesponserten Voucher vorbereiten', 'Mint-Transaktion senden', 'NFT-Metadaten laden'],
   },
   fr: {
     chat: ['Comprendre la demande', 'Identifier le contexte utile', 'Vérifier les besoins du wallet', 'Préparer la prochaine action', 'Contrôler les règles de sécurité', 'Composer la réponse'],
-    build: ['Clarifier le périmètre', 'Cartographier les composants Injective', 'Concevoir les contrats', 'Structurer le parcours utilisateur', 'Planifier tests et déploiement', 'Assembler la feuille de route'],
+    build: ['Clarifier le périmètre', 'Cartographier les composants Monad', 'Concevoir les contrats', 'Structurer le parcours utilisateur', 'Planifier tests et déploiement', 'Assembler la feuille de route'],
     mint: ['Analyser la demande de mint', 'Vérifier l’accès au wallet', 'Contrôler l’éligibilité', 'Préparer le voucher sponsorisé', 'Envoyer la transaction de mint', 'Lire les métadonnées NFT'],
   },
   ko: {
     chat: ['요청 내용 파악', '관련 컨텍스트 확인', '지갑 요구사항 점검', '다음 작업 준비', '안전 조건 검토', '응답 구성'],
-    build: ['제품 범위 정리', 'Injective 구성요소 설계', '컨트랙트 인터페이스 구성', '화면 흐름 설계', '테스트와 배포 계획', '빌드 로드맵 작성'],
+    build: ['제품 범위 정리', 'Monad 구성요소 설계', '컨트랙트 인터페이스 구성', '화면 흐름 설계', '테스트와 배포 계획', '빌드 로드맵 작성'],
     mint: ['민팅 요청 분석', '지갑 접근 확인', '민팅 자격 확인', '가스 지원 바우처 준비', '민팅 트랜잭션 제출', 'NFT 메타데이터 조회'],
   },
   ja: {
     chat: ['依頼内容を確認', '関連コンテキストを特定', 'ウォレット要件を確認', '次の操作を準備', '安全条件を確認', '回答を構成'],
-    build: ['プロダクト範囲を整理', 'Injective構成を設計', 'コントラクト面を設計', '画面フローを構成', 'テストとデプロイを計画', 'ビルド工程を整理'],
+    build: ['プロダクト範囲を整理', 'Monad構成を設計', 'コントラクト面を設計', '画面フローを構成', 'テストとデプロイを計画', 'ビルド工程を整理'],
     mint: ['Mint依頼を解析', 'ウォレット接続を確認', 'Mint資格を確認', 'スポンサーVoucherを準備', 'Mint取引を送信', 'NFTメタデータを取得'],
   },
   'zh-Hans': {
     chat: ['理解当前指令', '识别相关上下文', '检查钱包操作条件', '准备下一步动作', '复核安全边界', '组织最终回复'],
-    build: ['梳理产品范围', '映射 Injective 组件', '设计合约接口', '整理前端流程', '规划测试与部署', '组装构建路线'],
+    build: ['梳理产品范围', '映射 Monad 组件', '设计合约接口', '整理前端流程', '规划测试与部署', '组装构建路线'],
     mint: ['解析 Mint 指令', '核对钱包访问', '检查 Mint 资格', '准备赞助凭证', '提交 Mint 交易', '读取 NFT 元数据'],
   },
   'zh-Hant': {
     chat: ['理解目前指令', '識別相關上下文', '檢查錢包操作條件', '準備下一步動作', '複核安全邊界', '組織最終回覆'],
-    build: ['梳理產品範圍', '映射 Injective 元件', '設計合約介面', '整理前端流程', '規劃測試與部署', '組裝建構路線'],
+    build: ['梳理產品範圍', '映射 Monad 元件', '設計合約介面', '整理前端流程', '規劃測試與部署', '組裝建構路線'],
     mint: ['解析 Mint 指令', '核對錢包存取', '檢查 Mint 資格', '準備贊助憑證', '提交 Mint 交易', '讀取 NFT 中繼資料'],
   },
 };
@@ -2250,7 +2119,7 @@ function mapBackendDApp(
     id: dapp.id,
     name: dapp.name,
     category: (categoryId && categoryLabels.get(categoryId)) || categoryId || 'DApp',
-    body: dapp.description || dapp.mentionPrompt || 'Injective application available for AI-assisted wallet workflows.',
+    body: dapp.description || dapp.mentionPrompt || 'Monad application available for AI-assisted wallet workflows.',
     accent: accents[index % accents.length],
     url: dapp.url,
     icon: dapp.icon || getBundledDAppIcon(dapp.name) || (dapp.url ? getDAppIconUrl(dapp.url) : undefined),
@@ -3043,7 +2912,7 @@ function WalletDataPanel({
         <div className="mt-3">
           {[...Object.entries(data.tokens), ['LAM', String(lamBalance)]].map(([symbol, amount]) => (
             <div key={symbol} className={cx('grid grid-cols-[1fr_auto] items-center border-b px-1 py-4', isLight ? 'border-black/6' : 'border-white/7')}>
-              <div><div className="text-sm font-bold">{symbol}</div><div className={cx('mt-0.5 text-xs', isLight ? 'text-black/40' : 'text-white/40')}>{symbol === 'LAM' ? 'AI credits' : 'Injective wallet asset'}</div></div>
+              <div><div className="text-sm font-bold">{symbol}</div><div className={cx('mt-0.5 text-xs', isLight ? 'text-black/40' : 'text-white/40')}>{symbol === 'LAM' ? 'AI credits' : 'Monad wallet asset'}</div></div>
               <div className="font-mono text-sm font-semibold">{formatAmount(amount, 6)}</div>
             </div>
           ))}
@@ -3196,7 +3065,7 @@ function WalletDataPanel({
                 rel="noreferrer"
                 className={cx('mt-5 flex h-10 items-center justify-center rounded-md text-xs font-bold transition', isLight ? 'bg-black text-white hover:bg-black/82' : 'bg-white text-black hover:bg-white/86')}
               >
-                View on Injective Explorer
+                View on Monad Explorer
               </a>
             </div>
           </section>
@@ -3899,7 +3768,7 @@ function MiniAppTabStrip({
 }) {
   return (
     <div className={cx('flex h-10 shrink-0 items-end border-b px-2', isLight ? 'border-black/8 bg-[#ededf0]' : 'border-white/8 bg-[#161619]')}>
-      <div role="tablist" aria-label="Open INJ Pass apps" className="flex min-w-0 items-end gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div role="tablist" aria-label="Open AgentOS apps" className="flex min-w-0 items-end gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((tab) => {
           const active = activeTabId === tab.id;
           const label = tab.app?.name || appsLabel;
@@ -3943,7 +3812,7 @@ function MiniAppTabStrip({
         </button>
       </div>
       <div className="flex-1" />
-      <div className={cx('mb-2 mr-2 hidden shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] sm:block', isLight ? 'text-black/34' : 'text-white/34')}>INJ Pass Apps</div>
+      <div className={cx('mb-2 mr-2 hidden shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] sm:block', isLight ? 'text-black/34' : 'text-white/34')}>AgentOS Apps</div>
     </div>
   );
 }
@@ -4004,7 +3873,7 @@ function DAppMarketPanel({
         </div>
         <div className={cx('hidden h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 md:flex', isLight ? 'border-black/8 text-black/58' : 'border-white/8 text-white/58')}>
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          <span className="text-[11px] font-semibold">Injective</span>
+          <span className="text-[11px] font-semibold">Monad</span>
         </div>
       </div>
 
@@ -4015,7 +3884,7 @@ function DAppMarketPanel({
               {copy.dappMarket}
             </div>
             <p className={cx('mt-2 max-w-2xl text-sm leading-6', isLight ? 'text-black/58' : 'text-white/58')}>
-              Choose Injective apps for the agent to inspect, route, and operate with your approval.
+              Choose Monad apps for the agent to inspect, route, and operate with your approval.
             </p>
           </div>
           <div className={cx('text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>
@@ -4156,7 +4025,7 @@ function MiniAppPanel({
               ? isLight ? 'border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100' : 'border-violet-300/18 bg-violet-300/10 text-violet-100 hover:bg-violet-300/15'
               : isLight ? 'border-black/10 text-black/68 hover:bg-black/5' : 'border-white/10 text-white/68 hover:bg-white/8',
           )}
-          title={address ? `${walletName || 'INJ Pass'} · ${address}` : 'Connect an INJ Pass wallet'}
+          title={address ? `${walletName || 'AgentOS'} · ${address}` : 'Connect an AgentOS wallet'}
         >
           <WalletIcon className="h-3.5 w-3.5 shrink-0" />
           <span className="hidden min-w-0 truncate sm:block">
@@ -4189,7 +4058,7 @@ function MiniAppPanel({
               <div>
                 <div className="text-sm font-bold">App connection</div>
                 <div className={cx('mt-1 text-xs', isLight ? 'text-black/48' : 'text-white/48')}>
-                  {browserLocation.isLocal ? 'Local development origin' : 'Verified INJ Pass origin'}
+                  {browserLocation.isLocal ? 'Local development origin' : 'Verified AgentOS origin'}
                 </div>
               </div>
               <ShieldCheckIcon className={cx('h-5 w-5', browserLocation.isLocal ? 'text-amber-500' : 'text-emerald-500')} />
@@ -4206,7 +4075,7 @@ function MiniAppPanel({
               <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 py-2.5">
                 <dt className={isLight ? 'text-black/42' : 'text-white/42'}>Wallet</dt>
                 <dd className="truncate text-right font-semibold" title={address || 'Guest'}>
-                  {address ? `${walletName || 'INJ Pass'} · ${truncateAddress(address)}` : 'Not connected'}
+                  {address ? `${walletName || 'AgentOS'} · ${truncateAddress(address)}` : 'Not connected'}
                 </dd>
               </div>
               <div className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 py-2.5">
@@ -4365,7 +4234,7 @@ function ConversationSearchModal({
                 </div>
                 {conversation.snippets?.slice(0, 2).map((snippet, index) => (
                   <p key={`${conversation.id}-${index}`} className={cx('mt-1 line-clamp-2 text-xs leading-5', isLight ? 'text-black/48' : 'text-white/48')}>
-                    <strong className="mr-1 font-semibold">{snippet.role === 'user' ? 'You' : 'INJ Pass'}:</strong>{snippet.content}
+                    <strong className="mr-1 font-semibold">{snippet.role === 'user' ? 'You' : 'AgentOS'}:</strong>{snippet.content}
                   </p>
                 ))}
               </button>
@@ -4824,7 +4693,7 @@ function SkillsPanel({
               <div className="flex flex-wrap items-center gap-2">
                 <div className="text-sm font-bold">{skill.name}</div>
                 <span className={cx('text-[10px] font-bold', isLight ? 'text-black/38' : 'text-white/38')}>{skill.app}</span>
-                {skill.official && <span className={cx('rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em]', isLight ? 'bg-violet-100/55 text-violet-700' : 'bg-violet-300/[0.08] text-violet-200')}>Injective official</span>}
+                {skill.official && <span className={cx('rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em]', isLight ? 'bg-violet-100/55 text-violet-700' : 'bg-violet-300/[0.08] text-violet-200')}>Monad official</span>}
               </div>
               <div className={cx('mt-1 text-xs leading-5', isLight ? 'text-black/50' : 'text-white/50')}>{skill.body}</div>
               {skill.custom && <div className={cx('mt-1 text-[10px] font-semibold', isLight ? 'text-black/32' : 'text-white/32')}>Created by you</div>}
@@ -5202,9 +5071,9 @@ function WalletSetupWizard({
   const isPasskey = method === 'passkey';
   const stages = isPasskey
     ? [
-      { id: 'security', label: 'Security', title: 'Use your system Passkey', body: 'INJ Pass will ask this device to create a Passkey and require system verification.' },
-      { id: 'name', label: 'Name', title: 'Name your INJ Pass', body: 'Choose a name that makes this wallet easy to recognize on this device.' },
-      { id: 'invite', label: 'Invite', title: 'Have an invite code?', body: 'Apply an INJ Pass invite code to connect your account with the person who invited you. You can also skip this step.' },
+      { id: 'security', label: 'Security', title: 'Use your system Passkey', body: 'AgentOS will ask this device to create a Passkey and require system verification.' },
+      { id: 'name', label: 'Name', title: 'Name your AgentOS', body: 'Choose a name that makes this wallet easy to recognize on this device.' },
+      { id: 'invite', label: 'Invite', title: 'Have an invite code?', body: 'Apply an AgentOS invite code to connect your account with the person who invited you. You can also skip this step.' },
       { id: 'review', label: 'Create', title: 'Ready to create', body: 'Review the wallet protection method before opening the system Passkey prompt.' },
     ]
     : mode === 'recover'
@@ -5212,12 +5081,12 @@ function WalletSetupWizard({
       { id: 'phrase', label: 'Recovery phrase', title: 'Enter your 24 words', body: 'Use the words from your offline backup, in their original order.' },
       { id: 'name', label: 'Name', title: 'Name this wallet', body: 'This name is only used to identify the wallet on this device.' },
       { id: 'password', label: 'Protect', title: 'Set a local password', body: 'Your password encrypts the recovery phrase before it is stored in this browser.' },
-      { id: 'review', label: 'Recover', title: 'Ready to recover', body: 'INJ Pass will derive the wallet locally and connect it to your current session.' },
+      { id: 'review', label: 'Recover', title: 'Ready to recover', body: 'AgentOS will derive the wallet locally and connect it to your current session.' },
     ]
     : [
-      { id: 'name', label: 'Name', title: 'Name your INJ Pass', body: 'Choose a name that makes this wallet easy to recognize on this device.' },
+      { id: 'name', label: 'Name', title: 'Name your AgentOS', body: 'Choose a name that makes this wallet easy to recognize on this device.' },
       { id: 'password', label: 'Protect', title: 'Set a local password', body: 'Your password encrypts the new 24-word recovery phrase before it is stored in this browser.' },
-      { id: 'invite', label: 'Invite', title: 'Have an invite code?', body: 'Apply an INJ Pass invite code to connect your account with the person who invited you. You can also skip this step.' },
+      { id: 'invite', label: 'Invite', title: 'Have an invite code?', body: 'Apply an AgentOS invite code to connect your account with the person who invited you. You can also skip this step.' },
       { id: 'review', label: 'Create', title: 'Ready to create', body: 'The wallet and its 24-word recovery phrase will be generated locally on this device.' },
     ];
   const activeStep = Math.min(step, stages.length - 1);
@@ -5314,7 +5183,7 @@ function WalletSetupWizard({
                   </div>
                 </div>
                 <p className={cx('mt-4 text-xs leading-5', isLight ? 'text-black/46' : 'text-white/46')}>
-                  The system prompt is the only place where biometric or device verification happens. INJ Pass never receives biometric data.
+                  The system prompt is the only place where biometric or device verification happens. AgentOS never receives biometric data.
                 </p>
               </div>
             )}
@@ -5349,7 +5218,7 @@ function WalletSetupWizard({
                     onWalletName(event.target.value.slice(0, 40));
                     onClearError();
                   }}
-                  placeholder="My INJ Pass"
+                  placeholder="My AgentOS"
                   className={cx('mt-3 h-12 w-full rounded-xl border bg-transparent px-4 text-base outline-none transition focus:border-violet-400', isLight ? 'border-black/12' : 'border-white/14')}
                 />
                 <span className={cx('mt-2 block text-xs font-semibold', isLight ? 'text-black/42' : 'text-white/42')}>You can create and switch between multiple wallets later.</span>
@@ -5468,7 +5337,7 @@ function WalletSetupWizard({
                 <div className={cx('divide-y border-y', isLight ? 'divide-black/8 border-black/8' : 'divide-white/10 border-white/10')}>
                   <div className="flex items-center justify-between gap-4 py-4">
                     <span className={cx('text-sm', isLight ? 'text-black/48' : 'text-white/48')}>Wallet</span>
-                    <strong className="text-sm">{walletName.trim() || 'My INJ Pass'}</strong>
+                    <strong className="text-sm">{walletName.trim() || 'My AgentOS'}</strong>
                   </div>
                   <div className="flex items-center justify-between gap-4 py-4">
                     <span className={cx('text-sm', isLight ? 'text-black/48' : 'text-white/48')}>{isPasskey ? 'Security' : mode === 'recover' ? 'Recovery phrase' : 'Address'}</span>
@@ -5500,8 +5369,8 @@ function WalletSetupWizard({
                 </div>
                 <p className={cx('mt-4 text-xs leading-5', isLight ? 'text-black/46' : 'text-white/46')}>
                   {isPasskey
-                    ? 'INJ Pass will verify PRF support in the real system Passkey prompt. Only public credential metadata and the wallet address are registered; the wallet key is not stored on disk.'
-                    : 'Your recovery phrase and password are never uploaded to the INJ Pass server. You will be asked to save the 24 words offline after creation.'}
+                    ? 'AgentOS will verify PRF support in the real system Passkey prompt. Only public credential metadata and the wallet address are registered; the wallet key is not stored on disk.'
+                    : 'Your recovery phrase and password are never uploaded to the AgentOS server. You will be asked to save the 24 words offline after creation.'}
                 </p>
               </div>
             )}
@@ -5662,7 +5531,7 @@ function MnemonicBackupModal({
       <article className="inj-recovery-print-sheet" aria-hidden="true">
         <header className="inj-recovery-print-header">
           <p className="inj-recovery-print-brand">INJ PASS</p>
-          <h1>INJ Pass Private Recovery Key</h1>
+          <h1>AgentOS Private Recovery Key</h1>
           <p>Offline wallet recovery document</p>
         </header>
 
@@ -5737,7 +5606,7 @@ function LocalWalletUnlockModal({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="inj-display-serif text-2xl">Unlock wallet</h2>
-              <p className={cx('mt-1 truncate text-sm', isLight ? 'text-black/48' : 'text-white/48')}>{wallet.walletName || 'My INJ Pass'} · {truncateAddress(wallet.address)}</p>
+              <p className={cx('mt-1 truncate text-sm', isLight ? 'text-black/48' : 'text-white/48')}>{wallet.walletName || 'My AgentOS'} · {truncateAddress(wallet.address)}</p>
             </div>
             <button type="button" onClick={onClose} className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')} aria-label="Close wallet unlock"><CloseIcon /></button>
           </div>
@@ -7873,7 +7742,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         if (requestId === walletPanelRequestRef.current) setWalletPanelData((current) => ({ ...current, nfts }));
       } else {
         const response = await fetch(`/api/transactions?address=${encodeURIComponent(address)}&network=mainnet`);
-        if (!response.ok) throw new Error('Unable to load Injective history.');
+        if (!response.ok) throw new Error('Unable to load Monad history.');
         const payload = await response.json() as { current_block?: unknown; items?: Array<Record<string, unknown>> };
         const latestBlock = typeof payload.current_block === 'number' && Number.isSafeInteger(payload.current_block)
           ? payload.current_block
@@ -7911,7 +7780,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       throw new Error('Missing client tool use id');
     }
     if (!address) {
-      throw new Error('Unlock your main wallet first so INJ Pass can sign this action locally.');
+      throw new Error('Unlock your main wallet first so AgentOS can sign this action locally.');
     }
     const signingKey = await requireWalletPrivateKey();
 
@@ -8924,7 +8793,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           return;
         }
         if (!miniAppSessionAddress) {
-          respond(undefined, { code: 4100, message: 'Log in to INJ Pass before minting.' });
+          respond(undefined, { code: 4100, message: 'Log in to AgentOS before minting.' });
           return;
         }
 
@@ -8954,7 +8823,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         const bridgeError = error instanceof MiniAppHostError ? error : null;
         respond(undefined, {
           code: bridgeError?.code ?? -32603,
-          message: error instanceof Error ? error.message : 'INJ Pass mini app request failed.',
+          message: error instanceof Error ? error.message : 'AgentOS mini app request failed.',
           data: bridgeError?.data,
         });
       });
@@ -9091,7 +8960,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         const bridgeError = error instanceof MiniAppHostError ? error : null;
         respond(requestId, undefined, {
           code: bridgeError?.code ?? -32603,
-          message: error instanceof Error ? error.message : 'INJ Pass mini app request failed.',
+          message: error instanceof Error ? error.message : 'AgentOS mini app request failed.',
           data: bridgeError?.data,
         }, source);
       });
@@ -9218,7 +9087,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     const code = normalizeWalletInviteCode(walletInviteCode);
     if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) {
       setWalletInviteValidation('invalid');
-      setWalletInviteValidationMessage('Enter a valid 8-character INJ Pass invite code.');
+      setWalletInviteValidationMessage('Enter a valid 8-character AgentOS invite code.');
       return;
     }
 
@@ -9241,7 +9110,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setWalletSetupMethod('traditional');
     setTraditionalWalletWizardMode(mode);
     setTraditionalWalletWizardStep(0);
-    setNewWalletName('My INJ Pass');
+    setNewWalletName('My AgentOS');
     setNewWalletPassword('');
     setNewWalletPasswordConfirm('');
     setRecoveryMnemonic('');
@@ -9257,7 +9126,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setWalletSetupMethod('passkey');
     setTraditionalWalletWizardMode('create');
     setTraditionalWalletWizardStep(0);
-    setNewWalletName('My INJ Pass');
+    setNewWalletName('My AgentOS');
     setNewWalletPassword('');
     setNewWalletPasswordConfirm('');
     setRecoveryMnemonic('');
@@ -9293,7 +9162,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       // Requested from the click that creates the wallet: Firefox only shows
       // its persistent-storage prompt with user activation.
       requestPersistentStorage(setStorageWarning);
-      const walletName = newWalletName.trim() || 'My INJ Pass';
+      const walletName = newWalletName.trim() || 'My AgentOS';
       const preparedMnemonic = preparedMnemonicWallet?.mnemonic;
       if (newWalletPassword !== newWalletPasswordConfirm) {
         throw new Error('The two wallet passwords do not match.');
@@ -9340,7 +9209,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setTraditionalWalletWizardStep(0);
       setLocalWallets(loadWallets());
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Failed to create INJ Pass.');
+      setAuthError(error instanceof Error ? error.message : 'Failed to create AgentOS.');
     } finally {
       setAuthPendingAction(null);
     }
@@ -9354,7 +9223,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
 
     try {
       requestPersistentStorage(setStorageWarning);
-      const walletName = newWalletName.trim() || 'My INJ Pass';
+      const walletName = newWalletName.trim() || 'My AgentOS';
       const detection = prfDetection || await detectPrfSupport();
       setPrfDetection(detection);
       // Detection is advisory only. The authenticator selected in the actual
@@ -9390,7 +9259,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           'This authenticator does not support secure Passkey PRF. Continue with the Traditional wallet option to create a recoverable 24-word wallet protected by a local password.',
         );
       } else {
-        setAuthError(error instanceof Error ? error.message : 'Failed to create INJ Pass.');
+        setAuthError(error instanceof Error ? error.message : 'Failed to create AgentOS.');
       }
     } finally {
       setAuthPendingAction(null);
@@ -9413,7 +9282,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       setAuthMenuOpen(false);
     } catch (error) {
       setAuthMenuOpen(true);
-      setAuthError(error instanceof Error ? error.message : 'Failed to enter INJ Pass.');
+      setAuthError(error instanceof Error ? error.message : 'Failed to enter AgentOS.');
     } finally {
       setAuthPendingAction(null);
     }
@@ -9559,7 +9428,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           <div className={cx('flex items-center py-2', sidebarCollapsed ? 'justify-center px-1' : 'justify-between px-3')}>
             <div className={sidebarCollapsed ? 'lg:hidden' : undefined}>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <div className="text-sm font-bold">INJ Pass</div>
+                <div className="text-sm font-bold">AgentOS</div>
                 {isAuthenticated && (
                   <button
                     type="button"
@@ -10704,7 +10573,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 >
                   <MenuIcon />
                 </button>
-                <div className="text-sm font-bold">INJ Pass</div>
+                <div className="text-sm font-bold">AgentOS</div>
               </div>
               {!activeWalletTab && activeChatSurface !== 'mini-app' && activeChatSurface !== 'skills' && activeChatSurface !== 'dapp-market' && <div className="pointer-events-auto absolute left-1/2 top-12 -translate-x-1/2 sm:top-0">
                   <ModeToggle
@@ -10821,7 +10690,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                             className={cx('flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition disabled:opacity-55', isLight ? 'hover:bg-black/5' : 'hover:bg-white/8')}
                           >
                             <span className="min-w-0">
-                              <span className="block truncate text-sm font-bold">{wallet.walletName || 'INJ Pass wallet'}</span>
+                              <span className="block truncate text-sm font-bold">{wallet.walletName || 'AgentOS wallet'}</span>
                               <span className={cx('mt-0.5 block font-mono text-[10px]', isLight ? 'text-black/42' : 'text-white/42')}>{truncateAddress(wallet.address)}</span>
                             </span>
                             <span className="shrink-0 text-xs font-semibold">Enter</span>
@@ -11662,13 +11531,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 isLight ? 'text-black/38' : 'text-white/38'
               )}>
                 <span>{copy.poweredBy}</span>
-                <Image
-                  src={isLight ? '/injective-wordmark-color.png' : '/injective-wordmark-white.png'}
-                  alt="Injective"
-                  width={481}
-                  height={96}
-                  className="h-[14px] w-auto object-contain"
-                />
+                <span className="text-[11px] font-semibold tracking-wide">Monad</span>
               </div>}
 
             </div>
@@ -11758,7 +11621,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           setLocalUnlockError('');
           setLocalUnlockBusy(false);
           openTraditionalWalletWizard('recover');
-          setNewWalletName(walletToRecover.walletName || 'My INJ Pass');
+          setNewWalletName(walletToRecover.walletName || 'My AgentOS');
         }}
         onRemoveOrphan={() => {
           if (!orphanWalletAddress) return;

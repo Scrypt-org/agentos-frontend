@@ -969,7 +969,7 @@ function SendPageContent() {
             </div>
             <div className="flex justify-between items-center py-2 border-t border-white/5">
               <span className="text-sm text-gray-400">Network</span>
-              <span className="text-sm font-bold text-white">Injective EVM</span>
+              <span className="text-sm font-bold text-white">Monad</span>
             </div>
             <div className="flex justify-between items-center py-2 border-t border-white/5">
               <span className="text-sm text-gray-400">Timestamp</span>
@@ -1261,7 +1261,7 @@ function SendPageContent() {
               <div className="flex justify-between gap-4 border-t border-white/10 pt-3">
                 <span className="text-sm text-gray-400">Gas sponsor</span>
                 <span className="text-right text-sm font-bold text-emerald-300">
-                  Sponsored by INJ Pass
+                  Sponsored by AgentOS
                 </span>
               </div>
             </div>

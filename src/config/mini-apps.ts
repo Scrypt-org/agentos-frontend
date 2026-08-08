@@ -89,7 +89,7 @@ function getBrowserOrigin(): string | undefined {
 
 /**
  * The base URL used to embed the mini app. Registered apps use their local
- * development origin while INJ Pass is running in development, so connector
+ * development origin while AgentOS is running in development, so connector
  * changes can be tested end to end. Production follows the dApp directory URL
  * when present and otherwise uses the manifest fallback.
  */

@@ -1379,7 +1379,7 @@ export default function AgentsPage() {
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] leading-tight font-semibold text-white tracking-[-0.01em]">
-                  Share INJ Pass with Friends
+                  Share AgentOS with Friends
                 </p>
                 <p className="text-[11px] mt-1 text-blue-200/90 font-medium tracking-wide">
                   Inviter +10 / Invitee +10 NINJA
@@ -1413,7 +1413,7 @@ export default function AgentsPage() {
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                  <span className="text-xs text-gray-500">Injective Mainnet</span>
+                  <span className="text-xs text-gray-500">Monad Testnet</span>
                 </div>
               </div>
             </div>
@@ -1550,7 +1550,7 @@ export default function AgentsPage() {
                         <span className="lambda-gradient">AgentOS</span>
                       </h2>
                       <p className={`mt-2 max-w-xl text-[12px] leading-5 sm:text-[13px] ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
-                        AI-powered wallet assistant for balances, swaps, transfers, and quick Injective checks.
+                        AI-powered wallet assistant for balances, swaps, transfers, and quick Monad checks.
                       </p>
                     </div>
                     <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${isLight ? 'border border-slate-200/80 bg-slate-900/[0.03]' : 'border border-white/10 bg-white/5'}`}>
@@ -1592,7 +1592,7 @@ export default function AgentsPage() {
                     </div>
                     <h2 className="text-2xl font-bold tracking-tight"><span className="lambda-gradient">λ</span> Agent</h2>
                     <p className="mt-3 max-w-xl text-sm leading-6 text-gray-400">
-                      AI-powered wallet assistant. Ask it to check balances, swap tokens, send INJ, or explain anything on Injective without leaving this dashboard stage.
+                      AI-powered wallet assistant. Ask it to check balances, swap tokens, send INJ, or explain anything on Monad without leaving this dashboard stage.
                     </p>
 
                     <div className="mt-8 grid gap-3 md:grid-cols-2">
@@ -1621,7 +1621,7 @@ export default function AgentsPage() {
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-500">Session</div>
                       <div className="mt-2 text-sm font-semibold text-white">{address?.slice(0, 8)}...{address?.slice(-6)}</div>
-                      <div className="mt-1 text-xs text-gray-400">Injective Mainnet</div>
+                      <div className="mt-1 text-xs text-gray-400">Monad Testnet</div>
                     </div>
 
                     <div className={`mt-6 rounded-2xl border p-4 ${isLight ? 'border-slate-200/80 bg-slate-900/[0.03]' : 'border-white/10 bg-black/20'}`}>
@@ -1637,7 +1637,7 @@ export default function AgentsPage() {
                       onClick={() => { setShowInviteManager(true); setSidebarOpen(false); }}
                       className="mt-6 rounded-2xl border border-[#6e5dff]/25 bg-gradient-to-br from-[#4c3af9]/18 via-white/[0.04] to-transparent px-4 py-4 text-left transition-all hover:border-[#8b7bff]/40 hover:bg-[#4c3af9]/20"
                     >
-                      <div className="text-sm font-semibold text-white">Share INJ Pass with Friends</div>
+                      <div className="text-sm font-semibold text-white">Share AgentOS with Friends</div>
                       <div className="mt-1 text-xs text-blue-200/80">Open the referral panel and track reward activations.</div>
                     </button>
                   </aside>
@@ -1652,7 +1652,7 @@ export default function AgentsPage() {
                 </div>
                 <h2 className="text-xl font-bold mb-2"><span className="lambda-gradient">λ</span> Agent</h2>
                 <p className="text-gray-400 text-sm max-w-sm mb-8">
-                  AI-powered wallet assistant. Ask me to check balances, swap tokens, send INJ, or explain anything on Injective.
+                  AI-powered wallet assistant. Ask me to check balances, swap tokens, send INJ, or explain anything on Monad.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-sm">
                   {[
@@ -1864,7 +1864,7 @@ export default function AgentsPage() {
             >
               <div className={`px-6 sm:px-8 py-5 border-b flex items-center justify-between ${isLight ? 'border-slate-200/80' : 'border-white/10'}`}>
                 <div>
-                  <h3 className="text-xl font-semibold tracking-tight">Share INJ Pass with Friends</h3>
+                  <h3 className="text-xl font-semibold tracking-tight">Share AgentOS with Friends</h3>
                   <p className="text-sm text-gray-400 mt-1">Invite friends, track activations, and earn rewards.</p>
                 </div>
                 <button
@@ -1933,7 +1933,7 @@ export default function AgentsPage() {
                       }`}>
                         <p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Referral Route</p>
                         <p className={`mt-2 text-sm leading-6 ${isLight ? 'text-slate-600' : 'text-gray-300'}`}>
-                          Share the code or the link. Both route into the same INJ Pass referral flow.
+                          Share the code or the link. Both route into the same AgentOS referral flow.
                         </p>
                         <p className={`mt-2 text-xs ${isLight ? 'text-slate-500' : 'text-gray-400'}`}>
                           Invited by: {invitedByCode || '-'}
@@ -2249,7 +2249,7 @@ export default function AgentsPage() {
                     ? 'border-slate-200/80 bg-white/70 text-slate-500'
                     : 'border-white/10 bg-white/[0.04] text-gray-400'
                 }`}>
-                  Injective Mainnet
+                  Monad Testnet
                 </div>
                 <button
                   onClick={() => { setShowInviteManager(true); setSidebarOpen(false); }}

@@ -20,7 +20,7 @@ function manifest(permissions: MiniAppManifest['permissions']): MiniAppManifest 
     slug: 'gift',
     name: 'INJ Gift',
     productionUrl: 'https://gift.example',
-    networkName: 'Injective EVM Testnet',
+    networkName: 'Monad Testnet',
     chainId: 1439,
     rpcUrl: 'https://rpc.example',
     permissions,

@@ -14,7 +14,7 @@ function reconstructedWallet(vault: LocalMnemonicVaultV1): LocalKeystore {
     encryptedMnemonicVault: JSON.stringify(vault),
     mnemonicBackupConfirmed: false,
     createdAt: vault.createdAt,
-    walletName: 'Recovered INJ Pass',
+    walletName: 'Recovered AgentOS',
   };
 }
 

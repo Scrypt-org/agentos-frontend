@@ -6,7 +6,7 @@ import type { LocalMnemonicVaultV1 } from './vault';
 
 export class LocalVaultMissingError extends Error {
   constructor() {
-    super('The encrypted wallet copy is missing on this device. This can happen after browser data is cleared or when INJ Pass is opened from a different local address. Recover it with the 24-word phrase.');
+    super('The encrypted wallet copy is missing on this device. This can happen after browser data is cleared or when AgentOS is opened from a different local address. Recover it with the 24-word phrase.');
     this.name = 'LocalVaultMissingError';
   }
 }

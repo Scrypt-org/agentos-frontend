@@ -19,7 +19,7 @@ async function fetchWithTimeout(
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error(
-        'Could not reach the INJ Pass server (request timed out). Please check your network and try again.',
+        'Could not reach the AgentOS server (request timed out). Please check your network and try again.',
       );
     }
     throw err;

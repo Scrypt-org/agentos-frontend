@@ -39,7 +39,7 @@ function requestResize(width: number, height: number, targetOrigin: string) {
 async function ensureEmbedSession(): Promise<string> {
   const existingToken = getAuthToken();
   if (!existingToken) {
-    throw new Error('No active INJ Pass session. Please reconnect.');
+    throw new Error('No active AgentOS session. Please reconnect.');
   }
 
   const verified = await verifyToken(existingToken);
@@ -49,7 +49,7 @@ async function ensureEmbedSession(): Promise<string> {
 
   const refreshed = await refreshToken(existingToken);
   if (!refreshed) {
-    throw new Error('INJ Pass session expired. Please reconnect.');
+    throw new Error('AgentOS session expired. Please reconnect.');
   }
 
   return refreshed;
@@ -159,14 +159,14 @@ export default function EmbedPage() {
     if (isEmbedded && !referrerOrigin) {
       return {
         embeddingOrigin: '',
-        embeddingOriginError: 'The parent app disabled origin information, so INJ Pass cannot connect safely.',
+        embeddingOriginError: 'The parent app disabled origin information, so AgentOS cannot connect safely.',
       };
     }
 
     if (explicitOrigin && referrerOrigin && explicitOrigin !== referrerOrigin) {
       return {
         embeddingOrigin: '',
-        embeddingOriginError: 'The requested app origin does not match the page embedding INJ Pass.',
+        embeddingOriginError: 'The requested app origin does not match the page embedding AgentOS.',
       };
     }
 
@@ -474,7 +474,7 @@ export default function EmbedPage() {
       }
 
       if (type === 'TX_RESPONSE') {
-        console.log('[INJ Pass /embed] TX_RESPONSE received from popup:', {
+        console.log('[AgentOS /embed] TX_RESPONSE received from popup:', {
           requestId: data.requestId,
           txHash: data.txHash,
           error: data.error,
@@ -490,7 +490,7 @@ export default function EmbedPage() {
           },
           embeddingOrigin
         );
-        console.log('[INJ Pass /embed] INJPASS_TX_RESPONSE forwarded to parent (dApp)');
+        console.log('[AgentOS /embed] INJPASS_TX_RESPONSE forwarded to parent (dApp)');
       }
 
       if (type === 'INJPASS_DISCONNECT') {
@@ -511,7 +511,7 @@ export default function EmbedPage() {
         throw new Error(embeddingOriginError);
       }
       if (!embeddingOrigin || !isValidOrigin(embeddingOrigin)) {
-        throw new Error('This app origin is not authorized to connect to INJ Pass.');
+        throw new Error('This app origin is not authorized to connect to AgentOS.');
       }
       const { address: walletAddress, walletName: nextWalletName, walletType: nextWalletType, popup } =
         await triggerWalletConnect(embeddingOrigin);
@@ -612,7 +612,7 @@ export default function EmbedPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className={`text-[10px] font-medium uppercase tracking-[0.22em] ${brandTextTone}`}>
-                INJ Pass Authorization
+                AgentOS Authorization
               </div>
               <h2 className="mt-2 text-[1.05rem] font-semibold tracking-[-0.02em]">
                 Session active
@@ -750,13 +750,13 @@ export default function EmbedPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className={`text-[10px] font-medium uppercase tracking-[0.22em] ${brandTextTone}`}>
-              INJ Pass Authorization
+              AgentOS Authorization
             </div>
             <h2 className="mt-2 text-[1.28rem] font-semibold tracking-[-0.03em]">
-              Connect to INJ Pass
+              Connect to AgentOS
             </h2>
             <p className={`mt-2 max-w-[21rem] text-sm leading-6 ${brandTextTone}`}>
-              Choose one of your INJ Pass wallets and keep every signature inside
+              Choose one of your AgentOS wallets and keep every signature inside
               a secure authorization window.
             </p>
           </div>
@@ -805,7 +805,7 @@ export default function EmbedPage() {
             </div>
             <div>
               <p className="text-sm font-semibold tracking-[-0.01em]">
-                Choose your INJ Pass wallet
+                Choose your AgentOS wallet
               </p>
               <p className={`mt-1 text-xs leading-5 ${brandTextTone}`}>
                 Select a Passkey or traditional wallet. The mini app receives only
@@ -857,7 +857,7 @@ export default function EmbedPage() {
         </button>
 
         <p className={`mt-3 text-center text-[11px] leading-5 ${brandTextTone}`}>
-          The connector mirrors your current INJ Pass day or night theme automatically.
+          The connector mirrors your current AgentOS day or night theme automatically.
         </p>
       </div>
     </div>

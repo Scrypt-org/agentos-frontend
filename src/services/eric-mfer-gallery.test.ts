@@ -37,7 +37,7 @@ describe('isEricMferMintCreditUsedNotice', () => {
   it('recognizes the complimentary mint already-used message', () => {
     expect(
       isEricMferMintCreditUsedNotice(
-        'This INJ Pass account has already minted its eric mfer.',
+        'This AgentOS account has already minted its eric mfer.',
       ),
     ).toBe(true);
   });

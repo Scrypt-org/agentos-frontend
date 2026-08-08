@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Injective Mainnet LCD endpoint
+    // Monad Testnet LCD endpoint
     // Using the transactions endpoint with pagination
     // Query for both send and receive transactions, and swap transactions
     // Note: Use 'query' parameter instead of 'events' for Cosmos SDK v0.47+

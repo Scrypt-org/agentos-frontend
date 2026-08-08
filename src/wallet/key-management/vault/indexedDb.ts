@@ -20,7 +20,7 @@ function upgradeDatabase(version: number): Promise<IDBDatabase> {
     request.onupgradeneeded = () => ensureVaultStore(request.result);
     request.onsuccess = () => resolve(finishOpen(request.result));
     request.onerror = () => reject(request.error ?? new Error('Unable to upgrade encrypted wallet storage.'));
-    request.onblocked = () => reject(new Error('Close other INJ Pass tabs, then try opening the wallet again.'));
+    request.onblocked = () => reject(new Error('Close other AgentOS tabs, then try opening the wallet again.'));
   });
 }
 

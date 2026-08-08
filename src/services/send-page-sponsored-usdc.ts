@@ -96,7 +96,7 @@ export function getSponsoredUsdcStatusPresentation(
     case 'QUEUED':
       return {
         label: 'Transfer queued',
-        message: 'INJ Pass is preparing the sponsored transaction.',
+        message: 'AgentOS is preparing the sponsored transaction.',
         pending: true,
         canRefresh: true,
         tone: 'pending',

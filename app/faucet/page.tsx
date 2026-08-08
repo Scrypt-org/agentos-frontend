@@ -68,7 +68,7 @@ export default function FaucetPage() {
 
   const handleClaim = async () => {
     if (!address) {
-      setErrorMsg('Set up or sign in to INJ Pass first so the faucet knows where to send testnet assets.');
+      setErrorMsg('Set up or sign in to AgentOS first so the faucet knows where to send testnet assets.');
       setPageState('error');
       return;
     }
@@ -140,7 +140,7 @@ export default function FaucetPage() {
             <div>
               <div className="text-sm font-semibold text-amber-200">Wallet required</div>
               <div className="mt-1 text-xs leading-relaxed text-amber-100/80">
-                The faucet page can open directly, but claiming still needs an INJ Pass wallet address on this device.
+                The faucet page can open directly, but claiming still needs an AgentOS wallet address on this device.
               </div>
             </div>
           </div>
@@ -258,7 +258,7 @@ export default function FaucetPage() {
                 Verifying you are human
               </>
             ) : !address ? (
-              'Set Up INJ Pass to Claim'
+              'Set Up AgentOS to Claim'
             ) : (
               'Claim Tokens'
             )}

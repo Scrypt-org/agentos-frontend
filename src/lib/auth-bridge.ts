@@ -100,7 +100,7 @@ export type CurrentAuthRequestMessage =
     }
   | { type: 'TX_REQUEST'; requestId: string; tx: unknown };
 
-/** Return true only for an INJ Pass protocol message belonging to this request. */
+/** Return true only for an AgentOS protocol message belonging to this request. */
 export function isCurrentAuthRequestMessage(
   data: unknown,
   requestId: string,

@@ -1,5 +1,5 @@
 /**
- * Web3 Provider for INJ Pass
+ * Web3 Provider for AgentOS
  * Injects Web3 provider into DApp iframes
  */
 

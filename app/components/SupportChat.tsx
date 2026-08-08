@@ -25,12 +25,12 @@ const INTRO_MESSAGE: ChatMessage = {
   id: 'intro',
   role: 'assistant',
   content:
-    'I am Eric. Ask me about INJ Pass, Injective, DeFi strategy, or what to do next.',
+    'I am Eric. Ask me about AgentOS, Monad, DeFi strategy, or what to do next.',
 };
 
 const SHORTCUT_POOL = [
-  'What is INJ Pass?',
-  'Why Injective?',
+  'What is AgentOS?',
+  'Why Monad?',
   'Wallet security basics',
   'Explain AgentOS',
   'DeFi strategy',
@@ -38,7 +38,7 @@ const SHORTCUT_POOL = [
   'Passkeys vs seed phrases',
   'How to start safely?',
   'What should I build?',
-  'RWA on Injective',
+  'RWA on Monad',
   'Finance L1 thesis',
   'Avoid wallet mistakes',
 ];

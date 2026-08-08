@@ -67,7 +67,7 @@ export interface GasEstimate {
   totalCost: bigint; // in wei
 }
 
-// Injective EVM Testnet
+// Monad Testnet
 export const INJECTIVE_TESTNET: ChainConfig = {
   id: NETWORK_CONFIG.testnet.chainId,
   name: NETWORK_CONFIG.testnet.name,
@@ -81,7 +81,7 @@ export const INJECTIVE_TESTNET: ChainConfig = {
   },
 };
 
-// Injective EVM Mainnet - CORRECT Configuration
+// Monad Testnet - CORRECT Configuration
 export const INJECTIVE_MAINNET: ChainConfig = {
   id: NETWORK_CONFIG.mainnet.chainId,
   name: NETWORK_CONFIG.mainnet.name,

@@ -6,7 +6,7 @@ import {
   InjPassConnectionError,
 } from '@/lib/injpass-connection-error';
 
-describe('INJ Pass connection errors', () => {
+describe('AgentOS connection errors', () => {
   it.each([
     ['USER_CANCELLED', 'Authentication window was closed'],
     ['POPUP_BLOCKED', 'Popup blocked'],
@@ -19,7 +19,7 @@ describe('INJ Pass connection errors', () => {
   });
 
   it('localizes cancellation without changing the protocol code', () => {
-    expect(connectionErrorMessage('USER_CANCELLED', 'zh-CN')).toBe('你已取消 INJ Pass 连接。');
-    expect(connectionErrorMessage('USER_CANCELLED', 'en')).toBe('INJ Pass connection was cancelled.');
+    expect(connectionErrorMessage('USER_CANCELLED', 'zh-CN')).toBe('你已取消 AgentOS 连接。');
+    expect(connectionErrorMessage('USER_CANCELLED', 'en')).toBe('AgentOS connection was cancelled.');
   });
 });

@@ -18,7 +18,7 @@ describe('mini app host layout', () => {
     expect(MINI_APP_FRAME_CLASS).toContain('min-h-0');
   });
 
-  it('keeps normal INJ Pass surfaces host-scrollable', () => {
+  it('keeps normal AgentOS surfaces host-scrollable', () => {
     expect(mainContentOverflowClass('default')).toBe('overflow-y-auto');
     expect(mainContentOverflowClass('skills')).toBe('overflow-y-auto');
   });

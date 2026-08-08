@@ -1,10 +1,7 @@
 /**
- * Faucet network configurations
+ * Faucet network configuration
  *
- * INJ  : 0.1 per account per day (Injective Testnet)
- * ETH  : 0.02 per account per day — user picks exactly ONE companion chain
- *
- * @author Alex <jsxj81@163.com>
+ * MON: 0.5 per account per day (Monad Testnet)
  */
 
 import { INJECTIVE_TESTNET } from '@/types/chain';
@@ -15,88 +12,28 @@ export interface FaucetNetwork {
   chainName: string;
   rpcUrl: string;
   chainId: number;
-  /** Human-readable amount to distribute (e.g. "0.02") */
+  /** Human-readable amount to distribute (e.g. "0.5") */
   amount: string;
   symbol: string;
   /** Hex color for UI badges */
   color: string;
-  /** Whether this is the always-included INJ chain */
+  /** Whether this is the always-included base chain */
   isBase: boolean;
   explorerUrl: string;
 }
 
 export const FAUCET_NETWORKS: FaucetNetwork[] = [
   {
-    id: 'injective',
-    name: 'INJ',
+    id: 'monad',
+    name: 'MON',
     chainName: INJECTIVE_TESTNET.name,
     rpcUrl: INJECTIVE_TESTNET.rpcUrl,
     chainId: INJECTIVE_TESTNET.id,
-    amount: '0.1',
-    symbol: 'INJ',
-    color: '#00B2FF',
+    amount: '0.5',
+    symbol: 'MON',
+    color: '#836EF9',
     isBase: true,
-    explorerUrl: INJECTIVE_TESTNET.explorerUrl,
-  },
-  {
-    id: 'sepolia',
-    name: 'Sepolia',
-    chainName: 'Ethereum Sepolia',
-    rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
-    chainId: 11155111,
-    amount: '0.02',
-    symbol: 'ETH',
-    color: '#627EEA',
-    isBase: false,
-    explorerUrl: 'https://sepolia.etherscan.io/tx/',
-  },
-  {
-    id: 'arbitrum',
-    name: 'Arbitrum',
-    chainName: 'Arbitrum Sepolia',
-    rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
-    chainId: 421614,
-    amount: '0.02',
-    symbol: 'ETH',
-    color: '#28A0F0',
-    isBase: false,
-    explorerUrl: 'https://sepolia.arbiscan.io/tx/',
-  },
-  {
-    id: 'optimism',
-    name: 'Optimism',
-    chainName: 'Optimism Sepolia',
-    rpcUrl: 'https://sepolia.optimism.io',
-    chainId: 11155420,
-    amount: '0.02',
-    symbol: 'ETH',
-    color: '#FF0420',
-    isBase: false,
-    explorerUrl: 'https://sepolia-optimism.etherscan.io/tx/',
-  },
-  {
-    id: 'base',
-    name: 'Base',
-    chainName: 'Base Sepolia',
-    rpcUrl: 'https://sepolia.base.org',
-    chainId: 84532,
-    amount: '0.02',
-    symbol: 'ETH',
-    color: '#0052FF',
-    isBase: false,
-    explorerUrl: 'https://sepolia.basescan.org/tx/',
-  },
-  {
-    id: 'polygonzkevm',
-    name: 'Polygon zkEVM',
-    chainName: 'Polygon zkEVM Testnet',
-    rpcUrl: 'https://rpc.cardona.zkevm-rpc.com',
-    chainId: 2442,
-    amount: '0.02',
-    symbol: 'ETH',
-    color: '#8247E5',
-    isBase: false,
-    explorerUrl: 'https://cardona-zkevm.polygonscan.com/tx/',
+    explorerUrl: `${INJECTIVE_TESTNET.explorerUrl}/tx/`,
   },
 ];
 

@@ -19,11 +19,6 @@ export interface MiniAppManifest {
   allowedContracts?: readonly Address[];
 }
 
-const INJ_GIFT_CONTRACT = (
-  process.env.NEXT_PUBLIC_INJ_GIFT_CONTRACT_ADDRESS
-  || '0x5373A185ee8017eeDD8bF51C009f5A1F058A8D02'
-) as Address;
-
 const ERIC_MFER_CONTRACT = (
   process.env.NEXT_PUBLIC_CATNFT_CONTRACT_ADDRESS
   || '0x1424f9e885d5C2681D600b984062E3bffdb80310'
@@ -62,36 +57,11 @@ export const MINI_APP_MANIFESTS: readonly MiniAppManifest[] = [
     allowedContracts: [ERIC_MFER_CONTRACT],
   },
   {
-    appId: 'inj-gift',
-    slug: 'gift',
-    name: 'INJ Gift',
-    developmentUrl: process.env.NEXT_PUBLIC_INJ_GIFT_APP_URL || 'http://localhost:3002',
-    // Fallback only. The embed URL normally follows the dApp record's `url`
-    // (see resolveMiniAppUrl's baseOverride); this is used when that is absent.
-    productionUrl: 'https://www.inj-gift.fun',
-    networkName: NETWORK_CONFIG.mainnet.name,
-    chainId: NETWORK_CONFIG.mainnet.chainId,
-    rpcUrl: NETWORK_CONFIG.mainnet.rpcUrl,
-    permissions: ['accounts', 'read', 'sign', 'transactions'],
-    allowedContracts: [INJ_GIFT_CONTRACT],
-  },
-  {
     appId: 'bankrupt-elon-musk',
     slug: 'bankrupt-elon-musk',
     name: 'Bankrupt Elon Musk',
     developmentUrl: process.env.NEXT_PUBLIC_BANKRUPT_ELON_APP_URL || 'http://localhost:3003',
     productionUrl: process.env.NEXT_PUBLIC_BANKRUPT_ELON_APP_URL || 'https://bankrupt-elon-musk.vercel.app',
-    networkName: NETWORK_CONFIG.mainnet.name,
-    chainId: NETWORK_CONFIG.mainnet.chainId,
-    rpcUrl: NETWORK_CONFIG.mainnet.rpcUrl,
-    permissions: ['accounts', 'read', 'sign'],
-  },
-  {
-    appId: 'omisper',
-    slug: 'omisper',
-    name: 'Omisper',
-    developmentUrl: process.env.NEXT_PUBLIC_OMISPER_APP_URL || 'http://localhost:5173',
-    productionUrl: process.env.NEXT_PUBLIC_OMISPER_APP_URL || 'https://omisper-front.pages.dev',
     networkName: NETWORK_CONFIG.mainnet.name,
     chainId: NETWORK_CONFIG.mainnet.chainId,
     rpcUrl: NETWORK_CONFIG.mainnet.rpcUrl,

@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { INJECTIVE_MAINNET, INJECTIVE_TESTNET } from '@/types/chain';
 
+interface MonadscanTx {
+  hash: string;
+  from: string;
+  to: string;
+  value: string;
+  timeStamp: string;
+  blockNumber: string;
+  isError: string;
+  gasUsed?: string;
+  gasPrice?: string;
+}
+
 /**
- * API Route to proxy Blockscout API requests
- * This avoids CORS issues when calling Blockscout from the browser
+ * API Route to proxy the Monadscan (Etherscan-compatible) txlist API and
+ * reshape it into the Blockscout-ish `{ items: [...] }` payload the client
+ * (getTxHistory.ts) already parses, so that code didn't need to change too.
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -19,18 +32,22 @@ export async function GET(request: NextRequest) {
 
   try {
     const activeChain = network === 'testnet' ? INJECTIVE_TESTNET : INJECTIVE_MAINNET;
-    // Fetch from Blockscout API server-side - MAINNET
-    // Note: Blockscout API is on a separate domain from the explorer frontend
-    const apiUrl = `${activeChain.explorerApiUrl}/api/v2/addresses/${address}/transactions`;
-    
-    console.log(`[API] Fetching transactions from: ${apiUrl}`);
-    
+    const apiKey = process.env.MONADSCAN_API_KEY;
+    const params = new URLSearchParams({
+      module: 'account',
+      action: 'txlist',
+      address,
+      startblock: '0',
+      endblock: '99999999',
+      page: '1',
+      offset: '50',
+      sort: 'desc',
+      ...(apiKey ? { apikey: apiKey } : {}),
+    });
+    const apiUrl = `${activeChain.explorerApiUrl}?${params.toString()}`;
+
     const [response, latestBlockResponse] = await Promise.all([
-      fetch(apiUrl, {
-        headers: {
-          'Accept': 'application/json',
-        },
-      }),
+      fetch(apiUrl, { headers: { Accept: 'application/json' } }),
       fetch(activeChain.rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,40 +55,16 @@ export async function GET(request: NextRequest) {
       }).catch(() => null),
     ]);
 
-    console.log(`[API] Response status: ${response.status}`);
-
     if (!response.ok) {
-      // Check if it's a 404 - might mean no transactions yet
-      if (response.status === 404) {
-        // Return empty transactions list instead of error
-        return NextResponse.json({
-          items: [],
-          next_page_params: null
-        });
-      }
-      
-      return NextResponse.json(
-        { error: `Blockscout API returned ${response.status}` },
-        { status: response.status }
-      );
+      return NextResponse.json({ items: [], next_page_params: null });
     }
 
-    const contentType = response.headers.get('content-type');
-    
-    // Check if response is HTML (error page) instead of JSON
-    if (contentType?.includes('text/html')) {
-      console.log('[API] Received HTML instead of JSON - probably no transactions');
-      return NextResponse.json({
-        items: [],
-        next_page_params: null
-      });
-    }
+    const data = (await response.json()) as { status?: string; result?: MonadscanTx[] | string };
 
-    const data = await response.json();
     let currentBlock: number | null = null;
     if (latestBlockResponse?.ok) {
       try {
-        const latestBlockPayload = await latestBlockResponse.json() as { result?: unknown };
+        const latestBlockPayload = (await latestBlockResponse.json()) as { result?: unknown };
         if (typeof latestBlockPayload.result === 'string') {
           const parsedBlock = Number.parseInt(latestBlockPayload.result, 16);
           if (Number.isSafeInteger(parsedBlock)) currentBlock = parsedBlock;
@@ -81,7 +74,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ...data, current_block: currentBlock });
+    const result = Array.isArray(data.result) ? data.result : [];
+    const items = result.map((tx) => ({
+      hash: tx.hash,
+      from: { hash: tx.from },
+      to: tx.to ? { hash: tx.to } : null,
+      value: tx.value,
+      timestamp: new Date(Number(tx.timeStamp) * 1000).toISOString(),
+      block_number: Number(tx.blockNumber),
+      status: tx.isError === '0' ? 'ok' : 'error',
+      gas_used: tx.gasUsed,
+      gas_price: tx.gasPrice,
+    }));
+
+    return NextResponse.json({ items, next_page_params: null, current_block: currentBlock });
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return NextResponse.json(

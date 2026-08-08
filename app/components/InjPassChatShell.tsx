@@ -36,10 +36,6 @@ import {
   type MiniAppManifest,
 } from '@/config/mini-apps';
 import {
-  createInjGiftPacket,
-  syncInjGiftShareCode,
-} from '@/services/inj-gift-create';
-import {
   compileCreativeContracts,
   confirmAgentAction,
   createCreativeBuild,
@@ -99,12 +95,6 @@ import { createMySkill, getMySkills, getPublicSkills } from '@/services/skills';
 import { consumeGuestChatReply, getGuestChatQuota } from '@/services/guest-chat-quota';
 import { getN1NJ4NFTs, getNFTDetails, resolveNFTUri, type NFT } from '@/services/nft';
 import { getCatNFTDetails, getCatNFTsForOwner, mintSponsoredCatNFT } from '@/services/catnft';
-import { getUserStakingInfo, type StakingInfo } from '@/services/staking';
-import {
-  injGiftHelpMessage,
-  isInjGiftMessage,
-  parseInjGiftCommand,
-} from '@/services/inj-gift';
 import {
   formatMiniAppAgentResult,
   parseMiniAppAgentCommand,
@@ -162,7 +152,7 @@ import PasskeyWalletActions from './PasskeyWalletActions';
 type ShellEntry = 'home' | 'welcome' | 'dashboard';
 type ProductMode = 'chat' | 'creative';
 type ChatSurface = 'default' | 'dapp-market' | 'campaign' | 'skills' | 'cloud-drive' | 'mini-app';
-type WalletTab = 'tokens' | 'nfts' | 'defi' | 'activity';
+type WalletTab = 'tokens' | 'nfts' | 'activity';
 type WalletExecutionMode = 'sandbox' | 'main';
 type AssetWalletView = 'assets' | 'send' | 'receive';
 type ProfilePanel = 'menu' | 'language' | 'preferences' | 'tokens';
@@ -265,7 +255,6 @@ interface WalletActivityItem {
 interface WalletPanelData {
   tokens?: Record<string, string>;
   nfts?: NFT[];
-  defi?: StakingInfo;
   activity?: WalletActivityItem[];
 }
 
@@ -325,7 +314,6 @@ const walletTabs: Array<{
 }> = [
   { id: 'tokens', label: 'Assets' },
   { id: 'nfts', label: 'NFTs' },
-  { id: 'defi', label: 'DeFi' },
   { id: 'activity', label: 'History' },
 ];
 
@@ -1131,34 +1119,6 @@ const dappMarketApps: DAppMarketItem[] = [
     aiDriven: true,
   },
   {
-    id: 'omisper',
-    name: 'Omisper',
-    category: 'AI',
-    body: 'AI-assisted discovery and execution workflows for the Injective ecosystem.',
-    accent: 'from-fuchsia-400 to-rose-500',
-    icon: '/omisper.png',
-    aiDriven: true,
-  },
-  {
-    id: 'inj-gift',
-    name: 'INJ Gift',
-    category: 'Payments',
-    body: 'Create and claim Injective gifts through guided AgentOS actions.',
-    accent: 'from-emerald-400 to-cyan-500',
-    icon: '/NINJA.png',
-    aiDriven: true,
-  },
-  {
-    id: 'inj-batch',
-    name: 'INJ Batch',
-    category: 'Payments',
-    body: 'Send INJ or Injective EVM tokens to many recipients in one batched transaction.',
-    accent: 'from-sky-400 to-indigo-500',
-    icon: getDAppIconUrl('https://inj-batch.yuchangongzhu.workers.dev'),
-    url: 'https://inj-batch.yuchangongzhu.workers.dev',
-    aiDriven: true,
-  },
-  {
     id: 'helix',
     name: 'Helix',
     category: 'Exchange',
@@ -1341,22 +1301,6 @@ const composerSkills: AgentSkill[] = [
     popularity: 6410,
   },
   {
-    id: 'inj-gift-group-gift',
-    name: 'Group Gift',
-    body: 'Prepare an INJ red packet for a group and review the distribution.',
-    prompt: 'Use INJ Gift to create a group red packet funded with INJ and show me the distribution before signing.',
-    app: 'INJ Gift',
-    popularity: 5930,
-  },
-  {
-    id: 'omisper-scheduled-message',
-    name: 'Encrypted Messenger',
-    body: 'Send a private or group message and inspect the encrypted inbox or conversation history.',
-    prompt: 'Use Omisper to send an encrypted message, check my inbox, or read my recent history with an address.',
-    app: 'Omisper',
-    popularity: 4870,
-  },
-  {
     id: 'bankrupt-elon-market-order',
     name: 'Market Order',
     body: 'Inspect a simulated market asset, buy or sell it, and report the updated portfolio.',
@@ -1415,13 +1359,13 @@ const creativeShortcutsByLanguage: Record<LanguageCode, string[]> = {
 };
 
 const creativeSkillDemoDataByLanguage: Record<LanguageCode, Array<{ app: string; skill: string }>> = {
-  en: [{ app: 'Omisper', skill: 'Direct Message' }, { app: 'INJ Gift', skill: 'Group Gift' }, { app: 'Bankrupt Elon Musk', skill: 'Market Order' }],
-  de: [{ app: 'Omisper', skill: 'Direktnachricht' }, { app: 'INJ Gift', skill: 'Gruppengeschenk' }, { app: 'Bankrupt Elon Musk', skill: 'Marktorder' }],
-  fr: [{ app: 'Omisper', skill: 'Message direct' }, { app: 'INJ Gift', skill: 'Cadeau groupé' }, { app: 'Bankrupt Elon Musk', skill: 'Ordre de marché' }],
-  ko: [{ app: 'Omisper', skill: '개인 메시지' }, { app: 'INJ Gift', skill: '그룹 선물' }, { app: 'Bankrupt Elon Musk', skill: '시장 주문' }],
-  ja: [{ app: 'Omisper', skill: 'ダイレクトメッセージ' }, { app: 'INJ Gift', skill: '一斉ギフト' }, { app: 'Bankrupt Elon Musk', skill: '成行注文' }],
-  'zh-Hans': [{ app: 'Omisper', skill: '单点发送' }, { app: 'INJ Gift', skill: '群发红包' }, { app: 'Bankrupt Elon Musk', skill: '市场买卖' }],
-  'zh-Hant': [{ app: 'Omisper', skill: '單點傳送' }, { app: 'INJ Gift', skill: '群發紅包' }, { app: 'Bankrupt Elon Musk', skill: '市場買賣' }],
+  en: [{ app: 'Bankrupt Elon Musk', skill: 'Market Order' }],
+  de: [{ app: 'Bankrupt Elon Musk', skill: 'Marktorder' }],
+  fr: [{ app: 'Bankrupt Elon Musk', skill: 'Ordre de marché' }],
+  ko: [{ app: 'Bankrupt Elon Musk', skill: '시장 주문' }],
+  ja: [{ app: 'Bankrupt Elon Musk', skill: '成行注文' }],
+  'zh-Hans': [{ app: 'Bankrupt Elon Musk', skill: '市场买卖' }],
+  'zh-Hant': [{ app: 'Bankrupt Elon Musk', skill: '市場買賣' }],
 };
 
 function formatCreativeSkillDemoSegments(
@@ -3130,24 +3074,6 @@ function WalletDataPanel({
             ))}
           </div>
         ) : <div className={cx('py-14 text-center text-sm', isLight ? 'text-black/46' : 'text-white/46')}>No NFTs found in this wallet.</div>
-      )}
-
-      {isAuthenticated && !error && tab === 'defi' && data.defi && (
-        <div className="mt-5">
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-            {[
-              ['Staked INJ', data.defi.totalStaked],
-              ['Pending rewards', data.defi.rewards],
-              ['Staking APR', `${data.defi.stakingApr}%`],
-              ['Staked value', `$${data.defi.totalStakedUsd}`],
-            ].map(([label, value]) => <div key={label}><div className={cx('text-xs', isLight ? 'text-black/42' : 'text-white/42')}>{label}</div><div className="mt-2 text-xl font-semibold">{value}</div></div>)}
-          </div>
-          <div className={cx('mt-7 border-t pt-3', isLight ? 'border-black/8' : 'border-white/8')}>
-            {data.defi.delegations.length === 0 ? <div className={cx('py-8 text-sm', isLight ? 'text-black/46' : 'text-white/46')}>No active delegations.</div> : data.defi.delegations.map((delegation) => (
-              <div key={delegation.validatorAddress} className={cx('flex items-center justify-between border-b py-3 text-sm', isLight ? 'border-black/6' : 'border-white/7')}><span className="font-semibold">{delegation.validatorName}</span><span className="font-mono">{delegation.amount} INJ</span></div>
-            ))}
-          </div>
-        </div>
       )}
 
       {isAuthenticated && !error && tab === 'activity' && data.activity && (
@@ -7644,101 +7570,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     chatAbortControllerRef.current = controller;
     beginThinkingProgress(trimmedText, 'chat');
 
-    // INJ Gift CREATE runs natively in the host — the same pattern that makes the
-    // eric mfer mint reliable (mintSponsoredCatNFT below): the host signs and
-    // broadcasts directly with viem, so create never depends on the cross-origin
-    // gift iframe / postMessage bridge. Claim & query still fall through to the
-    // iframe path (claim already works via the gasless relayer).
-    if (isInjGiftMessage(trimmedText)) {
-      const giftCommand = parseInjGiftCommand(trimmedText);
-      if (giftCommand.kind === 'create') {
-        setIsAgentRunning(true);
-        try {
-          if (!isAuthenticated) {
-            throw new Error(injGiftHelpMessage('create', selectedLanguageCode));
-          }
-          if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
-
-          const giftManifest = getMiniAppManifest('inj-gift');
-          const contractAddress = giftManifest?.allowedContracts?.[0];
-          if (!giftManifest || !contractAddress) {
-            throw new Error('INJ Gift is not registered for on-chain create.');
-          }
-          const { baseOverride } = resolveMiniAppAgentUrl(giftManifest, dappMarketItems);
-          const giftBaseUrl = resolveMiniAppBase(giftManifest, baseOverride).replace(/\/$/, '');
-
-          const signingKey = await requireWalletPrivateKey();
-          if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
-
-          const created = await createInjGiftPacket(signingKey, contractAddress, {
-            amount: giftCommand.amount,
-            count: giftCommand.count,
-            password: giftCommand.password,
-            durationSec: giftCommand.durationSec,
-            mode: giftCommand.mode,
-          });
-
-          let shareCode: string | undefined;
-          if (created.packetId) {
-            const synced = await syncInjGiftShareCode(giftBaseUrl, {
-              packetId: created.packetId,
-              txHash: created.hash,
-            });
-            shareCode = synced?.shareCode;
-          }
-          const shareRef = shareCode ?? created.packetId;
-          const zh = selectedLanguageCode.startsWith('zh');
-
-          const body = created.packetId
-            ? formatMiniAppAgentResult({
-                ok: true,
-                key: 'inj_gift_created',
-                data: {
-                  amount: giftCommand.amount,
-                  count: giftCommand.count,
-                  password: giftCommand.password,
-                  packetId: created.packetId,
-                  shareCode,
-                  shareUrl: shareRef ? `${giftBaseUrl}/claim/${shareRef}` : undefined,
-                  transactionHash: created.hash,
-                },
-              }, selectedLanguageCode)
-            : (zh
-                ? `红包交易已提交，等待确认中。稍后可在「我的红包」页查看。\n\n- 领取口令：\`${giftCommand.password}\`\n- 交易：\`${created.hash}\``
-                : `Gift transaction submitted and awaiting confirmation — check My Packets shortly.\n\n- Claim passcode: \`${giftCommand.password}\`\n- Transaction: \`${created.hash}\``);
-
-          const assistantMessage: ChatMessage = { id: `a-${messageStamp}`, role: 'assistant', body };
-          stopThinkingProgress();
-          await streamAssistantMessage(assistantMessage, controller.signal);
-          setChatWorkStatus('complete');
-          persistCommandConversation(messageStamp, trimmedText, assistantMessage, 'inj-gift');
-        } catch (error) {
-          if (isAbortError(error)) {
-            setChatWorkStatus('idle');
-            return;
-          }
-          const assistantMessage: ChatMessage = {
-            id: `a-${messageStamp}`,
-            role: 'assistant',
-            body: error instanceof Error
-              ? error.message
-              : formatMiniAppAgentResult({ ok: false, key: 'unknown_error' }, selectedLanguageCode),
-            action: !isAuthenticated ? 'login' : undefined,
-          };
-          setMessages((current) => [...current, assistantMessage]);
-          setChatWorkStatus('idle');
-          persistCommandConversation(messageStamp, trimmedText, assistantMessage, 'inj-gift');
-        } finally {
-          stopThinkingProgress();
-          if (chatAbortControllerRef.current === controller) {
-            chatAbortControllerRef.current = null;
-            setIsAgentRunning(false);
-          }
-        }
-        return;
-      }
-    }
-
     const miniAppCommand = parseMiniAppAgentCommand(trimmedText, selectedLanguageCode);
     if (miniAppCommand) {
       setIsAgentRunning(true);
@@ -7817,93 +7648,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         setMessages((current) => [...current, assistantMessage]);
         setChatWorkStatus('idle');
         persistCommandConversation(messageStamp, trimmedText, assistantMessage, 'eric-mfer');
-      } finally {
-        stopThinkingProgress();
-        if (chatAbortControllerRef.current === controller) {
-          chatAbortControllerRef.current = null;
-          setIsAgentRunning(false);
-        }
-      }
-      return;
-    }
-
-    if (isInjGiftMessage(trimmedText)) {
-      setIsAgentRunning(true);
-      try {
-        const command = parseInjGiftCommand(trimmedText);
-        if (command.kind !== 'help') {
-          throw new Error('INJ Gift mini app command runner is unavailable. Please try again.');
-        }
-        if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
-        const body = injGiftHelpMessage(command.intent, selectedLanguageCode);
-        if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
-
-        const assistantMessage: ChatMessage = {
-          id: `a-${messageStamp}`,
-          role: 'assistant',
-          body,
-          action: !isAuthenticated && shouldOfferWalletLogin(trimmedText, body)
-            ? 'login'
-            : undefined,
-        };
-        setMessages((current) => [...current, assistantMessage]);
-        setChatWorkStatus('complete');
-
-        if (isAuthenticated) {
-          const conversationId = agentConversationId || uid('inj-gift');
-          const title = currentConversationTitle || trimmedText.slice(0, 48);
-          const history = [
-            ...messages
-              .filter((message) => message.role === 'user' || message.role === 'assistant')
-              .map((message) => ({
-                role: message.role as 'user' | 'assistant',
-                content: message.body,
-              })),
-            { role: 'user' as const, content: trimmedText },
-            { role: 'assistant' as const, content: body },
-          ];
-          setAgentConversationId(conversationId);
-          setSelectedStoredConversationId(conversationId);
-          conversationCacheRef.current.set(conversationId, {
-            title,
-            messages: [
-              ...messages,
-              { id: `u-${messageStamp}`, role: 'user', body: trimmedText },
-              assistantMessage,
-            ],
-          });
-          void syncAgentConversation({
-            conversationId,
-            title,
-            model: 'inj-gift',
-            messages: history,
-          }).then((synced) => {
-            if (!synced) return;
-            const now = new Date().toISOString();
-            upsertStoredConversation({
-              id: conversationId,
-              title,
-              model: 'inj-gift',
-              createdAt: now,
-              updatedAt: now,
-            });
-          });
-        }
-      } catch (error) {
-        if (isAbortError(error)) {
-          setChatWorkStatus('idle');
-          return;
-        }
-        setMessages((current) => [
-          ...current,
-          {
-            id: `a-${messageStamp}`,
-            role: 'assistant',
-            body: error instanceof Error ? error.message : copy.agentUnavailable,
-            action: !isAuthenticated ? 'login' : undefined,
-          },
-        ]);
-        setChatWorkStatus('idle');
       } finally {
         stopThinkingProgress();
         if (chatAbortControllerRef.current === controller) {
@@ -8104,9 +7848,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       ? walletPanelData.tokens !== undefined
       : tab === 'nfts'
         ? walletPanelData.nfts !== undefined
-        : tab === 'defi'
-          ? walletPanelData.defi !== undefined
-          : walletPanelData.activity !== undefined;
+        : walletPanelData.activity !== undefined;
     if (cached && !force) return;
 
     const requestId = ++walletPanelRequestRef.current;
@@ -8129,9 +7871,6 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           return true;
         });
         if (requestId === walletPanelRequestRef.current) setWalletPanelData((current) => ({ ...current, nfts }));
-      } else if (tab === 'defi') {
-        const defi = await getUserStakingInfo(address as Address);
-        if (requestId === walletPanelRequestRef.current) setWalletPanelData((current) => ({ ...current, defi }));
       } else {
         const response = await fetch(`/api/transactions?address=${encodeURIComponent(address)}&network=mainnet`);
         if (!response.ok) throw new Error('Unable to load Injective history.');

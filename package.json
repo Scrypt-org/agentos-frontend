@@ -1,5 +1,5 @@
 {
-  "name": "inject-pass-frontend",
+  "name": "agentos-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,12 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test-mini-app-commands": "node --import tsx scripts/test-mini-app-commands.ts",
     "find-router": "tsx scripts/find-router.ts",
     "test-router": "tsx scripts/test-router.ts",
     "find-pairs": "tsx scripts/find-pairs.ts",
-    "test-solidly": "tsx scripts/test-solidly-router.ts",
-    "test-staking": "tsx scripts/test-staking.ts"
+    "test-solidly": "tsx scripts/test-solidly-router.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

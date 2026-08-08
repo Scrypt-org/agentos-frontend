@@ -75,8 +75,8 @@ export const INJECTIVE_TESTNET: ChainConfig = {
   explorerUrl: NETWORK_CONFIG.testnet.explorerUrl,
   explorerApiUrl: NETWORK_CONFIG.testnet.explorerApiUrl,
   nativeCurrency: {
-    name: 'Injective',
-    symbol: 'INJ',
+    name: 'Monad',
+    symbol: 'MON',
     decimals: 18,
   },
 };
@@ -89,8 +89,8 @@ export const INJECTIVE_MAINNET: ChainConfig = {
   explorerUrl: NETWORK_CONFIG.mainnet.explorerUrl,
   explorerApiUrl: NETWORK_CONFIG.mainnet.explorerApiUrl,
   nativeCurrency: {
-    name: 'Injective',
-    symbol: 'INJ',
+    name: 'Monad',
+    symbol: 'MON',
     decimals: 18,
   },
 };
@@ -100,8 +100,8 @@ export const INJECTIVE_MAINNET_CHAIN: Chain = {
   id: NETWORK_CONFIG.mainnet.chainId,
   name: NETWORK_CONFIG.mainnet.name,
   nativeCurrency: {
-    name: 'Injective',
-    symbol: 'INJ',
+    name: 'Monad',
+    symbol: 'MON',
     decimals: 18,
   },
   rpcUrls: {
@@ -111,7 +111,7 @@ export const INJECTIVE_MAINNET_CHAIN: Chain = {
   },
   blockExplorers: {
     default: { 
-      name: 'Blockscout', 
+      name: 'Monadscan', 
       url: NETWORK_CONFIG.mainnet.explorerUrl 
     },
   },
@@ -121,8 +121,8 @@ export const INJECTIVE_TESTNET_CHAIN: Chain = {
   id: NETWORK_CONFIG.testnet.chainId,
   name: NETWORK_CONFIG.testnet.name,
   nativeCurrency: {
-    name: 'Injective',
-    symbol: 'INJ',
+    name: 'Monad',
+    symbol: 'MON',
     decimals: 18,
   },
   rpcUrls: {
@@ -132,7 +132,7 @@ export const INJECTIVE_TESTNET_CHAIN: Chain = {
   },
   blockExplorers: {
     default: { 
-      name: 'Blockscout', 
+      name: 'Monadscan', 
       url: NETWORK_CONFIG.testnet.explorerUrl 
     },
   },

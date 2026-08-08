@@ -23,7 +23,6 @@ import {
   type Address,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { getInjectiveAddress } from '@injectivelabs/sdk-ts';
 import { hasClaimedToday, recordClaim } from '@/lib/faucet-store';
 import { INJ_NETWORK, COMPANION_NETWORKS } from '@/config/faucet';
 
@@ -69,10 +68,9 @@ async function sendNative(
 
 export async function POST(req: NextRequest) {
   try {
-    const { address, companion, captchaToken } = (await req.json()) as {
+    const { address, companion } = (await req.json()) as {
       address: string;
       companion: string | null;
-      captchaToken?: string;
     };
 
     // --- Validation ---
@@ -98,54 +96,7 @@ export async function POST(req: NextRequest) {
     // --- Private key ---
     const rawKey = process.env.FAUCET_PRIVATE_KEY;
     if (!rawKey) {
-      if (companion) {
-        return NextResponse.json({ error: 'Companion faucet not configured' }, { status: 500 });
-      }
-
-      if (!captchaToken) {
-        return NextResponse.json(
-          {
-            error: 'Human verification is required by the Injective faucet.',
-            code: 'captcha_required',
-          },
-          { status: 428 }
-        );
-      }
-
-      const injectiveAddress = getInjectiveAddress(address);
-      const officialFaucetUrl = process.env.INJECTIVE_FAUCET_API_URL
-        || 'https://d1ikjbl0xk5pmx.cloudfront.net/v2/faucet';
-      const officialResponse = await fetch(
-        officialFaucetUrl,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address: injectiveAddress, token: captchaToken }),
-          signal: AbortSignal.timeout(20_000),
-        }
-      );
-      if (!officialResponse.ok) {
-        const responseText = await officialResponse.text().catch(() => '');
-        let message = responseText;
-        try {
-          const payload = JSON.parse(responseText) as { error?: string; message?: string };
-          message = payload.error || payload.message || responseText;
-        } catch {
-          // The faucet may return a plain-text validation message.
-        }
-        return NextResponse.json(
-          { error: message || 'Injective testnet faucet is unavailable' },
-          { status: officialResponse.status }
-        );
-      }
-
-      recordClaim(address, null);
-      return NextResponse.json({
-        success: true,
-        queued: true,
-        address: injectiveAddress,
-        source: 'injective-official-faucet-v2',
-      });
+      return NextResponse.json({ error: 'Faucet is not configured' }, { status: 500 });
     }
     const privateKeyHex = (rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`) as `0x${string}`;
 

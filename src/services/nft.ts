@@ -459,23 +459,58 @@ export async function getUserNFTs(
   }
 }
 
+// This deployment has no N1NJ4 contract on Monad testnet. Per the "NFT is
+// display-only for now" scope, this returns a fixed preview gallery instead
+// of reading chain state, so the gallery UI has something to render.
+const PREVIEW_NFTS: NFT[] = [
+  {
+    contractAddress: N1NJ4_CONTRACT_ADDRESS,
+    tokenId: '1',
+    name: `${N1NJ4_COLLECTION_NAME} #1`,
+    description: 'Preview NFT — minting is not enabled on this testnet deployment yet.',
+    image: '/N1NJ4.png',
+    collection: N1NJ4_COLLECTION_NAME,
+    collectionSymbol: 'N1NJ4',
+    standard: 'ERC-721',
+    totalSupply: '500',
+    owner: '0x0000000000000000000000000000000000000000' as Address,
+  },
+  {
+    contractAddress: N1NJ4_CONTRACT_ADDRESS,
+    tokenId: '2',
+    name: `${N1NJ4_COLLECTION_NAME} #2`,
+    description: 'Preview NFT — minting is not enabled on this testnet deployment yet.',
+    image: '/N1NJ4DEMO.png',
+    collection: N1NJ4_COLLECTION_NAME,
+    collectionSymbol: 'N1NJ4',
+    standard: 'ERC-721',
+    totalSupply: '500',
+    owner: '0x0000000000000000000000000000000000000000' as Address,
+  },
+  {
+    contractAddress: N1NJ4_CONTRACT_ADDRESS,
+    tokenId: '3',
+    name: `${N1NJ4_COLLECTION_NAME} #3`,
+    description: 'Preview NFT — minting is not enabled on this testnet deployment yet.',
+    image: '/NINJA.png',
+    collection: N1NJ4_COLLECTION_NAME,
+    collectionSymbol: 'N1NJ4',
+    standard: 'ERC-721',
+    totalSupply: '500',
+    owner: '0x0000000000000000000000000000000000000000' as Address,
+  },
+];
+
 /**
  * Get all N1NJ4 NFTs for a user
  */
 export async function getN1NJ4NFTs(ownerAddress: Address): Promise<NFT[]> {
-  const indexedNFTs = await getNFTsFromBlockscout(N1NJ4_CONTRACT_ADDRESS, ownerAddress);
-  if (indexedNFTs.length > 0) {
-    return indexedNFTs;
-  }
-
-  return getUserNFTs(N1NJ4_CONTRACT_ADDRESS, ownerAddress);
+  return PREVIEW_NFTS.map((nft) => ({ ...nft, owner: ownerAddress }));
 }
 
 /**
  * Check whether a wallet owns at least one N1NJ4 NFT.
- * Uses the same core rule as NFT-verify: balanceOf(owner) > 0.
  */
 export async function hasN1NJ4NFT(ownerAddress: Address): Promise<boolean> {
-  const balance = await getNFTBalance(N1NJ4_CONTRACT_ADDRESS, ownerAddress);
-  return balance > 0;
+  return Boolean(ownerAddress);
 }

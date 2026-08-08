@@ -4,15 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useWallet } from '@/contexts/WalletContext';
 import { useState, useEffect } from 'react';
 import { getTxHistory } from '@/wallet/chain';
-import { getCosmosTxHistory } from '@/wallet/chain/cosmos';
 import { INJECTIVE_MAINNET } from '@/types/chain';
 import { ACTIVE_NETWORK } from '@/config/network';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { getInjectiveAddress } from '@injectivelabs/sdk-ts';
 
 type TransactionType = 'send' | 'receive' | 'swap';
 type TransactionStatus = 'completed' | 'pending' | 'failed';
-type ChainType = 'EVM' | 'Cosmos';
 
 interface Transaction {
   id: string;
@@ -23,7 +20,6 @@ interface Transaction {
   timestamp: Date;
   status: TransactionStatus;
   txHash?: string;
-  chainType: ChainType; // EVM or Cosmos
 }
 
 export default function HistoryPage() {
@@ -43,25 +39,12 @@ export default function HistoryPage() {
     const fetchTransactions = async () => {
       try {
         setIsLoading(true);
-        
-        // Fetch both EVM and Cosmos transactions in parallel
-        const [evmTxHistory, cosmosTxHistory] = await Promise.all([
-          getTxHistory(address, 50).catch((err) => {
-            console.error('Failed to fetch EVM transactions:', err);
-            return [];
-          }),
-          (async () => {
-            try {
-              // Convert EVM address to Cosmos address for querying
-              const cosmosAddress = getInjectiveAddress(address);
-              return await getCosmosTxHistory(cosmosAddress, 50);
-            } catch (err) {
-              console.error('Failed to fetch Cosmos transactions:', err);
-              return [];
-            }
-          })(),
-        ]);
-        
+
+        const evmTxHistory = await getTxHistory(address, 50).catch((err) => {
+          console.error('Failed to fetch EVM transactions:', err);
+          return [];
+        });
+
         // Router address for detecting swap transactions
         const ROUTER_ADDRESS = '0xC7247df0e97353D676d78f1cc55D3CE39eE32bE1'.toLowerCase();
         
@@ -99,53 +82,10 @@ export default function HistoryPage() {
             timestamp: new Date(tx.timestamp * 1000),
             status: tx.status === 'success' ? 'completed' : tx.status === 'failed' ? 'failed' : 'pending',
             txHash: tx.hash,
-            chainType: 'EVM',
           };
         });
 
-        // Transform Cosmos transactions to our UI format
-        const cosmosTransactions: Transaction[] = cosmosTxHistory.map((tx) => {
-          // Check if this is a swap transaction
-          const isSwapTx = (tx as { isSwap?: boolean }).isSwap === true;
-          
-          // Determine transaction type based on address
-          const cosmosAddress = getInjectiveAddress(address);
-          const isSent = tx.from.toLowerCase() === cosmosAddress.toLowerCase();
-          let type: TransactionType;
-          if (isSwapTx) {
-            type = 'swap';
-          } else {
-            type = isSent ? 'send' : 'receive';
-          }
-          
-          // Convert value from wei to INJ (with 3 decimal places)
-          const amount = (Number(tx.value) / (10 ** 18)).toFixed(3);
-
-          // Format address for display (shortened)
-          const targetAddress = type === 'send' || type === 'swap' ? (tx.to || '') : tx.from;
-          const displayAddress = targetAddress.startsWith('inj') && targetAddress.length > 10
-            ? `${targetAddress.slice(0, 8)}...${targetAddress.slice(-6)}`
-            : targetAddress;
-
-          return {
-            id: `cosmos-${tx.hash}`,
-            type,
-            amount,
-            token: 'INJ',
-            address: displayAddress,
-            timestamp: new Date(tx.timestamp * 1000),
-            status: tx.status === 'success' ? 'completed' : tx.status === 'failed' ? 'failed' : 'pending',
-            txHash: tx.hash,
-            chainType: 'Cosmos',
-          };
-        });
-
-        // Combine and sort by timestamp (newest first)
-        const allTransactions = [...evmTransactions, ...cosmosTransactions].sort(
-          (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
-        );
-
-        setTransactions(allTransactions);
+        setTransactions(evmTransactions);
       } catch (error) {
         console.error('Failed to fetch transaction history:', error);
         setTransactions([]);
@@ -326,14 +266,7 @@ export default function HistoryPage() {
                   className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer group"
                   onClick={() => {
                     if (tx.txHash) {
-                      // Open transaction in explorer based on chain type
-                      if (tx.chainType === 'EVM') {
-                        // EVM transactions use Blockscout
-                        window.open(`${ACTIVE_NETWORK.explorerUrl}/tx/${tx.txHash}`, '_blank');
-                      } else {
-                        // Cosmos transactions use Injective Explorer
-                        window.open(`${ACTIVE_NETWORK.cosmosExplorerUrl}/transaction/${tx.txHash}`, '_blank');
-                      }
+                      window.open(`${ACTIVE_NETWORK.explorerUrl}/tx/${tx.txHash}`, '_blank');
                     }
                   }}
                 >
@@ -350,14 +283,6 @@ export default function HistoryPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-bold capitalize">{tx.type}</span>
-                      {/* Chain Type Badge */}
-                      <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
-                        tx.chainType === 'EVM' 
-                          ? 'bg-purple-500/20 text-purple-300' 
-                          : 'bg-blue-500/20 text-blue-300'
-                      }`}>
-                        {tx.chainType}
-                      </span>
                     </div>
                     <div className="text-sm text-gray-400 font-mono">{tx.address}</div>
                   </div>

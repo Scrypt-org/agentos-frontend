@@ -48,3 +48,4 @@ next-env.d.ts
 /packages/*/dist
 /packages/*/pnpm-lock.yaml
 /public/injpass-connector
+.env*

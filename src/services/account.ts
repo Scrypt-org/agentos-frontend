@@ -9,11 +9,9 @@ import {
   type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { getInjectiveAddress } from '@injectivelabs/sdk-ts';
 import { API_BASE_URL } from './api-base';
 import { getAuthToken } from './passkey';
 import { DEFAULT_CHAIN_VIEM } from '@/types/chain';
-import { sweepAllCosmosInj } from '@/wallet/chain/cosmos';
 
 export interface AccountFungibleAsset {
   contractAddress: string;
@@ -38,24 +36,9 @@ export interface AccountDeletionStatus {
   checksComplete: true;
   checkedAt: string;
   walletAddress: string;
-  cosmosAddress: string;
   evmNative: { symbol: 'INJ'; balanceRaw: string; balance: string };
   fungibleTokens: AccountFungibleAsset[];
   nfts: AccountNftAsset[];
-  cosmosBalances: Array<{
-    denom: string;
-    balanceRaw: string;
-    balance: string;
-    canAutoSweep: boolean;
-  }>;
-  staking: {
-    delegatedRaw: string;
-    delegated: string;
-    unbondingRaw: string;
-    unbonding: string;
-    rewardsRaw: string;
-    rewards: string;
-  };
   forfeitedLam: number;
   blockers: Array<{
     kind: string;
@@ -272,16 +255,6 @@ export async function sweepAccountAssets(
       gasPrice,
     });
     await publicClient.waitForTransactionReceipt({ hash });
-  }
-
-  const cosmosInj = status.cosmosBalances.find((coin) => coin.denom === 'inj');
-  if (cosmosInj && BigInt(cosmosInj.balanceRaw) > 0n) {
-    onProgress?.('Moving Cosmos INJ');
-    await sweepAllCosmosInj(
-      privateKey,
-      getInjectiveAddress(target),
-      BigInt(cosmosInj.balanceRaw),
-    );
   }
 
   const nativeBalance = await publicClient.getBalance({ address: account.address });

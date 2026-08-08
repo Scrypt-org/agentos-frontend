@@ -22,19 +22,6 @@ describe('mini app URL resolution', () => {
     });
   });
 
-  it('registers INJ Gift on Injective EVM Mainnet', () => {
-    const manifest = getMiniAppManifest('inj-gift');
-    expect(manifest).not.toBeNull();
-    expect(manifest).toMatchObject({
-      chainId: 1776,
-      permissions: ['accounts', 'read', 'sign', 'transactions'],
-    });
-    expect(manifest!.rpcUrl).toContain('evm-rpc.injective.network');
-    expect(manifest!.allowedContracts).toEqual([
-      '0x5373A185ee8017eeDD8bF51C009f5A1F058A8D02',
-    ]);
-  });
-
   it('keeps eric mfer on the active INJ Pass origin', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubGlobal('window', { location: { origin: 'http://localhost:3001' } });
@@ -94,27 +81,4 @@ describe('mini app URL resolution', () => {
       .toBe('https://fallback.example');
   });
 
-  it('uses the registered Omisper URL for AI Chat commands', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubGlobal('window', { location: { origin: 'https://injpass.com' } });
-    const manifest = getMiniAppManifest('omisper');
-    expect(manifest).not.toBeNull();
-
-    const resolved = resolveMiniAppAgentUrl(manifest!, [
-      { id: 'omisper', url: 'https://omisper-front.pages.dev' },
-    ]);
-
-    expect(new URL(resolved.src).origin).toBe('https://omisper-front.pages.dev');
-    expect(resolved.baseOverride).toBe('https://omisper-front.pages.dev');
-  });
-
-  it('falls back to the deployed Omisper Pages origin', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubGlobal('window', { location: { origin: 'https://www.injpass.com' } });
-    const manifest = getMiniAppManifest('omisper');
-
-    const resolved = resolveMiniAppAgentUrl(manifest!, []);
-
-    expect(new URL(resolved.src).origin).toBe('https://omisper-front.pages.dev');
-  });
 });

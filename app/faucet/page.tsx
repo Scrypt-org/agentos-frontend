@@ -9,7 +9,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@/contexts/WalletContext';
-import { COMPANION_NETWORKS, type FaucetNetwork } from '@/config/faucet';
 import Image from 'next/image';
 
 interface NetworkBalance {
@@ -32,12 +31,7 @@ interface ClaimResult {
 type PageState = 'loading-balances' | 'idle' | 'claiming' | 'success' | 'error';
 
 const CHAIN_LOGO: Record<string, string> = {
-  injective: '/injswap.png',
-  sepolia: '/eth-logo.png',
-  arbitrum: '/arb-logo.png',
-  optimism: '/op-logo.png',
-  base: '/base-logo.png',
-  polygonzkevm: '/polygon-logo.png',
+  monad: '/injswap.png',
 };
 
 export default function FaucetPage() {
@@ -97,7 +91,6 @@ export default function FaucetPage() {
   };
 
   const injBalance = balances.find((b) => b.isBase);
-  const companionBalances = balances.filter((b) => !b.isBase);
   const loadingBals = pageState === 'loading-balances';
   const canClaim = !!address && pageState !== 'claiming' && pageState !== 'loading-balances';
 
@@ -160,11 +153,11 @@ export default function FaucetPage() {
             <path strokeLinecap="round" d="M12 16v-4M12 8h.01" />
           </svg>
           <p className="text-xs text-violet-300 leading-relaxed">
-            INJ is always included. Optionally pick <strong>one</strong> companion chain to also receive test ETH.
+            Sends testnet MON on Monad Testnet to your wallet.
           </p>
         </div>
 
-        {/* ── INJ — always included ── */}
+        {/* ── MON — always included ── */}
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Always included
         </div>
@@ -179,13 +172,13 @@ export default function FaucetPage() {
 
           {/* Logo */}
           <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 bg-white/5">
-            <Image src="/injswap.png" alt="INJ" width={40} height={40} className="w-full h-full object-contain" />
+            <Image src={CHAIN_LOGO.monad} alt="MON" width={40} height={40} className="w-full h-full object-contain" />
           </div>
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-sm mb-0.5">INJ</div>
-            <div className="text-xs text-gray-500">Injective EVM Testnet · 0.1 INJ</div>
+            <div className="font-bold text-sm mb-0.5">MON</div>
+            <div className="text-xs text-gray-500">Monad Testnet · 0.5 MON</div>
           </div>
 
           {/* Inventory */}
@@ -195,74 +188,10 @@ export default function FaucetPage() {
               <div className="h-4 w-16 bg-white/10 rounded animate-pulse" />
             ) : (
               <div className="font-mono text-sm font-semibold">
-                {injBalance ? Number(injBalance.balance).toFixed(4) : '—'} INJ
+                {injBalance ? Number(injBalance.balance).toFixed(4) : '—'} MON
               </div>
             )}
           </div>
-        </div>
-
-        {/* ── Companion chain — pick one ── */}
-        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-          Companion chain{' '}
-          <span className="normal-case font-normal text-gray-500">(pick one, optional)</span>
-        </div>
-
-        <div className="space-y-2 mb-6">
-          {COMPANION_NETWORKS.map((network: FaucetNetwork) => {
-            const bal = companionBalances.find((b) => b.id === network.id);
-            const isSelected = selectedCompanion === network.id;
-            const logo = CHAIN_LOGO[network.id];
-
-            return (
-              <button
-                key={network.id}
-                onClick={() => setSelectedCompanion(isSelected ? null : network.id)}
-                className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-200 text-left ${
-                  isSelected
-                    ? 'bg-violet-600/15 border-violet-500/50'
-                    : 'bg-white/5 border-white/10 hover:bg-white/8 hover:border-white/20'
-                }`}
-              >
-                {/* Radio */}
-                <div
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                    isSelected ? 'bg-violet-600 border-violet-400' : 'border-white/30'
-                  }`}
-                >
-                  {isSelected && (
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-
-                {/* Chain logo */}
-                <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 bg-white/5">
-                  {logo && (
-                    <Image src={logo} alt={network.name} width={40} height={40} className="w-full h-full object-contain" />
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm mb-0.5">{network.symbol}</div>
-                  <div className="text-xs text-gray-500">{network.chainName} · {network.amount} {network.symbol}</div>
-                </div>
-
-                {/* Inventory */}
-                <div className="text-right flex-shrink-0">
-                  <div className="text-xs text-gray-500 mb-0.5">Inventory</div>
-                  {loadingBals ? (
-                    <div className="h-4 w-16 bg-white/10 rounded animate-pulse" />
-                  ) : (
-                    <div className="font-mono text-sm font-semibold">
-                      {bal ? Number(bal.balance).toFixed(4) : '—'} {network.symbol}
-                    </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
         </div>
 
         {/* ── Summary ── */}
@@ -271,18 +200,7 @@ export default function FaucetPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
           </svg>
           <span className="text-sm text-gray-300">
-            You will receive{' '}
-            <span className="text-white font-semibold">0.1 INJ</span>
-            {selectedCompanion && (
-              <>
-                {' + '}
-                <span className="text-white font-semibold">0.02 ETH</span>
-                {' on '}
-                <span className="text-white font-semibold">
-                  {COMPANION_NETWORKS.find((n) => n.id === selectedCompanion)?.name}
-                </span>
-              </>
-            )}
+            You will receive <span className="text-white font-semibold">0.5 MON</span>
           </span>
         </div>
 
@@ -308,7 +226,7 @@ export default function FaucetPage() {
               </div>
               <span className="font-bold text-emerald-400">Tokens sent!</span>
             </div>
-            <TxRow label="INJ Transaction" hash={claimResult.injTxHash} url={claimResult.injExplorerUrl} />
+            <TxRow label="MON Transaction" hash={claimResult.injTxHash} url={claimResult.injExplorerUrl} />
             {claimResult.ethTxHash && (
               <TxRow label="ETH Transaction" hash={claimResult.ethTxHash} url={claimResult.ethExplorerUrl!} />
             )}

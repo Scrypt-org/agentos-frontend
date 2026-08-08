@@ -253,7 +253,7 @@ describe('Send page sponsored USDC contract', () => {
     expect(source).toContain('gasEstimateGuardRef.current.invalidate()');
     expect(source).toContain('selectedAssetRef.current === estimateAsset');
     expect(source).toContain('Network fee');
-    expect(source).toContain('0 INJ');
+    expect(source).toContain('0 MON');
     expect(source).toContain('Sponsored by AgentOS');
     expect(source).toMatch(
       /prepareSponsoredUsdcTransfer\([\s\S]*setPreparedUsdc\(prepared\);[\s\S]*setShowAuthModal\(true\);/,

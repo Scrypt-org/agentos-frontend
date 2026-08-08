@@ -88,7 +88,7 @@ export interface SponsoredUsdcPrepareResponse {
   typedData: SponsoredUsdcTypedData;
   expiresAt: string;
   networkFee: '0';
-  networkFeeSymbol: 'INJ';
+  networkFeeSymbol: 'MON';
   sponsored: true;
 }
 
@@ -288,7 +288,7 @@ function isSponsoredUsdcPrepareResponse(
     && isSponsoredUsdcTypedData(value.typedData)
     && isTimestamp(value.expiresAt)
     && value.networkFee === '0'
-    && value.networkFeeSymbol === 'INJ'
+    && value.networkFeeSymbol === 'MON'
     && value.sponsored === true;
 }
 

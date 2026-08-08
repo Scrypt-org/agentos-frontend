@@ -730,7 +730,7 @@ export default function ConnectPage() {
                           <span className={`text-[10px] uppercase tracking-[0.18em] ${headerTone}`}>
                             Amount
                           </span>
-                          <span className="text-sm font-semibold">{signRequest.value} INJ</span>
+                          <span className="text-sm font-semibold">{signRequest.value} MON</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <span className={`text-[10px] uppercase tracking-[0.18em] ${headerTone}`}>

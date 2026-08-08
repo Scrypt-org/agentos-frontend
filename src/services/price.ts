@@ -15,7 +15,7 @@ const priceCache: Map<string, { price: TokenPrice; timestamp: number }> = new Ma
 const CACHE_DURATION = 60000; // 1 minute
 
 /**
- * Fetch INJ price from CoinGecko API
+ * Fetch MON price from CoinGecko API
  */
 export async function getInjPrice(): Promise<number> {
   const cacheKey = 'inj-usd';
@@ -60,7 +60,7 @@ export async function getInjPrice(): Promise<number> {
 
     return price;
   } catch (error) {
-    console.error('Failed to fetch INJ price:', error);
+    console.error('Failed to fetch MON price:', error);
     
     // Return cached price if available, even if expired
     if (cached) {

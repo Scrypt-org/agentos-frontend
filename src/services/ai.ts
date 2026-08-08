@@ -58,14 +58,14 @@ export interface AgentSweepResponse {
     sandboxAddress: string;
     recipientAddress: string;
     transfers: Array<{
-      symbol: 'INJ' | 'USDT' | 'USDC';
+      symbol: 'MON' | 'USDT' | 'USDC';
       amount: string;
       txHash: string;
       explorerUrl: string;
     }>;
     empty: boolean;
     balancesBefore: {
-      INJ: string;
+      MON: string;
       USDT: string;
       USDC: string;
     };

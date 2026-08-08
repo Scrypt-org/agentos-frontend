@@ -1,7 +1,7 @@
 /**
  * Plain ERC-20 transfers for assets the gas sponsor does not cover.
  *
- * The sender pays gas in INJ, so this is an ordinary contract call rather than
+ * The sender pays gas in MON, so this is an ordinary contract call rather than
  * the EIP-712 authorization flow used by sponsored USDC.
  */
 

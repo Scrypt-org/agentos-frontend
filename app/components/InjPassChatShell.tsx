@@ -401,9 +401,9 @@ const shellCopyEn = {
   gasLimit: 'Gas limit',
   // Reads the same in every supported language, so it carries no override.
   gasSponsor: 'Gas',
-  insufficientBalance: 'Insufficient INJ balance.',
+  insufficientBalance: 'Insufficient MON balance.',
   invalidRecipient: 'Enter a valid EVM or Cosmos address.',
-  invalidAmount: 'Enter a valid INJ amount.',
+  invalidAmount: 'Enter a valid MON amount.',
   walletLocked: 'Unlock your wallet before sending assets.',
   receiveEvmNote: 'Receive assets on Monad. Always verify the network before transferring.',
   receiveCosmosNote: 'Use this Monad-compatible address for compatible Cosmos transfers.',
@@ -543,7 +543,7 @@ const shellCopyEn = {
   dailyCheckIn: 'Daily check-in',
   checkInReward: 'Claim 1 free LAM today',
   checkedIn: 'Checked in today',
-  buyLam: 'Buy LAM with INJ',
+  buyLam: 'Buy LAM with MON',
   buyLamBody: 'Monad payment, credited after confirmation',
   purchasing: 'Purchasing',
   purchaseComplete: 'LAM credited',
@@ -586,9 +586,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: 'Wird gesendet...',
     gasEstimate: 'Geschätzte Netzwerkgebühr',
     gasLimit: 'Gas-Limit',
-    insufficientBalance: 'INJ-Guthaben reicht nicht aus.',
+    insufficientBalance: 'MON-Guthaben reicht nicht aus.',
     invalidRecipient: 'Gib eine gültige EVM- oder Cosmos-Adresse ein.',
-    invalidAmount: 'Gib einen gültigen INJ-Betrag ein.',
+    invalidAmount: 'Gib einen gültigen MON-Betrag ein.',
     walletLocked: 'Entsperre zuerst deine Wallet.',
     receiveEvmNote: 'Empfange Assets über Monad und prüfe vor dem Transfer das Netzwerk.',
     receiveCosmosNote: 'Diese Monad-Adresse ist für kompatible Cosmos-Transfers bestimmt.',
@@ -639,9 +639,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: '发送中...',
     gasEstimate: '预计网络费',
     gasLimit: 'Gas 上限',
-    insufficientBalance: 'INJ 余额不足。',
+    insufficientBalance: 'MON 余额不足。',
     invalidRecipient: '请输入有效的 EVM 或 Cosmos 地址。',
-    invalidAmount: '请输入有效的 INJ 数量。',
+    invalidAmount: '请输入有效的 MON 数量。',
     walletLocked: '请先解锁钱包再发送资产。',
     receiveEvmNote: '通过 Monad 接收资产，转账前请确认网络。',
     receiveCosmosNote: '此 Monad 兼容地址可用于兼容的 转账。',
@@ -781,7 +781,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     dailyCheckIn: '每日签到',
     checkInReward: '今天免费领取 1 LAM',
     checkedIn: '今日已签到',
-    buyLam: '使用 INJ 购买 LAM',
+    buyLam: '使用 MON 购买 LAM',
     buyLamBody: 'Monad 支付，确认后自动到账',
     purchasing: '购买中',
     purchaseComplete: 'LAM 已到账',
@@ -821,9 +821,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: 'Envoi en cours...',
     gasEstimate: 'Frais réseau estimés',
     gasLimit: 'Limite de gas',
-    insufficientBalance: 'Solde INJ insuffisant.',
+    insufficientBalance: 'Solde MON insuffisant.',
     invalidRecipient: 'Saisissez une adresse EVM ou Cosmos valide.',
-    invalidAmount: 'Saisissez un montant INJ valide.',
+    invalidAmount: 'Saisissez un montant MON valide.',
     walletLocked: 'Déverrouillez votre portefeuille avant l’envoi.',
     receiveEvmNote: 'Recevez des actifs sur Monad. Vérifiez toujours le réseau avant le transfert.',
     receiveCosmosNote: 'Utilisez cette adresse compatible Monad pour les transferts Cosmos compatibles.',
@@ -894,9 +894,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: '發送中...',
     gasEstimate: '預計網路費',
     gasLimit: 'Gas 上限',
-    insufficientBalance: 'INJ 餘額不足。',
+    insufficientBalance: 'MON 餘額不足。',
     invalidRecipient: '請輸入有效的 EVM 或 Cosmos 地址。',
-    invalidAmount: '請輸入有效的 INJ 數量。',
+    invalidAmount: '請輸入有效的 MON 數量。',
     walletLocked: '請先解鎖錢包。',
     receiveEvmNote: '透過 Monad 接收資產，轉帳前請確認網路。',
     receiveCosmosNote: '此 Monad 相容地址可用於相容的 轉帳。',
@@ -972,9 +972,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: '送信中...',
     gasEstimate: '推定ネットワーク手数料',
     gasLimit: 'Gas 上限',
-    insufficientBalance: 'INJ 残高が不足しています。',
+    insufficientBalance: 'MON 残高が不足しています。',
     invalidRecipient: '有効な EVM または Cosmos アドレスを入力してください。',
-    invalidAmount: '有効な INJ 数量を入力してください。',
+    invalidAmount: '有効な MON 数量を入力してください。',
     walletLocked: '先にウォレットをロック解除してください。',
     receiveEvmNote: 'Monad で資産を受け取ります。送金前にネットワークを確認してください。',
     receiveCosmosNote: 'この Monad 互換アドレスは対応する Cosmos 送金に使用できます。',
@@ -1030,9 +1030,9 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     sending: '전송 중...',
     gasEstimate: '예상 네트워크 수수료',
     gasLimit: 'Gas 한도',
-    insufficientBalance: 'INJ 잔액이 부족합니다.',
+    insufficientBalance: 'MON 잔액이 부족합니다.',
     invalidRecipient: '올바른 EVM 또는 Cosmos 주소를 입력하세요.',
-    invalidAmount: '올바른 INJ 수량을 입력하세요.',
+    invalidAmount: '올바른 MON 수량을 입력하세요.',
     walletLocked: '먼저 지갑 잠금을 해제하세요.',
     receiveEvmNote: 'Monad으로 자산을 받습니다. 전송 전에 네트워크를 확인하세요.',
     receiveCosmosNote: '이 Monad 호환 주소는 호환되는 Cosmos 전송에 사용할 수 있습니다.',
@@ -1871,8 +1871,8 @@ function isWalletInteractionRequest(message: string) {
   const walletIntentPatterns = [
     /\b(?:show|check|view|list|get|find|read)\b.{0,48}\b(?:my\s+)?(?:wallet\s+address|balance|assets?|tokens?|nfts?|portfolio|positions?|history|transactions?|approvals?)\b/i,
     /\bmy\b.{0,40}\b(?:wallet|address|balance|assets?|tokens?|nfts?|portfolio|positions?|history|transactions?|approvals?)\b/i,
-    /\b(?:send|receive|swap|stake|unstake|claim|mint|transfer|approve|revoke|bridge|deposit|withdraw)\b.{0,64}\b(?:inj|usdt|usdc|xaut|token|nft|asset|wallet|address|dapp)\b/i,
-    /(?:显示|顯示|查看|查询|查詢|检查|檢查|列出|发送|發送|接收|收款|兑换|兌換|质押|質押|解质押|解質押|领取|領取|铸造|鑄造|转账|轉帳|授权|授權|撤销|撤銷|跨链|跨鏈|充值|提现|提現).{0,36}(?:我的|我的钱包|我的錢包|钱包|錢包|地址|余额|餘額|资产|資產|代币|代幣|NFT|持仓|持倉|历史|歷史|交易|授权|授權|INJ|USDT|USDC|XAUT)/i,
+    /\b(?:send|receive|swap|stake|unstake|claim|mint|transfer|approve|revoke|bridge|deposit|withdraw)\b.{0,64}\b(?:mon|inj|usdt|usdc|xaut|token|nft|asset|wallet|address|dapp)\b/i,
+    /(?:显示|顯示|查看|查询|查詢|检查|檢查|列出|发送|發送|接收|收款|兑换|兌換|质押|質押|解质押|解質押|领取|領取|铸造|鑄造|转账|轉帳|授权|授權|撤销|撤銷|跨链|跨鏈|充值|提现|提現).{0,36}(?:我的|我的钱包|我的錢包|钱包|錢包|地址|余额|餘額|资产|資產|代币|代幣|NFT|持仓|持倉|历史|歷史|交易|授权|授權|MON|INJ|USDT|USDC|XAUT)/i,
     /(?:내|나의).{0,24}(?:지갑|주소|잔액|자산|토큰|NFT|거래|내역|승인)/i,
     /(?:私の|自分の).{0,24}(?:ウォレット|アドレス|残高|資産|トークン|NFT|取引|履歴|承認)/i,
     /\b(?:mein|meine|meinen)\b.{0,32}\b(?:wallet|adresse|guthaben|vermögen|token|nft|transaktionen|verlauf)\b/i,
@@ -2776,7 +2776,7 @@ function ComposerSyntaxIntroModal({
     ? ['INJ Gift', 'Bankrupt Elon Musk', 'Omisper']
     : page === 1
       ? ['Portfolio Lens', 'Transaction Guard', 'Contract Studio']
-      : ['INJ', 'USDT', 'LAM'];
+      : ['MON', 'USDT', 'LAM'];
 
   return (
     <OverlayPortal enabled={open}>
@@ -3469,7 +3469,7 @@ function WalletTransferPanel({
             // so this states the cost up front rather than only at review time.
             <div className="flex items-center justify-between gap-4 px-1 text-sm">
               <span className={cx(isLight ? 'text-black/52' : 'text-white/52')}>{copy.gasSponsor}</span>
-              <span className="text-right font-mono font-bold text-emerald-500">0 INJ</span>
+              <span className="text-right font-mono font-bold text-emerald-500">0 MON</span>
             </div>
           )}
           {reviewing && (
@@ -3478,7 +3478,7 @@ function WalletTransferPanel({
               {transferMode !== 'sponsored' && (
                 <div className={cx('mt-3 grid grid-cols-2 gap-3 text-xs', isLight ? 'text-black/52' : 'text-white/52')}>
                   <span>{copy.gasLimit}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate?.gasLimit.toString() || '--'}</strong></span>
-                  <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} INJ` : '--'}</strong></span>
+                  <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} MON` : '--'}</strong></span>
                 </div>
               )}
             </div>
@@ -3655,7 +3655,7 @@ function NFTTransferPanel({
               <div>Send <strong>{selectedNft.name}</strong> to <span className="font-mono">{truncateAddress(recipient)}</span>.</div>
               <div className={cx('mt-3 grid grid-cols-2 gap-3 text-xs', isLight ? 'text-black/52' : 'text-white/52')}>
                 <span>{copy.gasLimit}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate?.gasLimit.toString() || '--'}</strong></span>
-                <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} INJ` : '--'}</strong></span>
+                <span>{copy.gasEstimate}<strong className="mt-1 block font-mono text-current">{estimatingGas ? '...' : gasEstimate ? `${Number(formatEther(gasEstimate.totalCost)).toFixed(8)} MON` : '--'}</strong></span>
               </div>
             </div>
           )}
@@ -5530,7 +5530,7 @@ function MnemonicBackupModal({
 
       <article className="inj-recovery-print-sheet" aria-hidden="true">
         <header className="inj-recovery-print-header">
-          <p className="inj-recovery-print-brand">INJ PASS</p>
+          <p className="inj-recovery-print-brand">AGENTOS</p>
           <h1>AgentOS Private Recovery Key</h1>
           <p>Offline wallet recovery document</p>
         </header>
@@ -6261,7 +6261,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
           symbol: '#' as const,
         }));
     }
-    return ['INJ', 'USDT', 'USDC', 'XAUT', 'LAM']
+    return ['MON', 'USDT', 'USDC', 'XAUT', 'LAM']
       .filter((symbol) => symbol.toLocaleLowerCase().includes(query))
       .map((symbol) => ({
         id: `asset-${symbol}`,
@@ -6544,7 +6544,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
   useEffect(() => {
     if (composerTrigger?.symbol !== '$' || !address || composerAssetsAddress === address) return;
     let alive = true;
-    getTokenBalances(['INJ', 'USDT', 'USDC'], address as Address)
+    getTokenBalances(['MON', 'USDT', 'USDC'], address as Address)
       .then((balances) => {
         if (!alive) return;
         setComposerAssetBalances({ ...balances, XAUT: '0' });
@@ -6744,12 +6744,12 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       }
     });
     Promise.all([
-      getTokenBalances(['INJ'], address as Address),
+      getTokenBalances(['MON'], address as Address),
       getUserProfile(),
     ]).then(([balances, profile]) => {
       if (!alive) return;
       setSidebarWalletSummary({
-        inj: balances.INJ ?? '0',
+        inj: balances.MON ?? '0',
         lam: profile?.ninjaBalance ?? 0,
         isLoading: false,
       });
@@ -6914,7 +6914,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
       }
       const priceInj = formatEther(priceWei);
       if (Number(priceInj) !== Number(selectedPlan.inj)) {
-        throw new Error(`This package now costs ${priceInj} INJ. Refresh before purchasing.`);
+        throw new Error(`This package now costs ${priceInj} MON. Refresh before purchasing.`);
       }
 
       const clientRef = keccak256(stringToHex(`lam-${selectedPlan.id}-${Date.now()}`));
@@ -7691,11 +7691,11 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         return;
       }
       if (!response.ok) {
-        throw new Error(payload.error || 'Unable to request INJ testnet gas');
+        throw new Error(payload.error || 'Unable to request MON testnet gas');
       }
       setCreativeFaucetState('ready');
     } catch (error) {
-      setCreativeFaucetError(error instanceof Error ? error.message : 'Unable to request INJ testnet gas');
+      setCreativeFaucetError(error instanceof Error ? error.message : 'Unable to request MON testnet gas');
       setCreativeFaucetState('error');
     }
   };
@@ -7724,7 +7724,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     setWalletPanelLoading(true);
     try {
       if (tab === 'tokens') {
-        const tokens = await getTokenBalances(['INJ', 'USDT', 'USDC'], address as Address);
+        const tokens = await getTokenBalances(['MON', 'USDT', 'USDC'], address as Address);
         tokens.XAUT = '0';
         if (requestId === walletPanelRequestRef.current) setWalletPanelData((current) => ({ ...current, tokens }));
       } else if (tab === 'nfts') {
@@ -9850,7 +9850,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
             {isAuthenticated && <div className={cx('relative', !profileOpen && !sidebarCollapsed ? 'pt-7' : 'pt-0')}>
               {!profileOpen && !sidebarCollapsed && <div className="absolute left-3 top-px z-10 flex h-7 items-end gap-1 text-[10px] font-bold">
                 <span className={cx('inline-flex h-7 items-center rounded-t-lg border border-b-0 px-2', isLight ? 'border-black/9 bg-[#f5f5f3] text-black/48' : 'border-white/8 bg-[#141416] text-white/48')}>
-                  INJ · {formatAmount(sidebarWalletSummary.inj)}
+                  MON · {formatAmount(sidebarWalletSummary.inj)}
                 </span>
                 <span className={cx('inline-flex h-7 items-center rounded-t-lg border border-b-0 px-2', isLight ? 'border-black/9 bg-[#f5f5f3] text-black/48' : 'border-white/8 bg-[#141416] text-white/48')}>
                   LAM · {formatAmount(sidebarWalletSummary.lam, 2)}
@@ -10037,7 +10037,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                                   <div className={cx('mt-0.5 text-xs', isLight ? 'text-black/46' : 'text-white/46')}>{copy.buyLamBody}</div>
                                 </div>
                                 <span className={cx('shrink-0 text-xs font-bold', lamPurchaseState === 'complete' ? 'text-emerald-500' : isLight ? 'text-black/42' : 'text-white/42')}>
-                                  {lamPurchaseState === 'complete' ? copy.purchaseComplete : 'INJ → LAM'}
+                                  {lamPurchaseState === 'complete' ? copy.purchaseComplete : 'MON → LAM'}
                                 </span>
                               </div>
                               <div className="mt-3 grid grid-cols-3 gap-2">
@@ -10059,7 +10059,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                                   >
                                     <span className="block">{plan.lam} LAM</span>
                                     <span className={cx('mt-0.5 block text-[10px] font-semibold', selectedLamPlanId === plan.planId ? 'opacity-70' : isLight ? 'text-black/42' : 'text-white/42')}>
-                                      {plan.inj} INJ
+                                      {plan.inj} MON
                                     </span>
                                   </button>
                                 ))}
@@ -10542,7 +10542,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                 title={sidebarCollapsed ? displayAddress : undefined}
               >
                 <div className={cx('flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold', isLight ? 'bg-black text-white' : 'bg-white text-black')}>
-                  {isAuthenticated ? 'INJ' : 'G'}
+                  {isAuthenticated ? 'MON' : 'G'}
                 </div>
                 {!sidebarCollapsed && <div className="min-w-0 text-left">
                   <div className="truncate text-sm font-semibold">{isCheckingSession ? copy.checkingSession : displayAddress}</div>
@@ -11000,10 +11000,10 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
                   {creativeFaucetState !== 'idle' && (
                     <div className="mt-3 flex flex-col items-end gap-2">
                       <div className={cx('text-right text-xs', creativeFaucetState === 'ready' ? 'text-emerald-600' : creativeFaucetState === 'error' ? 'text-amber-600' : isLight ? 'text-black/42' : 'text-white/42')}>
-                        {creativeFaucetState === 'claiming' && 'Sending INJ testnet gas...'}
-                        {creativeFaucetState === 'verification' && 'Verify once to receive INJ testnet gas'}
-                        {creativeFaucetState === 'ready' && 'INJ testnet gas is ready'}
-                        {creativeFaucetState === 'needs-wallet' && 'Log in to receive INJ testnet gas'}
+                        {creativeFaucetState === 'claiming' && 'Sending MON testnet gas...'}
+                        {creativeFaucetState === 'verification' && 'Verify once to receive MON testnet gas'}
+                        {creativeFaucetState === 'ready' && 'MON testnet gas is ready'}
+                        {creativeFaucetState === 'needs-wallet' && 'Log in to receive MON testnet gas'}
                         {creativeFaucetState === 'error' && creativeFaucetError}
                       </div>
                       {creativeFaucetState === 'verification' && (

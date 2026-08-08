@@ -85,10 +85,10 @@ function getSwapRoutes(fromToken: string, toToken: string) {
   let toAddr = toInfo.address as Address;
 
   if (isNativeToken(fromToken)) {
-    fromAddr = getWrappedToken('INJ').address as Address;
+    fromAddr = getWrappedToken('MON').address as Address;
   }
   if (isNativeToken(toToken)) {
-    toAddr = getWrappedToken('INJ').address as Address;
+    toAddr = getWrappedToken('MON').address as Address;
   }
 
   // Determine if this should use stable or volatile pool

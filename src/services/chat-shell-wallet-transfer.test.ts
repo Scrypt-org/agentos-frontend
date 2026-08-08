@@ -46,7 +46,7 @@ describe('chat shell wallet transfer panel', () => {
     const source = await readShell();
 
     expect(source).toMatch(
-      /transferMode === 'sponsored' && \([\s\S]*?copy\.gasSponsor[\s\S]*?text-emerald-500[^>]*>0 INJ</,
+      /transferMode === 'sponsored' && \([\s\S]*?copy\.gasSponsor[\s\S]*?text-emerald-500[^>]*>0 MON</,
     );
     // A self-paid gas quote must never appear next to a sponsored transfer.
     expect(source).toContain("{transferMode !== 'sponsored' && (");

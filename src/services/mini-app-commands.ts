@@ -42,7 +42,7 @@ function extractQuantity(text: string): number | undefined {
 
 function extractProduct(text: string): string | undefined {
   const ticker = text.match(/\b[A-Z]{2,8}(?:[.-][A-Z0-9]+)?\b/)?.[0];
-  if (ticker && !['INJ', 'PASS', 'APP', 'DM'].includes(ticker)) return ticker;
+  if (ticker && !['INJ', 'MON', 'PASS', 'APP', 'DM'].includes(ticker)) return ticker;
   const cleaned = text
     .replace(ELON_PATTERN, ' ')
     .replace(GAME_BUY_PATTERN, ' ')
@@ -198,13 +198,13 @@ export function formatMiniAppAgentResult(
 
   if (result.key === 'product_not_found') {
     return {
-      en: 'I could not match that asset. Try a ticker such as TSLA, NVDA, BTC, or INJ.',
-      de: 'Ich konnte diesen Vermögenswert nicht zuordnen. Versuche z. B. TSLA, NVDA, BTC oder INJ.',
-      fr: 'Actif introuvable. Essayez un symbole comme TSLA, NVDA, BTC ou INJ.',
-      ko: '해당 자산을 찾지 못했습니다. TSLA, NVDA, BTC, INJ 같은 티커를 사용해 보세요.',
-      ja: 'その資産を特定できませんでした。TSLA、NVDA、BTC、INJ などのティッカーを指定してください。',
-      'zh-Hans': '没有匹配到这项资产，请尝试输入 TSLA、NVDA、BTC 或 INJ 等代码。',
-      'zh-Hant': '沒有配對到這項資產，請嘗試輸入 TSLA、NVDA、BTC 或 INJ 等代碼。',
+      en: 'I could not match that asset. Try a ticker such as TSLA, NVDA, BTC, or MON.',
+      de: 'Ich konnte diesen Vermögenswert nicht zuordnen. Versuche z. B. TSLA, NVDA, BTC oder MON.',
+      fr: 'Actif introuvable. Essayez un symbole comme TSLA, NVDA, BTC ou MON.',
+      ko: '해당 자산을 찾지 못했습니다. TSLA, NVDA, BTC, MON 같은 티커를 사용해 보세요.',
+      ja: 'その資産を特定できませんでした。TSLA、NVDA、BTC、MON などのティッカーを指定してください。',
+      'zh-Hans': '没有匹配到这项资产，请尝试输入 TSLA、NVDA、BTC 或 MON 等代码。',
+      'zh-Hant': '沒有配對到這項資產，請嘗試輸入 TSLA、NVDA、BTC 或 MON 等代碼。',
     }[lang];
   }
 

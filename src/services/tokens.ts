@@ -25,7 +25,7 @@ export const TOKENS_MAINNET: Record<string, TokenInfo> = {
   },
   WINJ: {
     symbol: 'WINJ',
-    name: 'Wrapped INJ',
+    name: 'Wrapped MON',
     address: '0x0000000088827d2d103ee2d9A6b781773AE03FfB',
     decimals: 18,
     icon: '/injswap.png',
@@ -58,7 +58,7 @@ export const TOKENS_TESTNET: Record<string, TokenInfo> = {
   },
   WINJ: {
     symbol: 'WINJ',
-    name: 'Wrapped INJ',
+    name: 'Wrapped MON',
     address: '0x0000000088827d2d103ee2d9A6b781773AE03FfB',
     decimals: 18,
     icon: '/injswap.png',

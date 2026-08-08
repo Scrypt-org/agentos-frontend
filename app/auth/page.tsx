@@ -1226,7 +1226,7 @@ function AuthPageContent() {
                       Amount
                     </p>
                     <p className="font-mono text-sm font-semibold">
-                      {formatInjValue(currentTxRequest.tx.value)} INJ
+                      {formatInjValue(currentTxRequest.tx.value)} MON
                     </p>
                   </div>
                   <div className="mt-2">

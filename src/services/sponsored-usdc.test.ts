@@ -74,7 +74,7 @@ const prepareResponse: SponsoredUsdcPrepareResponse = {
   },
   expiresAt: '2026-06-01T00:00:00.000Z',
   networkFee: '0',
-  networkFeeSymbol: 'INJ',
+  networkFeeSymbol: 'MON',
   sponsored: true,
 };
 

@@ -130,7 +130,7 @@ export default function AiTokenLotteryPage() {
         <div className={styles.machine}>
           <div className={styles.slot} />
           <article className={`${styles.voucher} ${won ? styles.visible : ''}`}>
-            <div className={styles.security}>INJ PASS • VERIFIED • AI TOKEN •</div>
+            <div className={styles.security}>AGENTOS • VERIFIED • AI TOKEN •</div>
             <div className={styles.voucherHeader}>
               <strong>AgentOS</strong>
               <span>{visibleStatus?.tier ? copy.tiers[visibleStatus.tier] : 'AI TOKEN'}</span>

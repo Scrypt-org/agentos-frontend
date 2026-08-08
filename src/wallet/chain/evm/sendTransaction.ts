@@ -33,7 +33,7 @@ function normalizeToEvmAddress(address: string): string {
  * 
  * @param privateKey - Private key bytes (32 bytes)
  * @param to - Recipient address
- * @param value - Amount to send (in INJ/ETH as string)
+ * @param value - Amount to send (in MON/ETH as string)
  * @param data - Optional contract call data
  * @param chain - Chain configuration
  */

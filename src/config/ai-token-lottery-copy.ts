@@ -51,7 +51,7 @@ export const LOTTERY_COPY: Record<LotteryLanguage, LotteryCopy> = {
   en,
   de: {
     ...en, live: 'LIVE-AKTION', title: 'Sichere dir deine AI-Token-Zuteilung.',
-    subtitle: 'Neue INJ-Pass-Wallets erhalten eine garantierte Belohnung.',
+    subtitle: 'Neue AgentOS-Wallets erhalten eine garantierte Belohnung.',
     pull: 'ZIEHEN ZUM EINLÖSEN', pulling: 'Weiterziehen', release: 'Loslassen zum Aufdecken',
     reward: 'Deine Belohnung', remaining: 'Verbleibende Belohnung', expires: 'Läuft ab in',
     eligibility: 'Einlösezeitraum', retry: 'Erneut versuchen', chat: 'AI Chat starten',
@@ -63,7 +63,7 @@ export const LOTTERY_COPY: Record<LotteryLanguage, LotteryCopy> = {
       claimed: 'Deine Belohnung ist aktiv und kann im AI Chat genutzt werden.',
       expired: 'Diese Aktionsbelohnung ist abgelaufen.',
       eligibility_expired: 'Der 7-tägige Einlösezeitraum ist beendet.',
-      wallet_unavailable: 'Melde dich mit einer INJ-Pass-Wallet an.',
+      wallet_unavailable: 'Melde dich mit einer AgentOS-Wallet an.',
       campaign_disabled: 'Diese Aktion ist derzeit nicht verfügbar.',
     },
     tiers: { common: 'Gewöhnlich', rare: 'Selten', epic: 'Episch', legendary: 'Legendär', mythic: 'Mythisch' },

@@ -273,7 +273,7 @@ export default function DAppBrowser({ url, name, onClose }: DAppBrowserProps) {
               {pendingTransaction.value && (
                 <div className="p-3 rounded-xl bg-white/5 border border-white/10">
                   <div className="text-xs text-gray-400 mb-1">Value</div>
-                  <div className="text-sm font-mono text-white">{pendingTransaction.value} INJ</div>
+                  <div className="text-sm font-mono text-white">{pendingTransaction.value} MON</div>
                 </div>
               )}
             </div>

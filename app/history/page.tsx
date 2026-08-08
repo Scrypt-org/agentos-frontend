@@ -77,7 +77,7 @@ export default function HistoryPage() {
             id: `evm-${tx.hash}`,
             type,
             amount,
-            token: 'INJ',
+            token: 'MON',
             address: displayAddress,
             timestamp: new Date(tx.timestamp * 1000),
             status: tx.status === 'success' ? 'completed' : tx.status === 'failed' ? 'failed' : 'pending',

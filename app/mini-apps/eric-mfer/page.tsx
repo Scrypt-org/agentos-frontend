@@ -498,7 +498,7 @@ export default function EricMferMiniAppPage() {
             </button>
             {mintResult?.sponsoredWei && (
               <div className={isLight ? 'mt-3 text-center text-[11px] text-black/38' : 'mt-3 text-center text-[11px] text-white/38'}>
-                Sponsored {Number(formatEther(BigInt(mintResult.sponsoredWei))).toFixed(8)} INJ for this mint
+                Sponsored {Number(formatEther(BigInt(mintResult.sponsoredWei))).toFixed(8)} MON for this mint
               </div>
             )}
           </div>

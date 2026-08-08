@@ -6,7 +6,7 @@ import { createPublicClient, http, formatEther, type Address } from 'viem';
 import { Balance, ChainConfig, DEFAULT_CHAIN } from '@/types/chain';
 
 /**
- * Get native token balance (INJ)
+ * Get native token balance (MON)
  */
 export async function getBalance(
   address: string,

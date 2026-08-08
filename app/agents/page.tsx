@@ -61,7 +61,7 @@ interface InviteFriend {
   status: 'Active';
 }
 
-type AssetMentionSymbol = 'INJ' | 'USDC' | 'LAM' | 'USDT';
+type AssetMentionSymbol = 'MON' | 'USDC' | 'LAM' | 'USDT';
 type DAppMentionName = string;
 
 const MODEL_OPTIONS: { value: Model; label: string }[] = [
@@ -73,7 +73,7 @@ const STORAGE_KEY = 'injpass_agent_conversations';
 const SANDBOX_MODE_KEY = 'injpass_sandbox_mode';
 
 const TOKEN_ICONS: Record<string, string> = {
-  INJ: '/injswap.png',
+  MON: '/injswap.png',
   USDT: '/USDT_Logo.png',
   USDC: '/USDC_Logo.png',
 };
@@ -140,7 +140,7 @@ function formatJoinedAt(value: string): string {
 function normalizeAssetMentionSymbol(symbol?: string): AssetMentionSymbol | null {
   if (!symbol) return null;
   if (symbol === 'NINJA') return 'LAM';
-  if (symbol === 'INJ' || symbol === 'USDC' || symbol === 'LAM' || symbol === 'USDT') {
+  if (symbol === 'MON' || symbol === 'USDC' || symbol === 'LAM' || symbol === 'USDT') {
     return symbol;
   }
   return null;
@@ -449,7 +449,7 @@ export default function AgentsPage() {
   const [totalRewards, setTotalRewards] = useState(0);
 
   // Sandbox
-  const [sandboxBalances, setSandboxBalances] = useState<{ INJ: string; USDT: string; USDC: string } | null>(null);
+  const [sandboxBalances, setSandboxBalances] = useState<{ MON: string; USDT: string; USDC: string } | null>(null);
   const [harvestLoading, setHarvestLoading] = useState(false);
   const [showSandboxPanel, setShowSandboxPanel] = useState(false);
   const [showSandboxKey, setShowSandboxKey] = useState(false);
@@ -470,13 +470,13 @@ export default function AgentsPage() {
   const hasEmbeddedAgentAccess = isEmbedded ? !!address : isUnlocked && !!address;
   const assetMentionTone: Record<AssetMentionSymbol, string> = isLight
     ? {
-        INJ: 'border-violet-200/90 bg-violet-500/10 text-violet-700',
+        MON: 'border-violet-200/90 bg-violet-500/10 text-violet-700',
         USDC: 'border-sky-200/90 bg-sky-500/10 text-sky-700',
         LAM: 'border-amber-200/90 bg-amber-500/10 text-amber-700',
         USDT: 'border-emerald-200/90 bg-emerald-500/10 text-emerald-700',
       }
     : {
-        INJ: 'border-violet-400/30 bg-violet-500/12 text-violet-200',
+        MON: 'border-violet-400/30 bg-violet-500/12 text-violet-200',
         USDC: 'border-sky-400/30 bg-sky-500/12 text-sky-200',
         LAM: 'border-amber-400/30 bg-amber-500/12 text-amber-200',
         USDT: 'border-emerald-400/30 bg-emerald-500/12 text-emerald-200',
@@ -719,8 +719,8 @@ export default function AgentsPage() {
     let alive = true;
     async function refresh() {
       try {
-        const bals = await getTokenBalances(['INJ', 'USDT', 'USDC'], sandboxAddr as Address);
-        if (alive) setSandboxBalances({ INJ: bals.INJ ?? '0', USDT: bals.USDT ?? '0', USDC: bals.USDC ?? '0' });
+        const bals = await getTokenBalances(['MON', 'USDT', 'USDC'], sandboxAddr as Address);
+        if (alive) setSandboxBalances({ MON: bals.MON ?? '0', USDT: bals.USDT ?? '0', USDC: bals.USDC ?? '0' });
       } catch { /* silent */ }
     }
     refresh();
@@ -786,13 +786,13 @@ export default function AgentsPage() {
         id: uid(),
         role: 'assistant',
         content: transfers.length > 0
-          ? `Sweep complete — transferred ${transfers.map((item) => `${Number(item.amount).toFixed(item.symbol === 'INJ' ? 4 : 2)} ${item.symbol}`).join(', ')} back to your main wallet.`
+          ? `Sweep complete — transferred ${transfers.map((item) => `${Number(item.amount).toFixed(item.symbol === 'MON' ? 4 : 2)} ${item.symbol}`).join(', ')} back to your main wallet.`
           : 'Nothing to sweep — the sandbox wallet balance is too low to cover gas fees or already empty.',
       });
 
       if (activeConv?.sandboxAddress) {
-        const nb = await getTokenBalances(['INJ', 'USDT', 'USDC'], activeConv.sandboxAddress as Address);
-        setSandboxBalances({ INJ: nb.INJ ?? '0', USDT: nb.USDT ?? '0', USDC: nb.USDC ?? '0' });
+        const nb = await getTokenBalances(['MON', 'USDT', 'USDC'], activeConv.sandboxAddress as Address);
+        setSandboxBalances({ MON: nb.MON ?? '0', USDT: nb.USDT ?? '0', USDC: nb.USDC ?? '0' });
       }
     } catch (err) {
       appendDisplay(activeId, {
@@ -1223,12 +1223,12 @@ export default function AgentsPage() {
     }
     if (name === 'send_token') {
       const addr = String(input.toAddress);
-      return `Send ${input.amount} INJ to ${addr.slice(0, 10)}...${addr.slice(-6)}`;
+      return `Send ${input.amount} MON to ${addr.slice(0, 10)}...${addr.slice(-6)}`;
     }
-    if (name === 'play_hash_mahjong') return 'Play Hash Mahjong × 1 round (0.000001 INJ)';
+    if (name === 'play_hash_mahjong') return 'Play Hash Mahjong × 1 round (0.000001 MON)';
     if (name === 'play_hash_mahjong_multi') {
       const rounds = Math.min(Math.max(1, Number(input.rounds) || 5), 20);
-      return `Play Hash Mahjong × ${rounds} rounds (${(rounds * 0.000001).toFixed(6)} INJ total)`;
+      return `Play Hash Mahjong × ${rounds} rounds (${(rounds * 0.000001).toFixed(6)} MON total)`;
     }
     return name;
   }
@@ -1564,7 +1564,7 @@ export default function AgentsPage() {
                     {[
                       'What is my wallet address?',
                       'Show my balances',
-                      'Swap all INJ to USDT',
+                      'Swap all MON to USDT',
                       'Show my recent transactions',
                     ].map((s) => (
                       <button
@@ -1592,14 +1592,14 @@ export default function AgentsPage() {
                     </div>
                     <h2 className="text-2xl font-bold tracking-tight"><span className="lambda-gradient">λ</span> Agent</h2>
                     <p className="mt-3 max-w-xl text-sm leading-6 text-gray-400">
-                      AI-powered wallet assistant. Ask it to check balances, swap tokens, send INJ, or explain anything on Monad without leaving this dashboard stage.
+                      AI-powered wallet assistant. Ask it to check balances, swap tokens, send MON, or explain anything on Monad without leaving this dashboard stage.
                     </p>
 
                     <div className="mt-8 grid gap-3 md:grid-cols-2">
                       {[
                         'What is my wallet address?',
                         'Show my balances',
-                        'Swap all INJ to USDT',
+                        'Swap all MON to USDT',
                         'Show my recent transactions',
                       ].map((s) => (
                         <button
@@ -1652,13 +1652,13 @@ export default function AgentsPage() {
                 </div>
                 <h2 className="text-xl font-bold mb-2"><span className="lambda-gradient">λ</span> Agent</h2>
                 <p className="text-gray-400 text-sm max-w-sm mb-8">
-                  AI-powered wallet assistant. Ask me to check balances, swap tokens, send INJ, or explain anything on Monad.
+                  AI-powered wallet assistant. Ask me to check balances, swap tokens, send MON, or explain anything on Monad.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-sm">
                   {[
                     'What is my wallet address?',
                     'Show my balances',
-                    'Swap all INJ to USDT',
+                    'Swap all MON to USDT',
                     'Show my recent transactions',
                   ].map((s) => (
                     <button
@@ -1792,8 +1792,8 @@ export default function AgentsPage() {
                   <div className={`px-5 py-4 border-b ${isLight ? 'border-slate-200/80' : 'border-white/10'}`}>
                     <div className="text-center mb-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/injswap.png" alt="INJ" className="w-10 h-10 object-contain mx-auto mb-1" />
-                      <div className="text-2xl font-bold">{amount} INJ</div>
+                      <img src="/injswap.png" alt="MON" className="w-10 h-10 object-contain mx-auto mb-1" />
+                      <div className="text-2xl font-bold">{amount} MON</div>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3">
                       <div className="text-xs text-gray-400 mb-1">To address</div>
@@ -1814,7 +1814,7 @@ export default function AgentsPage() {
                     <div className="text-center mb-3">
                       <div className="text-3xl mb-2">🀄</div>
                       <div className="text-lg font-bold">{rounds === 1 ? 'Hash Mahjong' : `Hash Mahjong × ${rounds} rounds`}</div>
-                      <div className="text-sm text-gray-400 mt-1">Cost: {totalCost} INJ</div>
+                      <div className="text-sm text-gray-400 mt-1">Cost: {totalCost} MON</div>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3 text-xs text-gray-400 text-center">
                       Tiles are derived from your on-chain tx hash. 18 win patterns supported.
@@ -2148,13 +2148,13 @@ export default function AgentsPage() {
                           <p className="text-sm font-semibold">Daily Spend Limit</p>
                           <p className="text-xs text-gray-400 mt-1">Hard limit for all AI-triggered transactions.</p>
                         </div>
-                        <span className="text-sm font-semibold text-blue-300">25 INJ / day</span>
+                        <span className="text-sm font-semibold text-blue-300">25 MON / day</span>
                       </div>
                       <div className="h-px bg-white/10" />
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold">Auto-approve Micro Tx</p>
-                          <p className="text-xs text-gray-400 mt-1">Skip confirmation for tx under 0.2 INJ.</p>
+                          <p className="text-xs text-gray-400 mt-1">Skip confirmation for tx under 0.2 MON.</p>
                         </div>
                         <span className="px-2 py-1 rounded-full text-[11px] border border-emerald-400/40 text-emerald-300 bg-emerald-500/10">Enabled</span>
                       </div>
@@ -2456,14 +2456,14 @@ export default function AgentsPage() {
                       {/* Balances */}
                       <div className="flex-1 flex items-center gap-5">
                         {sandboxBalances ? (
-                          ['INJ', 'USDT', 'USDC'].map(sym => {
+                          ['MON', 'USDT', 'USDC'].map(sym => {
                             const raw = sandboxBalances[sym as keyof typeof sandboxBalances] ?? '0';
                             const val = parseFloat(raw);
                             return (
                               <div key={sym} className="text-xs">
                                 <span className="text-gray-500 mr-1">{sym}</span>
                                 <span className={val > 0 ? 'text-white font-bold' : 'text-gray-600'}>
-                                  {sym === 'INJ' ? val.toFixed(4) : val.toFixed(2)}
+                                  {sym === 'MON' ? val.toFixed(4) : val.toFixed(2)}
                                 </span>
                               </div>
                             );

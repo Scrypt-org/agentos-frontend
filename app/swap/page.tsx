@@ -72,19 +72,19 @@ export default function SwapPage() {
   // Check if INJ balance is sufficient for gas (when swapping non-INJ tokens)
   const isInsufficientINJForGas = (): boolean => {
     if (!fromAmount || fromAmount === '') return false;
-    if (fromToken.symbol === 'INJ') {
+    if (fromToken.symbol === 'MON') {
       const amount = parseFloat(fromAmount);
       const balance = parseFloat(fromToken.balance);
       return !isNaN(amount) && (amount + GAS_RESERVE_INJ) > balance;
     }
-    const injToken = tokens.find(t => t.symbol === 'INJ');
+    const injToken = tokens.find(t => t.symbol === 'MON');
     const injBalance = injToken ? parseFloat(injToken.balance) : 0;
     return injBalance < GAS_RESERVE_INJ;
   };
 
   // Handle max button click
   const handleMaxClick = () => {
-    if (fromToken.symbol === 'INJ') {
+    if (fromToken.symbol === 'MON') {
       const balance = parseFloat(fromToken.balance);
       const maxAmount = balance - GAS_RESERVE_INJ;
       if (maxAmount <= 0) {
@@ -111,7 +111,7 @@ export default function SwapPage() {
       return { label: `Insufficient ${fromToken.symbol} Balance`, isError: true, disabled: true };
     }
     if (fromAmount && parseFloat(fromAmount) > 0 && isInsufficientINJForGas()) {
-      return { label: 'Insufficient INJ Balance', isError: true, disabled: true };
+      return { label: 'Insufficient MON Balance', isError: true, disabled: true };
     }
     if (isSameTokenPair()) {
       return { label: 'Swap Tokens', isError: false, disabled: true };
@@ -140,10 +140,10 @@ export default function SwapPage() {
     if (!address) return;
     
     try {
-      const balances = await getTokenBalances(['INJ', 'USDT', 'USDC'], address as Address);
+      const balances = await getTokenBalances(['MON', 'USDT', 'USDC'], address as Address);
       
       setTokens([
-        { symbol: 'MON', name: 'Monad', icon: '/injswap.png', balance: parseFloat(balances.INJ).toFixed(4) },
+        { symbol: 'MON', name: 'Monad', icon: '/injswap.png', balance: parseFloat(balances.MON).toFixed(4) },
         { symbol: 'USDT', name: 'Tether USD', icon: '/USDT_Logo.png', balance: parseFloat(balances.USDT).toFixed(2) },
         { symbol: 'USDC', name: 'USD Coin', icon: '/USDC_Logo.png', balance: parseFloat(balances.USDC).toFixed(2) },
       ]);
@@ -328,7 +328,7 @@ export default function SwapPage() {
       console.error('Swap failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (errorMessage.includes('insufficient funds') || errorMessage.includes('exceeds the balance')) {
-        setSwapButtonError('Insufficient INJ Balance');
+        setSwapButtonError('Insufficient MON Balance');
       } else if (errorMessage.includes('reverted') || errorMessage.includes('execution')) {
         setSwapButtonError('Swap Execution Failed');
       } else if (errorMessage.includes('slippage') || errorMessage.includes('INSUFFICIENT_OUTPUT')) {
@@ -575,7 +575,7 @@ export default function SwapPage() {
               <textarea
                 value={aiIntent}
                 onChange={(e) => setAiIntent(e.target.value)}
-                placeholder="e.g., Swap 10 INJ to USDT"
+                placeholder="e.g., Swap 10 MON to USDT"
                 className="w-full h-32 py-4 px-4 rounded-xl bg-black border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-white/30 transition-all text-sm resize-none"
               />
 
@@ -609,7 +609,7 @@ export default function SwapPage() {
               
               <div className="flex justify-between items-center py-2 border-t border-white/10 pt-3">
                 <span className="text-sm font-bold text-gray-300">Est. Cost:</span>
-                <span className="text-sm font-mono font-bold text-white">{gasEstimate} INJ</span>
+                <span className="text-sm font-mono font-bold text-white">{gasEstimate} MON</span>
               </div>
             </div>
           </div>
@@ -844,7 +844,7 @@ export default function SwapPage() {
               
               <div className="flex justify-between items-center py-2 border-t border-white/10 pt-3">
                 <span className="text-sm font-bold text-gray-300">Est. Cost:</span>
-                <span className="text-sm font-mono font-bold text-white">{gasEstimate} INJ</span>
+                <span className="text-sm font-mono font-bold text-white">{gasEstimate} MON</span>
               </div>
             </div>
 

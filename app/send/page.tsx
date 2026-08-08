@@ -1248,7 +1248,7 @@ function SendPageContent() {
               <div className="flex justify-between items-center py-2 border-t border-white/10 pt-3">
                 <span className="text-sm font-bold text-gray-300">Est. Cost:</span>
                 <span className={`text-sm font-mono font-bold text-white transition-opacity duration-300 ${costFlashing ? 'opacity-30' : 'opacity-100'}`}>
-                  {gasEstimate ? `${(Number(gasEstimate.totalCost) / 1e18).toFixed(6)} INJ` : '--'}
+                  {gasEstimate ? `${(Number(gasEstimate.totalCost) / 1e18).toFixed(6)} MON` : '--'}
                 </span>
               </div>
             </div>
@@ -1256,7 +1256,7 @@ function SendPageContent() {
             <div className="space-y-3 rounded-2xl border border-white/10 bg-black p-5">
               <div className="flex justify-between gap-4 py-2">
                 <span className="text-sm text-gray-400">Network fee</span>
-                <span className="text-sm font-mono font-bold text-white">0 INJ</span>
+                <span className="text-sm font-mono font-bold text-white">0 MON</span>
               </div>
               <div className="flex justify-between gap-4 border-t border-white/10 pt-3">
                 <span className="text-sm text-gray-400">Gas sponsor</span>

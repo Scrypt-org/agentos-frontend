@@ -36,7 +36,7 @@ export interface AccountDeletionStatus {
   checksComplete: true;
   checkedAt: string;
   walletAddress: string;
-  evmNative: { symbol: 'INJ'; balanceRaw: string; balance: string };
+  evmNative: { symbol: 'MON'; balanceRaw: string; balance: string };
   fungibleTokens: AccountFungibleAsset[];
   nfts: AccountNftAsset[];
   forfeitedLam: number;
@@ -241,7 +241,7 @@ export async function sweepAccountAssets(
     initialNativeBalance < contractFeeBudget + nativeTransferFeeBudget
   ) {
     throw new Error(
-      `Add at least ${formatEther(contractFeeBudget + nativeTransferFeeBudget - initialNativeBalance)} INJ for sweep gas.`,
+      `Add at least ${formatEther(contractFeeBudget + nativeTransferFeeBudget - initialNativeBalance)} MON for sweep gas.`,
     );
   }
 
@@ -259,11 +259,11 @@ export async function sweepAccountAssets(
 
   const nativeBalance = await publicClient.getBalance({ address: account.address });
   if (nativeBalance > 0n) {
-    onProgress?.('Moving remaining EVM INJ');
+    onProgress?.('Moving remaining EVM MON');
     const finalGasPrice = await publicClient.getGasPrice();
     const finalFee = 21_000n * finalGasPrice;
     if (nativeBalance <= finalFee) {
-      throw new Error('The remaining INJ is below the network fee. Add a small amount of INJ and sweep again.');
+      throw new Error('The remaining MON is below the network fee. Add a small amount of MON and sweep again.');
     }
     const hash = await walletClient.sendTransaction({
       to: target,

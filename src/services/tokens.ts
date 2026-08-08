@@ -15,8 +15,8 @@ export interface TokenInfo {
 
 // Monad Testnet Token Addresses
 export const TOKENS_MAINNET: Record<string, TokenInfo> = {
-  INJ: {
-    symbol: 'INJ',
+  MON: {
+    symbol: 'MON',
     name: 'Monad',
     address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE', // Special address for native token
     decimals: 18,
@@ -48,8 +48,8 @@ export const TOKENS_MAINNET: Record<string, TokenInfo> = {
 
 // Monad Testnet Token Addresses
 export const TOKENS_TESTNET: Record<string, TokenInfo> = {
-  INJ: {
-    symbol: 'INJ',
+  MON: {
+    symbol: 'MON',
     name: 'Monad',
     address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
     decimals: 18,
@@ -112,7 +112,7 @@ export function getTokenAddress(symbol: string): string {
 }
 
 /**
- * Check if a token is native (INJ)
+ * Check if a token is native (MON)
  */
 export function isNativeToken(symbol: string): boolean {
   const token = getTokenInfo(symbol);
@@ -123,7 +123,7 @@ export function isNativeToken(symbol: string): boolean {
  * Get the wrapped version of native token
  */
 export function getWrappedToken(symbol: string): TokenInfo {
-  if (symbol === 'INJ') {
+  if (symbol === 'MON') {
     return TOKENS.WINJ;
   }
   return getTokenInfo(symbol)!;

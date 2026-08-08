@@ -185,7 +185,7 @@ export function createOperationGuard(): OperationGuard {
 export function isCurrentSponsoredUsdcIntent(
   guard: OperationGuard,
   intent: SponsoredUsdcIntent,
-  asset: SendAsset,
+  asset: SendAsset | string,
   preparedTransferId: string | null,
 ): boolean {
   return asset === 'USDC'

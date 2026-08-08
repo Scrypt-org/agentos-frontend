@@ -475,7 +475,7 @@ const shellCopyEn = {
   community: 'Community',
   communityCaption: 'Telegram · t.me/injpass',
   support: 'Support',
-  supportCaption: 'Ask Eric about AgentOS',
+  supportCaption: 'Ask Monad about AgentOS',
   searchPlaceholder: 'Search saved conversations',
   history: 'Monad history',
   historyCaption: 'Transactions and approvals',
@@ -607,7 +607,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: 'Community',
     communityCaption: 'Telegram · t.me/injpass',
     support: 'Support',
-    supportCaption: 'Eric zu AgentOS fragen',
+    supportCaption: 'Monad zu AgentOS fragen',
     searchPlaceholder: 'Gespeicherte Chats durchsuchen',
     placeholderChat: 'AgentOS fragen oder Assets / DApps ablegen',
     placeholderCreate: 'Beschreibe die DApp, die du auf Monad bauen willst',
@@ -710,7 +710,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: '社群',
     communityCaption: 'Telegram · t.me/injpass',
     support: '支持',
-    supportCaption: '向 Eric 咨询 AgentOS',
+    supportCaption: '向 Monad 咨询 AgentOS',
     searchPlaceholder: '搜索已保存的对话',
     searchAllMessages: '搜索所有对话正文',
     searchNoResults: '没有找到包含该内容的对话。',
@@ -931,7 +931,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: '社群',
     communityCaption: 'Telegram · t.me/injpass',
     support: '支援',
-    supportCaption: '向 Eric 諮詢 AgentOS',
+    supportCaption: '向 Monad 諮詢 AgentOS',
     searchPlaceholder: '搜尋已儲存的對話',
     searchAllMessages: '搜尋所有對話正文',
     searchNoResults: '沒有找到包含該內容的對話。',
@@ -998,7 +998,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: 'コミュニティ',
     communityCaption: 'Telegram · t.me/injpass',
     support: 'サポート',
-    supportCaption: 'Eric に AgentOS を相談',
+    supportCaption: 'Monad に AgentOS を相談',
     searchPlaceholder: '保存したチャットを検索',
     placeholderChat: 'AgentOS に聞く、または資産 / DApp をドロップ',
     placeholderCreate: 'Monad で作りたい DApp を説明',
@@ -1056,7 +1056,7 @@ const shellCopyOverrides: Record<LanguageCode, Partial<Record<ShellCopyKey, stri
     community: '커뮤니티',
     communityCaption: 'Telegram · t.me/injpass',
     support: '지원',
-    supportCaption: 'Eric에게 AgentOS 문의',
+    supportCaption: 'Monad에게 AgentOS 문의',
     searchPlaceholder: '저장된 채팅 검색',
     placeholderChat: 'AgentOS에 묻거나 자산 / DApp을 드롭',
     placeholderCreate: 'Monad에서 만들 DApp을 설명',
@@ -1253,13 +1253,13 @@ function formatCreativeSkillDemoSegments(
 }
 
 const guestSlogansByLanguage: Record<LanguageCode, string[]> = {
-  en: ['Start with a Monad task', 'What will you do on Monad today?', 'Onchain finance is happening on Monad', 'Make Monad Great Again', 'In Eric We Trust', 'Put your next idea on Monad'],
-  de: ['Starte mit einer Monad-Aufgabe', 'Was machst du heute auf Monad?', 'Onchain-Finanzwelt entsteht auf Monad', 'Make Monad Great Again', 'In Eric We Trust', 'Bring deine nächste Idee auf Monad'],
-  fr: ['Commencez par une tâche Monad', 'Que ferez-vous sur Monad aujourd’hui ?', 'La finance on-chain se construit sur Monad', 'Make Monad Great Again', 'In Eric We Trust', 'Placez votre prochaine idée sur Monad'],
-  ko: ['Monad 작업으로 시작하기', '오늘 Monad에서 무엇을 할까요?', '온체인 금융은 Monad에서 일어나고 있습니다', 'Make Monad Great Again', 'In Eric We Trust', '다음 아이디어를 Monad에 올리세요'],
-  ja: ['Monad のタスクから始める', '今日は Monad で何をしますか？', 'オンチェーン金融は Monad で動いている', 'Make Monad Great Again', 'In Eric We Trust', '次のアイデアを Monad へ'],
-  'zh-Hans': ['从一个 Monad 任务开始', '今天想在 Monad 做点什么？', '链上金融正在 Monad 上发生', 'Make Monad Great Again', 'In Eric We Trust', '把下一个好点子放到 Monad'],
-  'zh-Hant': ['從一個 Monad 任務開始', '今天想在 Monad 做點什麼？', '鏈上金融正在 Monad 上發生', 'Make Monad Great Again', 'In Eric We Trust', '把下一個好點子放到 Monad'],
+  en: ['Start with a Monad task', 'What will you do on Monad today?', 'Onchain finance is happening on Monad', 'Make Monad Great Again', 'In Monad We Trust', 'Put your next idea on Monad'],
+  de: ['Starte mit einer Monad-Aufgabe', 'Was machst du heute auf Monad?', 'Onchain-Finanzwelt entsteht auf Monad', 'Make Monad Great Again', 'In Monad We Trust', 'Bring deine nächste Idee auf Monad'],
+  fr: ['Commencez par une tâche Monad', 'Que ferez-vous sur Monad aujourd’hui ?', 'La finance on-chain se construit sur Monad', 'Make Monad Great Again', 'In Monad We Trust', 'Placez votre prochaine idée sur Monad'],
+  ko: ['Monad 작업으로 시작하기', '오늘 Monad에서 무엇을 할까요?', '온체인 금융은 Monad에서 일어나고 있습니다', 'Make Monad Great Again', 'In Monad We Trust', '다음 아이디어를 Monad에 올리세요'],
+  ja: ['Monad のタスクから始める', '今日は Monad で何をしますか？', 'オンチェーン金融は Monad で動いている', 'Make Monad Great Again', 'In Monad We Trust', '次のアイデアを Monad へ'],
+  'zh-Hans': ['从一个 Monad 任务开始', '今天想在 Monad 做点什么？', '链上金融正在 Monad 上发生', 'Make Monad Great Again', 'In Monad We Trust', '把下一个好点子放到 Monad'],
+  'zh-Hant': ['從一個 Monad 任務開始', '今天想在 Monad 做點什麼？', '鏈上金融正在 Monad 上發生', 'Make Monad Great Again', 'In Monad We Trust', '把下一個好點子放到 Monad'],
 };
 
 const buildGuideByLanguage: Record<LanguageCode, { intro: string; cards: Array<{ title: string; body: string }> }> = {
@@ -3114,10 +3114,10 @@ function WalletTransferPanel({
 
   const transferMode = getSendTransferMode(asset);
 
-  // Every translation of the transfer copy names INJ literally, so swapping the
-  // symbol keeps the message correct for the other assets without forking all
-  // seven locales.
-  const forAsset = (text: string) => (asset === 'INJ' ? text : text.replace(/INJ/g, asset));
+  // Every translation of the transfer copy names INJ literally (a holdover
+  // from when Send supported multiple assets); swap in the real symbol so
+  // the message stays correct without forking all seven locales.
+  const forAsset = (text: string) => text.replace(/INJ/g, asset);
 
   // Any edit invalidates the quote: a gas estimate for the old numbers, or a
   // sponsor authorization signed over them, must never survive into the send.
@@ -5979,7 +5979,7 @@ function ShellMotionStyles() {
       }
 
       @media (max-width: 1023px) {
-        main.inj-creative-build-active ~ button[aria-label="Open Eric support"] {
+        main.inj-creative-build-active ~ button[aria-label="Open Monad support"] {
           bottom: calc(env(safe-area-inset-bottom) + 13rem) !important;
         }
       }
@@ -6085,7 +6085,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
     kind: 'inj-gift',
     app: 'INJ Gift',
     skill: 'Group Gift',
-    asset: 'INJ',
+    asset: 'MON',
   });
   const [guestSlogan, setGuestSlogan] = useState('');
   const [visibleChatShortcuts, setVisibleChatShortcuts] = useState<string[]>([]);
@@ -6518,7 +6518,7 @@ export default function InjPassChatShell({ entry = 'home' }: InjPassChatShellPro
         kind,
         app: kind === 'omisper' ? 'Omisper' : kind === 'inj-gift' ? 'INJ Gift' : 'Bankrupt Elon Musk',
         skill,
-        asset: kind === 'inj-gift' ? 'INJ' : undefined,
+        asset: kind === 'inj-gift' ? 'MON' : undefined,
       });
       setComposerDemoStep((current) => current + 1);
     };

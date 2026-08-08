@@ -7,29 +7,30 @@
 
 import { TOKENS, type TokenInfo } from './tokens';
 
-export const SEND_ASSETS = ['INJ', 'USDC', 'USDT'] as const;
+// USDC (sponsored/gasless) and USDT (plain ERC-20) both pointed at Injective
+// testnet contract addresses with no Monad equivalent, and the sponsor relay
+// backend has been removed — so Send only moves the native asset for now.
+export const SEND_ASSETS = ['MON'] as const;
 
 export type SendAsset = (typeof SEND_ASSETS)[number];
 
-export const DEFAULT_SEND_ASSET: SendAsset = 'INJ';
+export const DEFAULT_SEND_ASSET: SendAsset = 'MON';
 
 /**
- * native    - INJ itself, sent as the transaction value
+ * native    - MON itself, sent as the transaction value
  * sponsored - relayed gaslessly by the sponsor worker (EIP-712 authorization)
- * erc20     - a plain ERC-20 `transfer`, gas paid in INJ by the sender
+ * erc20     - a plain ERC-20 `transfer`, gas paid in MON by the sender
  */
 export type SendTransferMode = 'native' | 'sponsored' | 'erc20';
 
 const TRANSFER_MODES: Record<SendAsset, SendTransferMode> = {
-  INJ: 'native',
-  USDC: 'sponsored',
-  USDT: 'erc20',
+  MON: 'native',
 };
 
 /**
  * Normalize an untrusted symbol (URL param, drag payload, dashboard card) into
  * an asset Send supports. Returns null for anything Send cannot move, so
- * callers never link into a screen that would silently fall back to INJ.
+ * callers never link into a screen that would silently fall back to MON.
  */
 export function parseSendAsset(value: string | null | undefined): SendAsset | null {
   if (!value) return null;

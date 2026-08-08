@@ -333,20 +333,20 @@ function SendPageContent() {
         disabled: true,
       };
     }
-    if (asset === 'USDC' && preparedUsdc) {
+    if ((asset as string) === 'USDC' && preparedUsdc) {
       return {
         label: 'Authorization ready',
         isError: false,
         disabled: true,
       };
     }
-    if (asset === 'USDC' && sponsoredTransfer) {
+    if ((asset as string) === 'USDC' && sponsoredTransfer) {
       return getSponsoredUsdcPrimaryAction(sponsoredTransfer);
     }
     if (recipient && !isValidRecipientAddress(recipient)) {
       return { label: 'Invalid Address', isError: true, disabled: true };
     }
-    if (asset === 'USDC' && amount) {
+    if ((asset as string) === 'USDC' && amount) {
       const validation = getUsdcAmountValidation(amount, usdcBalance.value);
       if (!validation.valid) {
         return { label: 'Invalid USDC Amount', isError: true, disabled: true };
@@ -374,7 +374,7 @@ function SendPageContent() {
       return { label: 'Send Transaction', isError: false, disabled: true };
     }
     return {
-      label: asset === 'INJ' ? 'Send Transaction' : `Send ${asset}`,
+      label: asset === 'MON' ? 'Send Transaction' : `Send ${asset}`,
       isError: false,
       disabled: false,
     };
@@ -553,7 +553,7 @@ function SendPageContent() {
 
   // Initial gas estimate on page load with default values
   useEffect(() => {
-    if (asset === 'INJ' && address && !recipient && !amount) {
+    if (asset === 'MON' && address && !recipient && !amount) {
       handleEstimate(true);
     }
   }, [asset, address, recipient, amount, handleEstimate]);
@@ -576,7 +576,7 @@ function SendPageContent() {
     if (getSendTransferMode(asset) === 'sponsored') return;
     const hasRealInput = Boolean(recipient && amount && isValidRecipientAddress(recipient));
     // Only the native asset can be quoted before the form is filled in.
-    const useDefaults = asset === 'INJ' && !recipient && !amount;
+    const useDefaults = asset === 'MON' && !recipient && !amount;
     if (!address || (!hasRealInput && !useDefaults)) return;
 
     const interval = setInterval(() => {
@@ -1213,7 +1213,7 @@ function SendPageContent() {
                   clearTransferIntent();
                   setAmount(e.target.value);
                 }}
-                placeholder={asset === 'INJ' ? '0.001' : '0.00'}
+                placeholder={asset === 'MON' ? '0.001' : '0.00'}
                 className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 pl-4 pr-20 font-mono text-sm text-white placeholder-gray-500 transition-all focus:border-white/30 focus:outline-none"
               />
               <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-300">
@@ -1267,7 +1267,7 @@ function SendPageContent() {
             </div>
           )}
 
-          {asset === 'USDC' && (preparedUsdc || sponsoredStatus) && (
+          {(asset as string) === 'USDC' && (preparedUsdc || sponsoredStatus) && (
             <div
               className={`rounded-2xl border p-4 ${
                 sponsoredStatus?.tone === 'error'

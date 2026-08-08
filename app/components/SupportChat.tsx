@@ -25,7 +25,7 @@ const INTRO_MESSAGE: ChatMessage = {
   id: 'intro',
   role: 'assistant',
   content:
-    'I am Eric. Ask me about AgentOS, Monad, DeFi strategy, or what to do next.',
+    'I am Monad. Ask me about AgentOS, Monad, DeFi strategy, or what to do next.',
 };
 
 const SHORTCUT_POOL = [
@@ -118,7 +118,7 @@ function SupportAvatar({ isLight }: { isLight: boolean }) {
     >
       <Image
         src="/Eric.png"
-        alt="Eric avatar"
+        alt="Monad avatar"
         fill
         sizes="96px"
         quality={100}
@@ -140,7 +140,7 @@ function SupportHeaderAvatar({ isLight }: { isLight: boolean }) {
     >
       <Image
         src="/Eric.png"
-        alt="Eric avatar"
+        alt="Monad avatar"
         fill
         sizes="96px"
         quality={100}
@@ -152,7 +152,7 @@ function SupportHeaderAvatar({ isLight }: { isLight: boolean }) {
 
 function TypingDots() {
   return (
-    <span className="inline-flex items-center gap-1" aria-label="Eric is thinking">
+    <span className="inline-flex items-center gap-1" aria-label="Monad is thinking">
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-160ms]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-80ms]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
@@ -420,13 +420,13 @@ export default function SupportChat() {
               ? 'pointer-events-none translate-y-3 scale-[0.985] opacity-0 blur-[2px]'
               : 'translate-y-0 scale-100 opacity-100 blur-0'
           } ${panelClass}`}
-          aria-label="Eric support chat"
+          aria-label="Monad support chat"
         >
           <header className={`flex items-center justify-between border-b px-4 py-3 ${headerClass}`}>
             <div className="flex min-w-0 items-center">
               <SupportHeaderAvatar isLight={isLight} />
               <div className="min-w-0">
-                <h2 className="truncate text-sm font-semibold">Eric</h2>
+                <h2 className="truncate text-sm font-semibold">Monad</h2>
                 <p className={`truncate text-xs ${mutedTextClass}`}>Speclist in AgentOS</p>
               </div>
             </div>
@@ -540,7 +540,7 @@ export default function SupportChat() {
                   }
                 }}
                 rows={1}
-                placeholder="Ask Eric..."
+                placeholder="Ask Monad..."
                 className={`max-h-28 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 outline-none ${
                   isLight ? 'text-black placeholder:text-black/38' : 'text-white placeholder:text-white/38'
                 }`}
@@ -572,7 +572,7 @@ export default function SupportChat() {
             ? 'border-black bg-black text-white shadow-[0_18px_46px_rgba(0,0,0,0.18)] hover:bg-black/82 hover:shadow-[0_22px_54px_rgba(0,0,0,0.24)]'
             : 'border-white/14 bg-white text-black shadow-[0_18px_46px_rgba(0,0,0,0.48)] hover:bg-white/88 hover:shadow-[0_22px_54px_rgba(0,0,0,0.58)]'
         }`}
-        aria-label={isOpen ? 'Close Eric support' : 'Open Eric support'}
+        aria-label={isOpen ? 'Close Monad support' : 'Open Monad support'}
         title={isOpen ? 'Close support' : 'Open support'}
       >
         <span>Support</span>

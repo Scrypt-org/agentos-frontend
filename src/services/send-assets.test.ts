@@ -11,17 +11,18 @@ import {
 } from './send-assets';
 
 describe('parseSendAsset', () => {
-  it('accepts every supported symbol regardless of case or padding', () => {
-    expect(parseSendAsset('usdt')).toBe('USDT');
-    expect(parseSendAsset(' USDC ')).toBe('USDC');
-    expect(parseSendAsset('INJ')).toBe('INJ');
+  it('accepts the native asset regardless of case or padding', () => {
+    expect(parseSendAsset('mon')).toBe('MON');
+    expect(parseSendAsset(' MON ')).toBe('MON');
   });
 
-  it('rejects balances Send has no transfer path for', () => {
-    // These render in the dashboard asset list but cannot be moved, so a deep
-    // link must not silently fall back to INJ and send the wrong coin.
+  it('rejects assets Send has no transfer path for', () => {
+    // USDC/USDT pointed at Injective testnet contracts with no Monad
+    // equivalent, and the sponsor relay backend has been removed. A deep
+    // link must not silently fall back to MON and send the wrong coin.
+    expect(parseSendAsset('USDC')).toBeNull();
+    expect(parseSendAsset('USDT')).toBeNull();
     expect(parseSendAsset('LAM')).toBeNull();
-    expect(parseSendAsset('XAUT')).toBeNull();
   });
 
   it('rejects empty and unknown input', () => {
@@ -34,21 +35,15 @@ describe('parseSendAsset', () => {
 
 describe('isSendableSymbol', () => {
   it('agrees with parseSendAsset', () => {
-    expect(isSendableSymbol('USDT')).toBe(true);
-    expect(isSendableSymbol('LAM')).toBe(false);
+    expect(isSendableSymbol('MON')).toBe(true);
+    expect(isSendableSymbol('USDC')).toBe(false);
   });
 });
 
 describe('getSendTransferMode', () => {
-  it('routes USDC through the gas sponsor and everything else to self-paid gas', () => {
-    expect(getSendTransferMode('USDC')).toBe('sponsored');
-    expect(getSendTransferMode('INJ')).toBe('native');
-    expect(getSendTransferMode('USDT')).toBe('erc20');
-  });
-
-  it('has a mode for every supported asset', () => {
+  it('has a native mode for every supported asset', () => {
     for (const asset of SEND_ASSETS) {
-      expect(getSendTransferMode(asset)).toBeDefined();
+      expect(getSendTransferMode(asset)).toBe('native');
     }
   });
 });
@@ -65,11 +60,11 @@ describe('getSendAssetToken', () => {
 
 describe('buildSendHref', () => {
   it('carries the asset into the Send page', () => {
-    expect(buildSendHref('USDT')).toBe('/send?asset=USDT');
+    expect(buildSendHref('MON')).toBe('/send?asset=MON');
   });
 
   it('carries a recipient alongside the asset', () => {
-    expect(buildSendHref('USDC', '0xabc')).toBe('/send?asset=USDC&address=0xabc');
+    expect(buildSendHref('MON', '0xabc')).toBe('/send?asset=MON&address=0xabc');
   });
 });
 
